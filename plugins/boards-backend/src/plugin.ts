@@ -4,12 +4,14 @@ import {
 } from '@backstage/backend-plugin-api';
 import { Knex } from 'knex';
 import { actionsRegistryServiceRef } from '@backstage/backend-plugin-api/alpha';
+import { catalogServiceRef } from '@backstage/plugin-catalog-node';
 import { notificationService } from '@backstage/plugin-notifications-node';
 import { signalsServiceRef } from '@backstage/plugin-signals-node';
 import { applyDatabaseMigrations } from './database/migrations';
 import { BoardsService } from './service/BoardsService';
 import { createRouter } from './router';
 import { registerActions } from './actions';
+import { scheduleReminders } from './reminders';
 
 /**
  * The boards backend plugin: shareable kanban boards with items, comments,
@@ -23,24 +25,28 @@ export const boardsPlugin = createBackendPlugin({
     env.registerInit({
       deps: {
         logger: coreServices.logger,
+        config: coreServices.rootConfig,
         database: coreServices.database,
         scheduler: coreServices.scheduler,
         httpRouter: coreServices.httpRouter,
         httpAuth: coreServices.httpAuth,
         auth: coreServices.auth,
         userInfo: coreServices.userInfo,
+        catalog: catalogServiceRef,
         notifications: notificationService,
         signals: signalsServiceRef,
         actionsRegistry: actionsRegistryServiceRef,
       },
       async init({
         logger,
+        config,
         database,
         scheduler,
         httpRouter,
         httpAuth,
         auth,
         userInfo,
+        catalog,
         notifications,
         signals,
         actionsRegistry,
@@ -79,6 +85,16 @@ export const boardsPlugin = createBackendPlugin({
             await service.purgeArchivedItems(cutoff);
             await service.purgeArchivedBoards(cutoff);
           },
+        });
+
+        await scheduleReminders({
+          config,
+          scheduler,
+          service,
+          catalog,
+          auth,
+          notifications,
+          logger,
         });
       },
     });
