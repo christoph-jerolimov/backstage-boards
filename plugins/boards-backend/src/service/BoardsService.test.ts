@@ -174,6 +174,71 @@ describe('BoardsService', () => {
     });
   });
 
+  describe('duplicate board', () => {
+    it('copies columns with colors, never items', async () => {
+      const board = await service.createBoard(alice, { name: 'Source' });
+      await service.updateColumn(alice, board.id, board.columns[0].id, {
+        color: 'green',
+      });
+      await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Not copied',
+      });
+      const copy = await service.duplicateBoard(alice, board.id, {
+        copyColumns: true,
+        copyPermissions: false,
+      });
+      expect(copy.name).toBe('Source (copy)');
+      expect(copy.access).toBe('admin');
+      expect(copy.visibility).toBe('private');
+      expect(copy.columns.map(column => column.title)).toEqual(
+        board.columns.map(column => column.title),
+      );
+      expect(copy.columns[0].color).toBe('green');
+      expect(await service.listItems(alice, copy.id)).toHaveLength(0);
+    });
+
+    it('copies share settings for source admins', async () => {
+      const board = await service.createBoard(alice, {
+        name: 'Source',
+        visibility: 'logged-in-read',
+      });
+      await service.addPermission(alice, board.id, {
+        principalRef: 'user:default/bob',
+        level: 'write',
+      });
+      const copy = await service.duplicateBoard(alice, board.id, {
+        name: 'Clone',
+        copyColumns: false,
+        copyPermissions: true,
+      });
+      expect(copy.visibility).toBe('logged-in-read');
+      const permissions = await service.listPermissions(alice, copy.id);
+      expect(
+        permissions.map(entry => `${entry.principalRef}:${entry.level}`).sort(),
+      ).toEqual(['user:default/alice:admin', 'user:default/bob:write']);
+    });
+
+    it('rejects share-settings copy without source admin', async () => {
+      const board = await service.createBoard(alice, {
+        name: 'Source',
+        visibility: 'logged-in-write',
+      });
+      await expect(
+        service.duplicateBoard(bob, board.id, {
+          copyColumns: true,
+          copyPermissions: true,
+        }),
+      ).rejects.toThrow(/requires admin/);
+      // plain duplication with columns is fine for a non-admin
+      const copy = await service.duplicateBoard(bob, board.id, {
+        copyColumns: true,
+        copyPermissions: false,
+      });
+      expect(copy.access).toBe('admin');
+    });
+  });
+
   describe('permissions', () => {
     it('rejects invalid principals and duplicate entries', async () => {
       const board = await service.createBoard(alice, { name: 'B' });

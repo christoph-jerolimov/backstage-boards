@@ -475,6 +475,70 @@ export class BoardsService {
     }
   }
 
+  /**
+   * Duplicates a board's structure (never its items). Share settings can
+   * only be copied by admins of the source board.
+   */
+  async duplicateBoard(
+    principal: BoardsPrincipal,
+    boardId: string,
+    options: { name?: string; copyColumns: boolean; copyPermissions: boolean },
+  ): Promise<BoardWithContext> {
+    const { board, level } = await this.requireBoard(principal, boardId, 'read');
+    if (options.copyPermissions && !levelIncludes(level, 'admin')) {
+      throw new NotAllowedError(
+        'Copying share settings requires admin access to the source board',
+      );
+    }
+    if (principal.type === 'anonymous') {
+      throw new NotAllowedError('Duplicating a board requires authentication');
+    }
+    const sourceColumns = await this.knex<ColumnRow>('board_columns')
+      .where('board_id', boardId)
+      .orderBy('position');
+    const created = await this.createBoard(principal, {
+      name: options.name?.trim() || `${board.name} (copy)`,
+      columns: options.copyColumns
+        ? sourceColumns.map(column => column.title)
+        : undefined,
+      visibility: options.copyPermissions ? board.visibility : 'private',
+    });
+    if (options.copyColumns) {
+      // carry over the colors, matching source order to created order
+      const newColumns = await this.knex<ColumnRow>('board_columns')
+        .where('board_id', created.id)
+        .orderBy('position');
+      for (let index = 0; index < newColumns.length; index += 1) {
+        const color = sourceColumns[index]?.color ?? null;
+        if (color) {
+          await this.knex('board_columns')
+            .where('id', newColumns[index].id)
+            .update({ color });
+        }
+      }
+    }
+    if (options.copyPermissions) {
+      const ownRefs = new Set(
+        (await this.permissionRows(created.id)).map(row => row.principal_ref),
+      );
+      const sourcePermissions = await this.permissionRows(boardId);
+      const clones = sourcePermissions.filter(
+        row => !ownRefs.has(row.principal_ref),
+      );
+      if (clones.length > 0) {
+        await this.knex('board_permissions').insert(
+          clones.map(row => ({
+            id: uuid(),
+            board_id: created.id,
+            principal_ref: row.principal_ref,
+            level: row.level,
+          })),
+        );
+      }
+    }
+    return this.getBoard(principal, created.id);
+  }
+
   // ----------------------------------------------------------- permissions
 
   async listPermissions(
