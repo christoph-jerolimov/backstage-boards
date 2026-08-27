@@ -137,7 +137,6 @@ describe('actions', () => {
         'delete-item',
         'add-comment',
         'update-comment',
-        'set-item-labels',
         'set-item-tags',
       ].sort(),
     );
@@ -203,11 +202,6 @@ describe('actions', () => {
       aliceCredentials,
     );
     await registry.invoke(
-      'set-item-labels',
-      { boardId: board.id, itemId: item.id, labels: { env: 'prod' } },
-      aliceCredentials,
-    );
-    await registry.invoke(
       'set-item-tags',
       { boardId: board.id, itemId: item.id, tags: ['infra'] },
       aliceCredentials,
@@ -215,7 +209,7 @@ describe('actions', () => {
     const changes = await knex('changes').where('item_id', item.id);
     const types = changes.map(c => c.type).sort();
     expect(types).toEqual(
-      ['created', 'moved', 'updated', 'updated', 'updated'].sort(),
+      ['created', 'moved', 'updated', 'updated'].sort(),
     );
   });
 

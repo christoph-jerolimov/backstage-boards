@@ -270,18 +270,10 @@ export async function createRouter(
       }
       return Array.isArray(value) ? (value as string[]) : [];
     };
-    const labels: Record<string, string> = {};
-    for (const pair of asArray(req.query.label)) {
-      const eq = pair.indexOf('=');
-      if (eq > 0) {
-        labels[pair.slice(0, eq)] = pair.slice(eq + 1);
-      }
-    }
     res.json({
       items: await service.listItems(principal, req.params.boardId, {
         text: typeof req.query.text === 'string' ? req.query.text : undefined,
         tags: asArray(req.query.tag),
-        labels,
       }),
     });
   });
@@ -316,7 +308,6 @@ export async function createRouter(
         position: req.body.position,
         creatorRef: req.body.creatorRef,
         assignees: req.body.assignees,
-        labels: req.body.labels,
         tags: req.body.tags,
         externalManager: req.body.externalManager,
       }),
@@ -342,7 +333,6 @@ export async function createRouter(
           creatorRef: req.body.creatorRef,
           description: req.body.description,
           assignees: req.body.assignees,
-          labels: req.body.labels,
           tags: req.body.tags,
           dueDate: req.body.dueDate,
         },

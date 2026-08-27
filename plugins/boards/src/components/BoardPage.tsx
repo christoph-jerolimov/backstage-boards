@@ -91,7 +91,6 @@ export function BoardPage() {
   const [groupBy, setGroupBy] = useState<GroupByMode>('none');
   const [filterText, setFilterText] = useState('');
   const [filterTags, setFilterTags] = useState<string[]>([]);
-  const [filterLabels, setFilterLabels] = useState<string[]>([]);
   const [shareOpen, setShareOpen] = useState(false);
   const [changesOpen, setChangesOpen] = useState(false);
   const [archivedOpen, setArchivedOpen] = useState(false);
@@ -202,22 +201,9 @@ export function BoardPage() {
   const openItem = (items ?? []).find(item => item.id === openItemId);
 
   const allTags = [...new Set((items ?? []).flatMap(item => item.tags))].sort();
-  const allLabelPairs = [
-    ...new Set(
-      (items ?? []).flatMap(item =>
-        Object.entries(item.labels).map(([key, value]) => `${key}=${value}`),
-      ),
-    ),
-  ].sort();
   const filter: ItemFilter = {
     text: filterText,
     tags: filterTags,
-    labels: Object.fromEntries(
-      filterLabels.map(pair => {
-        const eq = pair.indexOf('=');
-        return [pair.slice(0, eq), pair.slice(eq + 1)];
-      }),
-    ),
   };
   const filteredItems = (items ?? []).filter(item =>
     itemMatchesFilter(item, filter),
@@ -430,30 +416,7 @@ export function BoardPage() {
             </Menu>
           </MenuTrigger>
         )}
-        {allLabelPairs.length > 0 && (
-          <MenuTrigger>
-            <Button variant="tertiary" size="small">
-              Labels{filterLabels.length > 0 ? ` (${filterLabels.length})` : ''}
-            </Button>
-            <Menu aria-label="Filter by labels">
-              {allLabelPairs.map(pair => (
-                <MenuItem
-                  key={pair}
-                  onAction={() =>
-                    setFilterLabels(current =>
-                      current.includes(pair)
-                        ? current.filter(entry => entry !== pair)
-                        : [...current, pair],
-                    )
-                  }
-                >
-                  {filterLabels.includes(pair) ? `✓ ${pair}` : pair}
-                </MenuItem>
-              ))}
-            </Menu>
-          </MenuTrigger>
-        )}
-        {filterActive && (
+                {filterActive && (
           <>
             <Text variant="body-small" color="secondary">
               {filteredItems.length} of {(items ?? []).length} items
@@ -464,8 +427,7 @@ export function BoardPage() {
               onPress={() => {
                 setFilterText('');
                 setFilterTags([]);
-                setFilterLabels([]);
-              }}
+                              }}
             >
               Clear filters
             </Button>

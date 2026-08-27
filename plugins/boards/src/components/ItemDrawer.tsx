@@ -7,7 +7,6 @@ import {
   Select,
   Text,
   TextAreaField,
-  TextField,
 } from '@backstage/ui';
 import {
   BoardItem,
@@ -43,19 +42,6 @@ function CloseIcon() {
       />
     </svg>
   );
-}
-
-function parseLabels(text: string): Record<string, string> {
-  const labels: Record<string, string> = {};
-  for (const pair of text.split(',')) {
-    const trimmed = pair.trim();
-    if (!trimmed) continue;
-    const eq = trimmed.indexOf('=');
-    if (eq > 0) {
-      labels[trimmed.slice(0, eq).trim()] = trimmed.slice(eq + 1).trim();
-    }
-  }
-  return labels;
 }
 
 function CommentBlock(props: {
@@ -145,7 +131,6 @@ export function ItemDrawer(props: {
   const boardsApi = useApi(boardsApiRef);
   const readonly = !canWrite || !!item.externalManager;
   const [newComment, setNewComment] = useState('');
-  const [editLabels, setEditLabels] = useState(false);
 
   const {
     data: timeline,
@@ -433,47 +418,6 @@ export function ItemDrawer(props: {
                   await changed();
                 }}
               />
-            </div>
-
-            <div>
-              <Text variant="body-small" color="secondary">
-                Labels
-              </Text>
-              {editLabels ? (
-                <TextField
-                  aria-label="Labels (key=value, comma separated)"
-                  description="Comma-separated key=value pairs, e.g. priority=high, env=prod"
-                  defaultValue={Object.entries(item.labels)
-                    .map(([key, value]) => `${key}=${value}`)
-                    .join(', ')}
-                  // eslint-disable-next-line jsx-a11y/no-autofocus -- focus moves into a field the user just revealed
-                  autoFocus
-                  onBlur={async event => {
-                    setEditLabels(false);
-                    await boardsApi.updateItem(board.id, item.id, {
-                      labels: parseLabels(event.target.value),
-                    });
-                    await changed();
-                  }}
-                />
-              ) : (
-                <Flex align="center" gap="2">
-                  <Text variant="body-small">
-                    {Object.entries(item.labels)
-                      .map(([key, value]) => `${key}=${value}`)
-                      .join(', ') || '—'}
-                  </Text>
-                  {!readonly && (
-                    <Button
-                      variant="tertiary"
-                      size="small"
-                      onPress={() => setEditLabels(true)}
-                    >
-                      Edit
-                    </Button>
-                  )}
-                </Flex>
-              )}
             </div>
 
             <div>

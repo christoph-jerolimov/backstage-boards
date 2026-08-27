@@ -64,7 +64,6 @@ function ItemsTable(props: {
           Due
         </Column>
         <Column>Assignees</Column>
-        <Column>Labels</Column>
         <Column>Tags</Column>
         <Column id="createdBy" allowsSorting>
           Created by
@@ -95,11 +94,6 @@ function ItemsTable(props: {
             </Cell>
             <Cell>
               <AssigneeAvatars refs={item.assignees} />
-            </Cell>
-            <Cell>
-              {Object.entries(item.labels)
-                .map(([key, value]) => `${key}=${value}`)
-                .join(', ')}
             </Cell>
             <Cell>{item.tags.join(', ')}</Cell>
             <Cell>
