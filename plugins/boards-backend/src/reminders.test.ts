@@ -146,9 +146,9 @@ describe('entityField', () => {
   it('resolves plain and slash-containing label paths', () => {
     expect(entityField(entity, 'metadata.name')).toBe('jane');
     expect(entityField(entity, 'metadata.labels.team')).toBe('payments');
-    expect(
-      entityField(entity, 'metadata.labels.boards/notifications'),
-    ).toBe('false');
+    expect(entityField(entity, 'metadata.labels.boards/notifications')).toBe(
+      'false',
+    );
     expect(entityField(entity, 'metadata.labels.missing')).toBeUndefined();
   });
 });

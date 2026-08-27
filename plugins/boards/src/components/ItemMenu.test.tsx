@@ -72,19 +72,25 @@ describe('ItemMenu', () => {
 
   it('opens the item details', async () => {
     const { actions, item } = await openMenu({});
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Open details' }));
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: 'Open details' }),
+    );
     expect(actions.openItem).toHaveBeenCalledWith(item.id);
   });
 
   it('deletes the item', async () => {
     const { actions, item } = await openMenu({});
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Delete item' }));
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: 'Delete item' }),
+    );
     expect(actions.deleteItem).toHaveBeenCalledWith(item.id);
   });
 
   it('moves the item to another column', async () => {
     const { actions, item } = await openMenu({});
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Move to column' }));
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: 'Move to column' }),
+    );
     const target = await screen.findByRole('menuitem', { name: 'In progress' });
     await userEvent.click(target);
     expect(actions.moveItem).toHaveBeenCalledWith(item.id, {
@@ -127,7 +133,16 @@ describe('ItemMenu', () => {
     const entries = screen
       .getAllByRole('menuitem')
       .map(entry => entry.textContent)
-      .filter(text => !['Open details', 'Move to column', 'Due date', 'Assignee', 'Delete item'].includes(text!));
+      .filter(
+        text =>
+          ![
+            'Open details',
+            'Move to column',
+            'Due date',
+            'Assignee',
+            'Delete item',
+          ].includes(text!),
+      );
     // "Me" replaces alice; the rest are sorted by display name
     expect(entries).toEqual(['Me', 'bob', 'carol', 'Contractor']);
   });
@@ -161,14 +176,14 @@ describe('ItemContextMenu', () => {
   it('renders nothing without a pointer position', () => {
     renderWithProviders(
       <div data-testid="host">
-      <ItemContextMenu
-        state={undefined}
-        onClose={jest.fn()}
-        columns={columns}
-        readonly={false}
-        actions={testActions()}
-        assigneePool={[]}
-      />
+        <ItemContextMenu
+          state={undefined}
+          onClose={jest.fn()}
+          columns={columns}
+          readonly={false}
+          actions={testActions()}
+          assigneePool={[]}
+        />
       </div>,
       { apis: [[identityApiRef, identityApi]] },
     );

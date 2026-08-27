@@ -103,7 +103,9 @@ describe('TagsEditor', () => {
     await userEvent.type(screen.getByRole('searchbox'), 'b');
     // 'bug' is already on the item, so only 'backend' matches
     const option = await screen.findByRole('option', { name: 'backend' });
-    expect(screen.queryByRole('option', { name: 'bug' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('option', { name: 'bug' }),
+    ).not.toBeInTheDocument();
     await userEvent.click(option);
     expect(onChange).toHaveBeenCalledWith(['bug', 'backend']);
   });

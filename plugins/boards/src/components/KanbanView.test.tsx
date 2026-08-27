@@ -30,9 +30,24 @@ const columns = [
 ];
 
 const items = [
-  testItem({ id: 'item-1', title: 'Second', columnId: 'column-1', position: 2000 }),
-  testItem({ id: 'item-2', title: 'First', columnId: 'column-1', position: 1000 }),
-  testItem({ id: 'item-3', title: 'Shipped', columnId: 'column-3', tags: ['docs'] }),
+  testItem({
+    id: 'item-1',
+    title: 'Second',
+    columnId: 'column-1',
+    position: 2000,
+  }),
+  testItem({
+    id: 'item-2',
+    title: 'First',
+    columnId: 'column-1',
+    position: 1000,
+  }),
+  testItem({
+    id: 'item-3',
+    title: 'Shipped',
+    columnId: 'column-3',
+    tags: ['docs'],
+  }),
 ];
 
 function renderBoard(
@@ -99,9 +114,7 @@ describe('KanbanView lanes', () => {
       ],
     });
     expect(screen.getByText('docs')).toBeInTheDocument();
-    expect(
-      screen.getByText('Managed by jira (read-only)'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('Managed by jira (read-only)')).toBeInTheDocument();
   });
 
   it('renames an item inline', async () => {
@@ -153,7 +166,9 @@ describe('KanbanView lanes', () => {
 describe('KanbanView add item', () => {
   it('creates an item and stays open for the next one', async () => {
     const { actions } = renderBoard();
-    await userEvent.click(screen.getAllByRole('button', { name: 'Add item' })[0]);
+    await userEvent.click(
+      screen.getAllByRole('button', { name: 'Add item' })[0],
+    );
     const field = screen.getByRole('textbox', { name: 'New item title' });
     await userEvent.type(field, 'Write the spec{Enter}');
     expect(actions.createItem).toHaveBeenCalledWith(
@@ -167,7 +182,9 @@ describe('KanbanView add item', () => {
 
   it('closes the form on Escape without creating', async () => {
     const { actions } = renderBoard();
-    await userEvent.click(screen.getAllByRole('button', { name: 'Add item' })[0]);
+    await userEvent.click(
+      screen.getAllByRole('button', { name: 'Add item' })[0],
+    );
     await userEvent.type(
       screen.getByRole('textbox', { name: 'New item title' }),
       'Never mind{Escape}',
@@ -216,7 +233,9 @@ describe('KanbanView column menu', () => {
     const { actions } = renderBoard();
     await openColumnMenu('Todo');
     await userEvent.click(screen.getByRole('menuitem', { name: 'Color' }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'blue' }));
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'blue' }),
+    );
     expect(actions.setColumnColor).toHaveBeenCalledWith('column-1', 'blue');
   });
 
@@ -235,9 +254,7 @@ describe('KanbanView column menu', () => {
     await userEvent.click(
       screen.getByRole('menuitem', { name: 'Delete column' }),
     );
-    expect(
-      await screen.findByText('Delete column “Todo”'),
-    ).toBeInTheDocument();
+    expect(await screen.findByText('Delete column “Todo”')).toBeInTheDocument();
     expect(actions.deleteColumn).not.toHaveBeenCalled();
     // the closing column menu still owns the focus scope, so the dialog's
     // own controls are hidden from the accessibility tree for a moment

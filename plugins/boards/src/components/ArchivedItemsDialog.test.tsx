@@ -2,7 +2,11 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { boardsApiRef } from '../api';
 import { ArchivedItemsDialog } from './ArchivedItemsDialog';
-import { renderWithProviders, testBoardsApi, testItem } from './__testUtils__/testHelpers';
+import {
+  renderWithProviders,
+  testBoardsApi,
+  testItem,
+} from './__testUtils__/testHelpers';
 
 const archived = [
   testItem({
@@ -50,16 +54,18 @@ describe('ArchivedItemsDialog', () => {
     renderDialog();
     expect(await screen.findByText('Old task')).toBeInTheDocument();
     expect(
-      screen.getByText(
-        'Archived items are removed permanently after 30 days.',
-      ),
+      screen.getByText('Archived items are removed permanently after 30 days.'),
     ).toBeInTheDocument();
-    expect(await screen.findByRole('link', { name: 'jane' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('link', { name: 'jane' }),
+    ).toBeInTheDocument();
   });
 
   it('restores an item and refreshes the board', async () => {
     const { boardsApi, onChanged } = renderDialog();
-    await userEvent.click(await screen.findByRole('button', { name: 'Restore' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Restore' }),
+    );
     expect(boardsApi.restoreItem).toHaveBeenCalledWith('board-1', 'item-1');
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
     expect(boardsApi.listArchivedItems).toHaveBeenCalledTimes(2);

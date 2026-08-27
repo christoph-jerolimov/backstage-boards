@@ -4,7 +4,10 @@ import { BoardPermissionLevel } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
 import { rootRouteRef } from '../routes';
 import { DuplicateBoardDialog } from './DuplicateBoardDialog';
-import { renderWithProviders, testBoardsApi } from './__testUtils__/testHelpers';
+import {
+  renderWithProviders,
+  testBoardsApi,
+} from './__testUtils__/testHelpers';
 
 function renderDialog(
   over: { access?: BoardPermissionLevel; boardsApi?: any } = {},
@@ -44,9 +47,9 @@ describe('DuplicateBoardDialog', () => {
   it('proposes a name for the copy', () => {
     renderDialog();
     expect(screen.getByText('Duplicate “Roadmap”')).toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: 'Name of the copy' })).toHaveValue(
-      'Roadmap (copy)',
-    );
+    expect(
+      screen.getByRole('textbox', { name: 'Name of the copy' }),
+    ).toHaveValue('Roadmap (copy)');
   });
 
   it('copies the columns but not the items by default', async () => {

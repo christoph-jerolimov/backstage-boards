@@ -6,7 +6,11 @@ import { boardsApiRef } from '../api';
 import { boardsQueryClient } from '../queries';
 import { rootRouteRef } from '../routes';
 import { EntityBoardsContent } from './EntityBoardsContent';
-import { renderWithProviders, testBoardsApi, testColumn } from './__testUtils__/testHelpers';
+import {
+  renderWithProviders,
+  testBoardsApi,
+  testColumn,
+} from './__testUtils__/testHelpers';
 
 jest.mock('@backstage/plugin-catalog-react', () => ({
   ...jest.requireActual('@backstage/plugin-catalog-react'),

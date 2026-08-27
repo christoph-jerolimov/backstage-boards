@@ -3,7 +3,10 @@ import userEvent from '@testing-library/user-event';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
 import { boardsApiRef } from '../api';
 import { BoardSettingsDialog } from './BoardSettingsDialog';
-import { renderWithProviders, testBoardsApi } from './__testUtils__/testHelpers';
+import {
+  renderWithProviders,
+  testBoardsApi,
+} from './__testUtils__/testHelpers';
 
 const catalogApi = {
   getEntities: jest.fn().mockResolvedValue({
@@ -15,9 +18,7 @@ const catalogApi = {
   getEntitiesByRefs: jest.fn().mockResolvedValue({ items: [] }),
 };
 
-function renderDialog(
-  over: { entityRefs?: string[]; boardsApi?: any } = {},
-) {
+function renderDialog(over: { entityRefs?: string[]; boardsApi?: any } = {}) {
   const boardsApi = over.boardsApi ?? testBoardsApi();
   const onChanged = jest.fn().mockResolvedValue(undefined);
   renderWithProviders(
@@ -47,7 +48,9 @@ describe('BoardSettingsDialog', () => {
   it('lists the referenced entities', async () => {
     renderDialog();
     expect(screen.getByText('Board settings')).toBeInTheDocument();
-    expect(await screen.findByRole('link', { name: 'www' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('link', { name: 'www' }),
+    ).toBeInTheDocument();
   });
 
   it('says so when no entity is referenced', () => {

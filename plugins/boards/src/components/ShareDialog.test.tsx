@@ -4,7 +4,10 @@ import { catalogApiRef } from '@backstage/plugin-catalog-react';
 import { BoardWithContext } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
 import { ShareDialog } from './ShareDialog';
-import { renderWithProviders, testBoardsApi } from './__testUtils__/testHelpers';
+import {
+  renderWithProviders,
+  testBoardsApi,
+} from './__testUtils__/testHelpers';
 
 const catalogApi = {
   getEntities: jest.fn().mockResolvedValue({
@@ -75,7 +78,9 @@ describe('ShareDialog', () => {
   it('lists the people the board is shared with', async () => {
     renderDialog();
     expect(screen.getByText('Share “Roadmap”')).toBeInTheDocument();
-    expect(await screen.findByRole('link', { name: 'jane' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('link', { name: 'jane' }),
+    ).toBeInTheDocument();
   });
 
   it('does not load the permissions for non-admins', async () => {

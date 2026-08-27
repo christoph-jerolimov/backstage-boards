@@ -57,10 +57,7 @@ export interface ItemGroup {
  * tags) put an item into each of its groups; the "none of them" group
  * (unassigned / no due date / untagged) always comes last.
  */
-export function groupItems(
-  items: BoardItem[],
-  mode: GroupByMode,
-): ItemGroup[] {
+export function groupItems(items: BoardItem[], mode: GroupByMode): ItemGroup[] {
   if (mode === 'none') {
     return [{ key: 'all', items }];
   }

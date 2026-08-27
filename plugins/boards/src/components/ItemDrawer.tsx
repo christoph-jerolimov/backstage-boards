@@ -63,8 +63,8 @@ function CommentBlock(props: {
       }}
     >
       <Text variant="body-small">
-        <RefDisplay refString={comment.authorRef} />{' '}
-        commented {formatDate(comment.createdAt)}
+        <RefDisplay refString={comment.authorRef} /> commented{' '}
+        {formatDate(comment.createdAt)}
         {comment.versionCount > 1 ? ' (edited)' : ''}
       </Text>
       <EditableMarkdown
@@ -132,10 +132,7 @@ export function ItemDrawer(props: {
   const readonly = !canWrite || !!item.externalManager;
   const [newComment, setNewComment] = useState('');
 
-  const {
-    data: timeline,
-    refresh: refreshTimeline,
-  } = useAsyncData(
+  const { data: timeline, refresh: refreshTimeline } = useAsyncData(
     () => boardsApi.getTimeline(board.id, item.id),
     [boardsApi, board.id, item.id, item.updatedAt],
   );
@@ -197,288 +194,284 @@ export function ItemDrawer(props: {
           padding: 16,
         }}
       >
-          <Flex direction="column" gap="3">
-            <Flex align="center" justify="between" gap="2">
-              <InlineEdit
-                value={item.title}
-                canEdit={!readonly}
-                ariaLabel="item title"
-                onCommit={async title => {
-                  await boardsApi.updateItem(board.id, item.id, { title });
-                  await changed();
-                }}
-                display={
-                  <Text variant="title-small" as="h2">
-                    {item.title}
-                  </Text>
-                }
-              />
-              <ButtonIcon
-                aria-label="Close item details"
-                variant="tertiary"
-                icon={<CloseIcon />}
-                onPress={onClose}
-              />
-            </Flex>
+        <Flex direction="column" gap="3">
+          <Flex align="center" justify="between" gap="2">
+            <InlineEdit
+              value={item.title}
+              canEdit={!readonly}
+              ariaLabel="item title"
+              onCommit={async title => {
+                await boardsApi.updateItem(board.id, item.id, { title });
+                await changed();
+              }}
+              display={
+                <Text variant="title-small" as="h2">
+                  {item.title}
+                </Text>
+              }
+            />
+            <ButtonIcon
+              aria-label="Close item details"
+              variant="tertiary"
+              icon={<CloseIcon />}
+              onPress={onClose}
+            />
+          </Flex>
 
-            {item.externalManager && (
-              <Text variant="body-small" color="secondary">
-                This item is managed by “{item.externalManager}” and read-only.
-              </Text>
-            )}
+          {item.externalManager && (
+            <Text variant="body-small" color="secondary">
+              This item is managed by “{item.externalManager}” and read-only.
+            </Text>
+          )}
 
-            <Flex align="center" gap="2" justify="between">
-              <WatchButton
-                watching={!!item.watching}
-                targetLabel="this item"
-                onToggle={async watching => {
-                  await boardsApi.setWatchItem(board.id, item.id, watching);
+          <Flex align="center" gap="2" justify="between">
+            <WatchButton
+              watching={!!item.watching}
+              targetLabel="this item"
+              onToggle={async watching => {
+                await boardsApi.setWatchItem(board.id, item.id, watching);
+                await onChanged();
+              }}
+              loadWatchers={() => boardsApi.listItemWatchers(board.id, item.id)}
+            />
+            {!readonly && (
+              <Button
+                variant="secondary"
+                size="small"
+                destructive
+                onPress={async () => {
+                  await boardsApi.deleteItem(board.id, item.id);
+                  onClose();
                   await onChanged();
                 }}
-                loadWatchers={() =>
-                  boardsApi.listItemWatchers(board.id, item.id)
-                }
-              />
+              >
+                Delete item
+              </Button>
+            )}
+          </Flex>
+
+          <Flex align="center" gap="2">
+            <StatusBadge
+              column={board.columns.find(column => column.id === item.columnId)}
+            />
+          </Flex>
+          <Select
+            label="Status"
+            isDisabled={readonly}
+            options={board.columns.map(column => ({
+              value: column.id,
+              label: column.title,
+            }))}
+            selectedKey={item.columnId}
+            onSelectionChange={async key => {
+              if (key && String(key) !== item.columnId) {
+                await boardsApi.moveItem(board.id, item.id, {
+                  columnId: String(key),
+                });
+                await changed();
+              }
+            }}
+          />
+
+          <div>
+            <Text variant="body-small" color="secondary">
+              Due date
+            </Text>
+            <Flex align="center" gap="2">
+              {item.dueDate ? (
+                <DueDateBadge dueDate={item.dueDate} />
+              ) : (
+                <Text variant="body-small" color="secondary">
+                  No due date
+                </Text>
+              )}
               {!readonly && (
+                <input
+                  type="date"
+                  aria-label="Due date"
+                  value={item.dueDate ?? ''}
+                  onChange={async event => {
+                    const value = event.target.value;
+                    await boardsApi.updateItem(board.id, item.id, {
+                      dueDate: value === '' ? null : value,
+                    });
+                    await changed();
+                  }}
+                  style={{
+                    background: 'var(--bui-bg-neutral-1)',
+                    color: 'inherit',
+                    border: '1px solid var(--bui-border-1)',
+                    borderRadius: 4,
+                    padding: '4px 8px',
+                    font: 'inherit',
+                  }}
+                />
+              )}
+              {!readonly && item.dueDate && (
                 <Button
-                  variant="secondary"
+                  variant="tertiary"
                   size="small"
-                  destructive
                   onPress={async () => {
-                    await boardsApi.deleteItem(board.id, item.id);
-                    onClose();
-                    await onChanged();
+                    await boardsApi.updateItem(board.id, item.id, {
+                      dueDate: null,
+                    });
+                    await changed();
                   }}
                 >
-                  Delete item
+                  Clear
                 </Button>
               )}
             </Flex>
+          </div>
 
-            <Flex align="center" gap="2">
-              <StatusBadge
-                column={board.columns.find(
-                  column => column.id === item.columnId,
-                )}
-              />
-            </Flex>
-            <Select
-              label="Status"
-              isDisabled={readonly}
-              options={board.columns.map(column => ({
-                value: column.id,
-                label: column.title,
-              }))}
-              selectedKey={item.columnId}
-              onSelectionChange={async key => {
-                if (key && String(key) !== item.columnId) {
-                  await boardsApi.moveItem(board.id, item.id, {
-                    columnId: String(key),
-                  });
-                  await changed();
-                }
-              }}
-            />
-
-            <div>
-              <Text variant="body-small" color="secondary">
-                Due date
-              </Text>
-              <Flex align="center" gap="2">
-                {item.dueDate ? (
-                  <DueDateBadge dueDate={item.dueDate} />
-                ) : (
-                  <Text variant="body-small" color="secondary">
-                    No due date
-                  </Text>
-                )}
-                {!readonly && (
-                  <input
-                    type="date"
-                    aria-label="Due date"
-                    value={item.dueDate ?? ''}
-                    onChange={async event => {
-                      const value = event.target.value;
-                      await boardsApi.updateItem(board.id, item.id, {
-                        dueDate: value === '' ? null : value,
-                      });
-                      await changed();
-                    }}
-                    style={{
-                      background: 'var(--bui-bg-neutral-1)',
-                      color: 'inherit',
-                      border: '1px solid var(--bui-border-1)',
-                      borderRadius: 4,
-                      padding: '4px 8px',
-                      font: 'inherit',
-                    }}
-                  />
-                )}
-                {!readonly && item.dueDate && (
-                  <Button
-                    variant="tertiary"
-                    size="small"
-                    onPress={async () => {
-                      await boardsApi.updateItem(board.id, item.id, {
-                        dueDate: null,
-                      });
-                      await changed();
-                    }}
-                  >
-                    Clear
-                  </Button>
-                )}
-              </Flex>
-            </div>
-
-            <div>
-              <Text variant="body-small" color="secondary">
-                Assignees
-              </Text>
-              <Flex direction="column" gap="2">
-                {item.assignees.length > 0 ? (
-                  <Flex gap="1" align="center" style={{ flexWrap: 'wrap' }}>
-                    {item.assignees.map(assignee => (
-                      <span
-                        key={assignee}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 4,
-                          border: '1px solid var(--bui-border-1)',
-                          borderRadius: 12,
-                          padding: '2px 4px 2px 8px',
-                        }}
-                      >
-                        {isTextRef(assignee) ? (
-                          <RefDisplay refString={assignee} />
-                        ) : (
-                          <AssigneeAvatars refs={[assignee]} />
-                        )}
-                        {!readonly && (
-                          <Button
-                            variant="tertiary"
-                            size="small"
-                            aria-label={`Remove assignee ${assignee}`}
-                            onPress={async () => {
-                              await boardsApi.updateItem(board.id, item.id, {
-                                assignees: item.assignees.filter(
-                                  ref => ref !== assignee,
-                                ),
-                              });
-                              await changed();
-                            }}
-                          >
-                            ✕
-                          </Button>
-                        )}
-                      </span>
-                    ))}
-                  </Flex>
-                ) : (
-                  <Text variant="body-small" color="secondary">
-                    Unassigned
-                  </Text>
-                )}
-                {!readonly && (
-                  <PrincipalPicker
-                    ariaLabel="Add assignee"
-                    placeholder="Add assignee…"
-                    allowText
-                    exclude={item.assignees}
-                    onSelect={async ref => {
-                      await boardsApi.updateItem(board.id, item.id, {
-                        assignees: [...item.assignees, ref],
-                      });
-                      await changed();
-                    }}
-                  />
-                )}
-              </Flex>
-            </div>
-
-            <div>
-              <Text variant="body-small" color="secondary">
-                Description
-              </Text>
-              <EditableMarkdown
-                text={item.description ?? ''}
-                canEdit={!readonly}
-                versionCount={item.descriptionVersionCount}
-                allowEmpty
-                emptyText="No description yet."
-                editAriaLabel="Edit description"
-                loadVersions={() =>
-                  boardsApi.listDescriptionVersions(board.id, item.id)
-                }
-                onSave={async text => {
-                  await boardsApi.updateItem(board.id, item.id, {
-                    description: text,
-                  });
-                  await changed();
-                }}
-              />
-            </div>
-
-            <div>
-              <Text variant="body-small" color="secondary">
-                Tags
-              </Text>
-              <TagsEditor
-                tags={item.tags}
-                canEdit={!readonly}
-                suggestions={props.tagSuggestions ?? []}
-                onChange={async tags => {
-                  await boardsApi.updateItem(board.id, item.id, { tags });
-                  await changed();
-                }}
-              />
-            </div>
-
-            <Flex direction="column" gap="1">
-              <Text variant="body-x-small" color="secondary">
-                Created by <RefDisplay refString={item.createdBy} /> at{' '}
-                {formatDate(item.createdAt)}
-              </Text>
-              {item.creatorRef && (
-                <Text variant="body-x-small" color="secondary">
-                  Creator: <RefDisplay refString={item.creatorRef} />
+          <div>
+            <Text variant="body-small" color="secondary">
+              Assignees
+            </Text>
+            <Flex direction="column" gap="2">
+              {item.assignees.length > 0 ? (
+                <Flex gap="1" align="center" style={{ flexWrap: 'wrap' }}>
+                  {item.assignees.map(assignee => (
+                    <span
+                      key={assignee}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        border: '1px solid var(--bui-border-1)',
+                        borderRadius: 12,
+                        padding: '2px 4px 2px 8px',
+                      }}
+                    >
+                      {isTextRef(assignee) ? (
+                        <RefDisplay refString={assignee} />
+                      ) : (
+                        <AssigneeAvatars refs={[assignee]} />
+                      )}
+                      {!readonly && (
+                        <Button
+                          variant="tertiary"
+                          size="small"
+                          aria-label={`Remove assignee ${assignee}`}
+                          onPress={async () => {
+                            await boardsApi.updateItem(board.id, item.id, {
+                              assignees: item.assignees.filter(
+                                ref => ref !== assignee,
+                              ),
+                            });
+                            await changed();
+                          }}
+                        >
+                          ✕
+                        </Button>
+                      )}
+                    </span>
+                  ))}
+                </Flex>
+              ) : (
+                <Text variant="body-small" color="secondary">
+                  Unassigned
                 </Text>
               )}
-              <Text variant="body-x-small" color="secondary">
-                Updated by <RefDisplay refString={item.updatedBy} /> at{' '}
-                {formatDate(item.updatedAt)}
-              </Text>
-            </Flex>
-
-            <Text variant="body-medium" weight="bold" as="h3">
-              Activity
-            </Text>
-            {timeline && (
-              <Timeline
-                boardId={board.id}
-                itemId={item.id}
-                entries={timeline}
-                canWrite={canWrite}
-                onChanged={changed}
-              />
-            )}
-            {canWrite && (
-              <Flex direction="column" gap="2">
-                <TextAreaField
-                  aria-label="New comment"
-                  placeholder="Write a comment… (markdown subset, entity refs like system:default/example auto-link)"
-                  value={newComment}
-                  onChange={setNewComment}
+              {!readonly && (
+                <PrincipalPicker
+                  ariaLabel="Add assignee"
+                  placeholder="Add assignee…"
+                  allowText
+                  exclude={item.assignees}
+                  onSelect={async ref => {
+                    await boardsApi.updateItem(board.id, item.id, {
+                      assignees: [...item.assignees, ref],
+                    });
+                    await changed();
+                  }}
                 />
-                <div>
-                  <Button variant="primary" size="small" onPress={addComment}>
-                    Comment
-                  </Button>
-                </div>
-              </Flex>
+              )}
+            </Flex>
+          </div>
+
+          <div>
+            <Text variant="body-small" color="secondary">
+              Description
+            </Text>
+            <EditableMarkdown
+              text={item.description ?? ''}
+              canEdit={!readonly}
+              versionCount={item.descriptionVersionCount}
+              allowEmpty
+              emptyText="No description yet."
+              editAriaLabel="Edit description"
+              loadVersions={() =>
+                boardsApi.listDescriptionVersions(board.id, item.id)
+              }
+              onSave={async text => {
+                await boardsApi.updateItem(board.id, item.id, {
+                  description: text,
+                });
+                await changed();
+              }}
+            />
+          </div>
+
+          <div>
+            <Text variant="body-small" color="secondary">
+              Tags
+            </Text>
+            <TagsEditor
+              tags={item.tags}
+              canEdit={!readonly}
+              suggestions={props.tagSuggestions ?? []}
+              onChange={async tags => {
+                await boardsApi.updateItem(board.id, item.id, { tags });
+                await changed();
+              }}
+            />
+          </div>
+
+          <Flex direction="column" gap="1">
+            <Text variant="body-x-small" color="secondary">
+              Created by <RefDisplay refString={item.createdBy} /> at{' '}
+              {formatDate(item.createdAt)}
+            </Text>
+            {item.creatorRef && (
+              <Text variant="body-x-small" color="secondary">
+                Creator: <RefDisplay refString={item.creatorRef} />
+              </Text>
             )}
+            <Text variant="body-x-small" color="secondary">
+              Updated by <RefDisplay refString={item.updatedBy} /> at{' '}
+              {formatDate(item.updatedAt)}
+            </Text>
           </Flex>
+
+          <Text variant="body-medium" weight="bold" as="h3">
+            Activity
+          </Text>
+          {timeline && (
+            <Timeline
+              boardId={board.id}
+              itemId={item.id}
+              entries={timeline}
+              canWrite={canWrite}
+              onChanged={changed}
+            />
+          )}
+          {canWrite && (
+            <Flex direction="column" gap="2">
+              <TextAreaField
+                aria-label="New comment"
+                placeholder="Write a comment… (markdown subset, entity refs like system:default/example auto-link)"
+                value={newComment}
+                onChange={setNewComment}
+              />
+              <div>
+                <Button variant="primary" size="small" onPress={addComment}>
+                  Comment
+                </Button>
+              </div>
+            </Flex>
+          )}
+        </Flex>
       </div>
     </>
   );

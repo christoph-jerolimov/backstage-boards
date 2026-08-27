@@ -1,6 +1,7 @@
 import { expect, request, test, type Page } from '@playwright/test';
 
-const BACKEND_URL = process.env.PLAYWRIGHT_BACKEND_URL ?? 'http://localhost:7007';
+const BACKEND_URL =
+  process.env.PLAYWRIGHT_BACKEND_URL ?? 'http://localhost:7007';
 
 async function seedBoard(name: string) {
   const api = await request.newContext({ baseURL: BACKEND_URL });

@@ -69,9 +69,9 @@ describe('EntityPicker', () => {
     renderPicker({ exclude: ['component:default/www'] });
     await openList('Add entity reference');
     const options = await screen.findAllByRole('option');
-    expect(
-      options.map(option => option.textContent),
-    ).not.toContain('Website (component:default/www)');
+    expect(options.map(option => option.textContent)).not.toContain(
+      'Website (component:default/www)',
+    );
   });
 
   it('reports the selected ref and clears the input', async () => {

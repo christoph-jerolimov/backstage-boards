@@ -99,8 +99,12 @@ describe('BoardPage loading', () => {
 describe('BoardPage header', () => {
   it('shows the board with its entities and access', async () => {
     renderBoard();
-    expect(await screen.findByRole('heading', { name: 'Roadmap' })).toBeInTheDocument();
-    expect(await screen.findByRole('link', { name: 'www' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Roadmap' }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByRole('link', { name: 'www' }),
+    ).toBeInTheDocument();
     expect(screen.getByText('· your access: admin')).toBeInTheDocument();
   });
 
@@ -189,11 +193,17 @@ describe('BoardPage filtering', () => {
     renderBoard();
     await screen.findByText('Todo (1)');
     await userEvent.click(screen.getByRole('button', { name: 'Tags' }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'docs' }));
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'docs' }),
+    );
     expect(await screen.findByText('1 of 2 items')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Tags (1)' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Tags (1)' }),
+    ).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Clear filters' }),
+    );
     await waitFor(() =>
       expect(screen.queryByText('1 of 2 items')).not.toBeInTheDocument(),
     );
@@ -202,7 +212,9 @@ describe('BoardPage filtering', () => {
   it('offers no tag filter when no item is tagged', async () => {
     renderBoard({ items: [testItem({ tags: [] })] });
     await screen.findByText('Todo (1)');
-    expect(screen.queryByRole('button', { name: 'Tags' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Tags' }),
+    ).not.toBeInTheDocument();
   });
 });
 

@@ -22,7 +22,9 @@ function renderBlock(
 describe('EditableMarkdown', () => {
   it('renders the text as markdown with an Edit button', () => {
     renderBlock();
-    expect(screen.getByText('description').closest('strong')).toBeInTheDocument();
+    expect(
+      screen.getByText('description').closest('strong'),
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument();
   });
 
@@ -34,7 +36,9 @@ describe('EditableMarkdown', () => {
 
   it('hides the edit affordance for readers', () => {
     renderBlock({ canEdit: false });
-    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Edit' }),
+    ).not.toBeInTheDocument();
   });
 
   it('saves an edited text', async () => {

@@ -3,7 +3,10 @@ import { boardsApiRef } from '../api';
 import { boardsQueryClient } from '../queries';
 import { rootRouteRef } from '../routes';
 import { BoardsPage } from './BoardsPage';
-import { renderWithProviders, testBoardsApi } from './__testUtils__/testHelpers';
+import {
+  renderWithProviders,
+  testBoardsApi,
+} from './__testUtils__/testHelpers';
 
 describe('BoardsPage', () => {
   it('routes the index path to the board list', async () => {

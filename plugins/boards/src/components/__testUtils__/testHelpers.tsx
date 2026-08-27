@@ -79,7 +79,9 @@ export function testActions(): jest.Mocked<BoardActions> {
 }
 
 /** A BoardsApi where every method is a jest mock with an empty result. */
-export function testBoardsApi(over: Partial<BoardsApi> = {}): jest.Mocked<BoardsApi> {
+export function testBoardsApi(
+  over: Partial<BoardsApi> = {},
+): jest.Mocked<BoardsApi> {
   return {
     listBoards: jest.fn().mockResolvedValue([]),
     createBoard: jest.fn(),

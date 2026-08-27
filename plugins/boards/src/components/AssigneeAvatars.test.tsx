@@ -77,13 +77,13 @@ describe('AssigneeAvatars', () => {
     );
     await screen.findByRole('img', { name: 'Jane Doe' });
     // the metadata title is used when there is no profile display name
-    expect(await screen.findByRole('img', { name: 'Team A' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('img', { name: 'Team A' }),
+    ).toBeInTheDocument();
     expect(screen.getAllByRole('img')).toHaveLength(2);
     // no single-assignee name label in stacked mode
     expect(screen.queryByText('Jane Doe')).not.toBeInTheDocument();
-    expect(
-      document.querySelector('[data-stacked]'),
-    ).toBeInTheDocument();
+    expect(document.querySelector('[data-stacked]')).toBeInTheDocument();
   });
 
   it('renders text assignees as plain badges, not avatars', async () => {

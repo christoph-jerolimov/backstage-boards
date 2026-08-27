@@ -110,7 +110,11 @@ function parseInline(text: string): InlineToken[] {
 
   while (remaining.length > 0) {
     let earliest:
-      | { index: number; match: RegExpMatchArray; build: (m: RegExpMatchArray) => InlineToken }
+      | {
+          index: number;
+          match: RegExpMatchArray;
+          build: (m: RegExpMatchArray) => InlineToken;
+        }
       | undefined;
     for (const { regex, build } of patterns) {
       const match = remaining.match(regex);
@@ -126,9 +130,7 @@ function parseInline(text: string): InlineToken[] {
       tokens.push(...autolinkEntities(remaining.slice(0, earliest.index)));
     }
     tokens.push(earliest.build(earliest.match));
-    remaining = remaining.slice(
-      earliest.index + earliest.match[0].length,
-    );
+    remaining = remaining.slice(earliest.index + earliest.match[0].length);
   }
   return tokens;
 }
@@ -149,7 +151,10 @@ export function parseMarkdown(text: string): BlockToken[] {
     if (line.trimStart().startsWith('```')) {
       const codeLines: string[] = [];
       index += 1;
-      while (index < lines.length && !lines[index].trimStart().startsWith('```')) {
+      while (
+        index < lines.length &&
+        !lines[index].trimStart().startsWith('```')
+      ) {
         codeLines.push(lines[index]);
         index += 1;
       }

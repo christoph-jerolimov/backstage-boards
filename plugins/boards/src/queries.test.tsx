@@ -14,7 +14,10 @@ import {
   useMoveItem,
   useRenameItem,
 } from './queries';
-import { testBoardsApi, testItem } from './components/__testUtils__/testHelpers';
+import {
+  testBoardsApi,
+  testItem,
+} from './components/__testUtils__/testHelpers';
 
 function setup(over: Parameters<typeof testBoardsApi>[0] = {}) {
   const boardsApi = testBoardsApi(over);
@@ -30,8 +33,18 @@ function setup(over: Parameters<typeof testBoardsApi>[0] = {}) {
 }
 
 const items: BoardItem[] = [
-  testItem({ id: 'item-1', title: 'First', columnId: 'column-1', position: 1000 }),
-  testItem({ id: 'item-2', title: 'Second', columnId: 'column-1', position: 2000 }),
+  testItem({
+    id: 'item-1',
+    title: 'First',
+    columnId: 'column-1',
+    position: 1000,
+  }),
+  testItem({
+    id: 'item-2',
+    title: 'Second',
+    columnId: 'column-1',
+    position: 2000,
+  }),
 ];
 
 describe('query hooks', () => {
@@ -40,7 +53,9 @@ describe('query hooks', () => {
       listBoards: jest.fn().mockResolvedValue([{ id: 'board-1' }]),
     } as any);
     const { result } = renderHook(() => useBoardsQuery(), { wrapper });
-    await waitFor(() => expect(result.current.data).toEqual([{ id: 'board-1' }]));
+    await waitFor(() =>
+      expect(result.current.data).toEqual([{ id: 'board-1' }]),
+    );
     expect(boardsApi.listBoards).toHaveBeenCalledWith();
   });
 
@@ -141,10 +156,9 @@ describe('useRenameItem', () => {
       updateItem: jest.fn().mockResolvedValue(undefined),
     } as any);
     client.setQueryData(queryKeys.items('board-1'), items);
-    const { result } = renderHook(
-      () => useRenameItem('board-1', jest.fn()),
-      { wrapper },
-    );
+    const { result } = renderHook(() => useRenameItem('board-1', jest.fn()), {
+      wrapper,
+    });
 
     await act(() =>
       result.current.mutateAsync({ itemId: 'item-2', title: 'Renamed' }),

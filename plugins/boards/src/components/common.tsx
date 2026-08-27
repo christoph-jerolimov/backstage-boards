@@ -240,12 +240,16 @@ export function changeSummary(change: {
     return 'restored this item';
   }
   if (change.type === 'moved') {
-    return `moved this item from “${String(change.oldValue)}” to “${String(change.newValue)}”`;
+    return `moved this item from “${String(change.oldValue)}” to “${String(
+      change.newValue,
+    )}”`;
   }
   if (change.oldValue === undefined && change.newValue === undefined) {
     return `changed the ${change.field}`;
   }
-  return `changed ${change.field}: ${JSON.stringify(change.oldValue) ?? '(empty)'} → ${JSON.stringify(change.newValue) ?? '(empty)'}`;
+  return `changed ${change.field}: ${
+    JSON.stringify(change.oldValue) ?? '(empty)'
+  } → ${JSON.stringify(change.newValue) ?? '(empty)'}`;
 }
 
 export function formatDate(iso: string): string {

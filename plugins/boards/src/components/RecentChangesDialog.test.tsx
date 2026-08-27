@@ -2,7 +2,10 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { boardsApiRef } from '../api';
 import { RecentChangesDialog } from './RecentChangesDialog';
-import { renderWithProviders, testBoardsApi } from './__testUtils__/testHelpers';
+import {
+  renderWithProviders,
+  testBoardsApi,
+} from './__testUtils__/testHelpers';
 
 const changes = [
   {

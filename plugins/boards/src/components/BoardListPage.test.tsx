@@ -3,7 +3,10 @@ import userEvent from '@testing-library/user-event';
 import { boardsApiRef } from '../api';
 import { rootRouteRef } from '../routes';
 import { BoardListPage } from './BoardListPage';
-import { renderWithProviders, testBoardsApi } from './__testUtils__/testHelpers';
+import {
+  renderWithProviders,
+  testBoardsApi,
+} from './__testUtils__/testHelpers';
 
 const mockNavigate = jest.fn();
 jest.mock('react-router-dom', () => ({
@@ -64,7 +67,9 @@ describe('BoardListPage', () => {
     expect(
       screen.getByRole('button', { name: 'Open board Support' }),
     ).toBeInTheDocument();
-    expect(await screen.findByRole('link', { name: 'www' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('link', { name: 'www' }),
+    ).toBeInTheDocument();
     expect(screen.getByText('read')).toBeInTheDocument();
   });
 
@@ -101,9 +106,7 @@ describe('BoardListPage', () => {
       }),
     );
     expect(boardsApi.setFavorite).toHaveBeenCalledWith('board-1', false);
-    await waitFor(() =>
-      expect(boardsApi.listBoards).toHaveBeenCalledTimes(2),
-    );
+    await waitFor(() => expect(boardsApi.listBoards).toHaveBeenCalledTimes(2));
   });
 
   it('opens a board', async () => {
@@ -136,9 +139,7 @@ describe('BoardListPage', () => {
       'Team Alpha{Enter}',
     );
     expect(boardsApi.createBoard).toHaveBeenCalledWith({ name: 'Team Alpha' });
-    await waitFor(() =>
-      expect(mockNavigate).toHaveBeenCalledWith('board-3'),
-    );
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith('board-3'));
   });
 
   it('does not create a board without a name', async () => {
@@ -146,7 +147,9 @@ describe('BoardListPage', () => {
     await userEvent.click(
       await screen.findByRole('button', { name: 'Create board' }),
     );
-    await userEvent.click(await screen.findByRole('button', { name: 'Create' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Create' }),
+    );
     expect(boardsApi.createBoard).not.toHaveBeenCalled();
   });
 

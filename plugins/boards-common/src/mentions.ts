@@ -15,9 +15,7 @@ const MENTION_PATTERN =
 export function resolveMentionRef(raw: string): string {
   if (raw.includes(':')) {
     const [kind, rest] = raw.split(':', 2);
-    return rest.includes('/')
-      ? `${kind}:${rest}`
-      : `${kind}:default/${rest}`;
+    return rest.includes('/') ? `${kind}:${rest}` : `${kind}:default/${rest}`;
   }
   return `user:default/${raw}`;
 }

@@ -1,4 +1,10 @@
-import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  render,
+  renderHook,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
   changeSummary,
@@ -40,9 +46,7 @@ describe('RefChips', () => {
   });
 
   it('renders one badge per ref', () => {
-    renderWithProviders(
-      <RefChips refs={['text:Ops team', 'text:Support']} />,
-    );
+    renderWithProviders(<RefChips refs={['text:Ops team', 'text:Support']} />);
     expect(screen.getByText('Ops team')).toBeInTheDocument();
     expect(screen.getByText('Support')).toBeInTheDocument();
   });
@@ -63,9 +67,7 @@ describe('MarkdownContent', () => {
   });
 
   it('renders fenced code blocks verbatim', () => {
-    renderWithProviders(
-      <MarkdownContent text={'```\nconst a = 1;\n```'} />,
-    );
+    renderWithProviders(<MarkdownContent text={'```\nconst a = 1;\n```'} />);
     expect(screen.getByText('const a = 1;').tagName).toBe('CODE');
   });
 
@@ -108,7 +110,9 @@ describe('InlineEdit', () => {
         ariaLabel="board name"
       />,
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Edit board name' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Edit board name' }),
+    );
     const field = screen.getByRole('textbox', { name: 'board name' });
     await userEvent.clear(field);
     await userEvent.type(field, 'New{Enter}');
@@ -152,12 +156,7 @@ describe('InlineEdit', () => {
     const onCommit = jest.fn();
     render(
       <>
-        <InlineEdit
-          value="Old"
-          canEdit
-          onCommit={onCommit}
-          ariaLabel="title"
-        />
+        <InlineEdit value="Old" canEdit onCommit={onCommit} ariaLabel="title" />
         <button type="button">elsewhere</button>
       </>,
     );

@@ -72,22 +72,28 @@ describe('sortItems', () => {
 
   it('sorts by title case-insensitively in both directions', () => {
     expect(
-      sortItems(items, { column: 'title', direction: 'ascending' }, columns).map(
-        entry => entry.title,
-      ),
+      sortItems(
+        items,
+        { column: 'title', direction: 'ascending' },
+        columns,
+      ).map(entry => entry.title),
     ).toEqual(['alpha', 'Beta', 'Gamma']);
     expect(
-      sortItems(items, { column: 'title', direction: 'descending' }, columns).map(
-        entry => entry.title,
-      ),
+      sortItems(
+        items,
+        { column: 'title', direction: 'descending' },
+        columns,
+      ).map(entry => entry.title),
     ).toEqual(['Gamma', 'Beta', 'alpha']);
   });
 
   it('sorts by status title and updated timestamp', () => {
     expect(
-      sortItems(items, { column: 'status', direction: 'ascending' }, columns).map(
-        entry => entry.columnId,
-      ),
+      sortItems(
+        items,
+        { column: 'status', direction: 'ascending' },
+        columns,
+      ).map(entry => entry.columnId),
     ).toEqual(['c2', 'c1', 'c1']);
     expect(
       sortItems(
@@ -127,9 +133,9 @@ describe('groupItems', () => {
       updatedAt: '',
       descriptionVersionCount: 0,
       assignees: over.assignees ?? [],
-        tags: over.tags ?? [],
+      tags: over.tags ?? [],
       dueDate: over.dueDate,
-    }) as BoardItem;
+    } as BoardItem);
 
   it('groups by due date with the undated group last', () => {
     const groups = groupItems(

@@ -88,7 +88,9 @@ describe('ItemDrawer', () => {
     expect(screen.getByText('No due date')).toBeInTheDocument();
     expect(screen.getByText('Unassigned')).toBeInTheDocument();
     expect(screen.getByText('No description yet.')).toBeInTheDocument();
-    expect(await screen.findAllByRole('link', { name: 'alice' })).toHaveLength(2);
+    expect(await screen.findAllByRole('link', { name: 'alice' })).toHaveLength(
+      2,
+    );
   });
 
   it('closes on the close button, the backdrop and Escape', async () => {
@@ -176,10 +178,7 @@ describe('ItemDrawer', () => {
   it('saves the tags', async () => {
     const { boardsApi } = renderDrawer();
     await userEvent.click(screen.getByRole('button', { name: 'Add tag' }));
-    await userEvent.type(
-      screen.getByRole('searchbox'),
-      'frontend{Enter}',
-    );
+    await userEvent.type(screen.getByRole('searchbox'), 'frontend{Enter}');
     expect(boardsApi.updateItem).toHaveBeenCalledWith('board-1', 'item-1', {
       tags: ['frontend'],
     });

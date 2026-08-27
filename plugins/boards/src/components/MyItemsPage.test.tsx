@@ -3,7 +3,11 @@ import userEvent from '@testing-library/user-event';
 import { boardsApiRef } from '../api';
 import { rootRouteRef } from '../routes';
 import { MyItemsList } from './MyItemsPage';
-import { renderWithProviders, testBoardsApi, testItem } from './__testUtils__/testHelpers';
+import {
+  renderWithProviders,
+  testBoardsApi,
+  testItem,
+} from './__testUtils__/testHelpers';
 
 const mockNavigate = jest.fn();
 jest.mock('react-router-dom', () => ({

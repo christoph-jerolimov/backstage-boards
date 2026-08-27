@@ -23,7 +23,11 @@ export function ArchivedItemsDialog(props: {
 }) {
   const { boardId, canWrite, isOpen, onOpenChange, onChanged } = props;
   const boardsApi = useApi(boardsApiRef);
-  const { data: items, loading, refresh } = useAsyncData(
+  const {
+    data: items,
+    loading,
+    refresh,
+  } = useAsyncData(
     () =>
       isOpen && canWrite
         ? boardsApi.listArchivedItems(boardId)

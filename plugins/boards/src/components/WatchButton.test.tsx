@@ -48,7 +48,9 @@ describe('WatchButton', () => {
     await userEvent.click(
       screen.getByRole('button', { name: 'Show watchers of this board' }),
     );
-    expect(await screen.findByRole('link', { name: 'jane' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('link', { name: 'jane' }),
+    ).toBeInTheDocument();
     expect(screen.getByText('Ops team')).toBeInTheDocument();
   });
 

@@ -21,10 +21,7 @@ describe('boardsPlugin', () => {
       features: [boardsPlugin],
       initialRouteEntries: ['/boards'],
       apis: [
-        [
-          boardsApiRef,
-          { listBoards: jest.fn().mockResolvedValue([]) } as any,
-        ],
+        [boardsApiRef, { listBoards: jest.fn().mockResolvedValue([]) } as any],
       ],
     });
     expect(
