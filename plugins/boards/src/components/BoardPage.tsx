@@ -47,6 +47,7 @@ import { ItemDrawer } from './ItemDrawer';
 import { ShareDialog } from './ShareDialog';
 import { RecentChangesDialog } from './RecentChangesDialog';
 import { ArchivedItemsDialog } from './ArchivedItemsDialog';
+import { DuplicateBoardDialog } from './DuplicateBoardDialog';
 import { WatchButton } from './WatchButton';
 
 function StarIcon(props: { filled: boolean }) {
@@ -75,6 +76,7 @@ export function BoardPage() {
   const [shareOpen, setShareOpen] = useState(false);
   const [changesOpen, setChangesOpen] = useState(false);
   const [archivedOpen, setArchivedOpen] = useState(false);
+  const [duplicateOpen, setDuplicateOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editEntity, setEditEntity] = useState(false);
   const [error, setError] = useState<string | undefined>();
@@ -327,6 +329,9 @@ export function BoardPage() {
                   Archived items…
                 </MenuItem>
               )}
+              <MenuItem onAction={() => setDuplicateOpen(true)}>
+                Duplicate board…
+              </MenuItem>
               {isAdmin && (
                 <MenuItem onAction={() => setShareOpen(true)}>Share…</MenuItem>
               )}
@@ -483,6 +488,12 @@ export function BoardPage() {
         isOpen={archivedOpen}
         onOpenChange={setArchivedOpen}
         onChanged={refreshAll}
+      />
+
+      <DuplicateBoardDialog
+        board={board}
+        isOpen={duplicateOpen}
+        onOpenChange={setDuplicateOpen}
       />
 
       <Dialog isOpen={deleteOpen} onOpenChange={setDeleteOpen}>

@@ -33,6 +33,10 @@ export interface BoardsApi {
   getBoard(boardId: string): Promise<BoardWithContext>;
   updateBoard(boardId: string, update: BoardUpdate): Promise<BoardWithContext>;
   deleteBoard(boardId: string): Promise<void>;
+  duplicateBoard(
+    boardId: string,
+    options: { name?: string; copyColumns: boolean; copyPermissions: boolean },
+  ): Promise<BoardWithContext>;
   setFavorite(boardId: string, favorite: boolean): Promise<void>;
   setWatchBoard(boardId: string, watching: boolean): Promise<void>;
 
@@ -195,6 +199,13 @@ export class BoardsClient implements BoardsApi {
 
   deleteBoard(boardId: string): Promise<void> {
     return this.request('DELETE', `/boards/${boardId}`);
+  }
+
+  duplicateBoard(
+    boardId: string,
+    options: { name?: string; copyColumns: boolean; copyPermissions: boolean },
+  ): Promise<BoardWithContext> {
+    return this.request('POST', `/boards/${boardId}/duplicate`, options);
   }
 
   setFavorite(boardId: string, favorite: boolean): Promise<void> {

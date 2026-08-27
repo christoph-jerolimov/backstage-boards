@@ -125,6 +125,17 @@ export async function createRouter(
     res.status(204).end();
   });
 
+  router.post('/boards/:boardId/duplicate', async (req, res) => {
+    const principal = await principalOf(req);
+    res.status(201).json(
+      await service.duplicateBoard(principal, req.params.boardId, {
+        name: req.body.name,
+        copyColumns: !!req.body.copyColumns,
+        copyPermissions: !!req.body.copyPermissions,
+      }),
+    );
+  });
+
   router.get('/boards/:boardId/changes', async (req, res) => {
     const principal = await principalOf(req);
     res.json({
