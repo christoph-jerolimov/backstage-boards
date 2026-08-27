@@ -1,10 +1,14 @@
 import { useApi } from '@backstage/frontend-plugin-api';
 import {
-  Button,
+  Cell,
+  Column,
   Dialog,
   DialogBody,
   DialogHeader,
-  Flex,
+  Row,
+  TableBody,
+  TableHeader,
+  TableRoot,
   Text,
 } from '@backstage/ui';
 import { boardsApiRef } from '../api';
@@ -39,26 +43,35 @@ export function RecentChangesDialog(props: {
     content = <Text>No changes recorded yet.</Text>;
   } else {
     content = (
-      <Flex direction="column" gap="2">
-        {entries.map(entry => (
-          <Flex key={entry.change.id} align="center" gap="2">
-            <Button
-              variant="tertiary"
-              size="small"
-              onPress={() => {
-                onOpenChange(false);
-                onOpenItem(entry.change.itemId);
-              }}
-            >
-              {entry.itemTitle}
-            </Button>
-            <Text variant="body-small" color="secondary">
-              <RefDisplay refString={entry.change.actorRef} />{' '}
-              {changeSummary(entry.change)} · {formatDate(entry.change.at)}
-            </Text>
-          </Flex>
-        ))}
-      </Flex>
+      <TableRoot
+        aria-label="Recent changes"
+        onRowAction={key => {
+          const entry = entries.find(e => e.change.id === String(key));
+          if (entry) {
+            onOpenChange(false);
+            onOpenItem(entry.change.itemId);
+          }
+        }}
+      >
+        <TableHeader>
+          <Column isRowHeader>Item</Column>
+          <Column>Actor</Column>
+          <Column>Change</Column>
+          <Column>When</Column>
+        </TableHeader>
+        <TableBody>
+          {entries.map(entry => (
+            <Row key={entry.change.id} id={entry.change.id}>
+              <Cell>{entry.itemTitle}</Cell>
+              <Cell>
+                <RefDisplay refString={entry.change.actorRef} />
+              </Cell>
+              <Cell>{changeSummary(entry.change)}</Cell>
+              <Cell>{formatDate(entry.change.at)}</Cell>
+            </Row>
+          ))}
+        </TableBody>
+      </TableRoot>
     );
   }
 
