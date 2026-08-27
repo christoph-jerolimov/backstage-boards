@@ -9,8 +9,8 @@ import {
   CatalogProcessorCache,
 } from '@backstage/plugin-catalog-node';
 import {
-  BOARDS_ENTITY_LABEL,
-  BOARDS_ENTITY_LABEL_VALUE,
+  BOARDS_ENTITY_IS_REFERENCED_LABEL,
+  BOARDS_ENTITY_IS_REFERENCED_LABEL_VALUE,
 } from '@internal/plugin-boards-common';
 
 /** Cache key holding the last successfully resolved answer for an entity. */
@@ -21,8 +21,8 @@ const CACHE_KEY = 'referenced';
  * itself when it already says the right thing.
  */
 function withBoardsLabel(entity: Entity, referenced: boolean): Entity {
-  const current = entity.metadata.labels?.[BOARDS_ENTITY_LABEL];
-  if (referenced && current === BOARDS_ENTITY_LABEL_VALUE) {
+  const current = entity.metadata.labels?.[BOARDS_ENTITY_IS_REFERENCED_LABEL];
+  if (referenced && current === BOARDS_ENTITY_IS_REFERENCED_LABEL_VALUE) {
     return entity;
   }
   if (!referenced && current === undefined) {
@@ -30,9 +30,10 @@ function withBoardsLabel(entity: Entity, referenced: boolean): Entity {
   }
   const labels = { ...entity.metadata.labels };
   if (referenced) {
-    labels[BOARDS_ENTITY_LABEL] = BOARDS_ENTITY_LABEL_VALUE;
+    labels[BOARDS_ENTITY_IS_REFERENCED_LABEL] =
+      BOARDS_ENTITY_IS_REFERENCED_LABEL_VALUE;
   } else {
-    delete labels[BOARDS_ENTITY_LABEL];
+    delete labels[BOARDS_ENTITY_IS_REFERENCED_LABEL];
   }
   return { ...entity, metadata: { ...entity.metadata, labels } };
 }

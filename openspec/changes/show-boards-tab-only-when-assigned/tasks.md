@@ -1,6 +1,6 @@
 ## 1. Boards backend
 
-- [x] 1.1 Export a shared `BOARDS_ENTITY_LABEL = 'boards/is-referenced'` constant (and its `'auto-detected'` value) from `@internal/plugin-boards-common`; verify it is re-exported from the package index and consumed by the later tasks rather than string literals
+- [x] 1.1 Export a shared `BOARDS_ENTITY_IS_REFERENCED_LABEL = 'boards/is-referenced'` constant (and its `'auto-detected'` value) from `@internal/plugin-boards-common`; verify it is re-exported from the package index and consumed by the later tasks rather than string literals
 - [x] 1.2 Add `isEntityReferenced(entityRef)` to `BoardsService` (join `board_entities` with non-archived boards) and unit test it for referenced, unreferenced, and archived-board-only entities
 - [x] 1.3 Add `GET /service/entity-references?entityRef=…` to the router, gated by `httpAuth.credentials(req, { allow: ['service'] })`, returning `{ referenced: boolean }`; router tests cover service caller (both answers), a logged-in user (rejected), an unauthenticated caller (rejected), and a private board still counting as a reference
 - [x] 1.4 Add the optional `onEntityRefsChanged` hook to `BoardsService` and call it from `createBoard`, `updateBoard` (old ∪ new refs), `deleteBoard`, `unarchiveBoard`, and `hardDeleteBoard`; service tests assert the refs passed for each operation and that duplication with copied entities reports through `createBoard`

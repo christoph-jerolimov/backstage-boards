@@ -8,8 +8,8 @@ import {
 } from '@backstage/frontend-plugin-api';
 import { EntityContentBlueprint } from '@backstage/plugin-catalog-react/alpha';
 import {
-  BOARDS_ENTITY_LABEL_PATH,
-  BOARDS_ENTITY_LABEL_VALUE,
+  BOARDS_ENTITY_IS_REFERENCED_LABEL_PATH,
+  BOARDS_ENTITY_IS_REFERENCED_LABEL_VALUE,
 } from '@internal/plugin-boards-common';
 import { boardsApiRef, BoardsClient } from './api';
 import { rootRouteRef } from './routes';
@@ -42,7 +42,10 @@ const entityBoardsContent = EntityContentBlueprint.make({
     // Only entities a board references carry this label; the boards catalog
     // module (`@internal/plugin-catalog-backend-module-boards`) derives it.
     // Overridable per deployment through the extension's `filter` config.
-    filter: { [BOARDS_ENTITY_LABEL_PATH]: BOARDS_ENTITY_LABEL_VALUE },
+    filter: {
+      [BOARDS_ENTITY_IS_REFERENCED_LABEL_PATH]:
+        BOARDS_ENTITY_IS_REFERENCED_LABEL_VALUE,
+    },
     loader: () =>
       import('./components/EntityBoardsContent').then(m => (
         <m.EntityBoardsContent />
