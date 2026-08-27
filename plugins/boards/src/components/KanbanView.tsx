@@ -47,6 +47,7 @@ export interface BoardActions {
   openItem: (itemId: string) => void;
   renameItem: (itemId: string, title: string) => Promise<void>;
   setItemDueDate: (itemId: string, dueDate: string | null) => Promise<void>;
+  setAssignees: (itemId: string, assignees: string[]) => Promise<void>;
   deleteItem: (itemId: string) => Promise<void>;
 }
 
@@ -65,6 +66,7 @@ function ItemCard(props: {
   columns: BoardColumn[];
   canWrite: boolean;
   actions: BoardActions;
+  assigneePool: string[];
   onDropBefore: (droppedItemId: string) => void;
   onContextMenu: (event: React.MouseEvent) => void;
 }) {
@@ -159,6 +161,7 @@ function ItemCard(props: {
               columns={columns}
               readonly={readonly}
               actions={actions}
+              assigneePool={props.assigneePool}
             />
           </MenuTrigger>
         </div>
@@ -248,6 +251,7 @@ function ColumnLane(props: {
   groupBy: GroupByMode;
   onRequestDelete: (column: BoardColumn, hasItems: boolean) => void;
   onItemContextMenu: (item: BoardItem, event: React.MouseEvent) => void;
+  assigneePool: string[];
 }) {
   const { board, column, items, canWrite, actions, groupBy } = props;
   const laneRef = useRef<HTMLDivElement>(null);
@@ -277,6 +281,7 @@ function ColumnLane(props: {
       columns={board.columns}
       canWrite={canWrite}
       actions={actions}
+      assigneePool={props.assigneePool}
       onDropBefore={droppedItemId => {
         const itemIndex = sorted.findIndex(entry => entry.id === item.id);
         actions.moveItem(droppedItemId, {
@@ -428,6 +433,7 @@ export function KanbanView(props: {
   groupBy: GroupByMode;
 }) {
   const { board, items, canWrite, actions, groupBy } = props;
+  const assigneePool = [...new Set(items.flatMap(item => item.assignees))];
   const [contextMenu, setContextMenu] = useState<ContextMenuState | undefined>();
   const [deleteTarget, setDeleteTarget] = useState<BoardColumn | undefined>();
   const [moveItemsTo, setMoveItemsTo] = useState<string | undefined>();
@@ -454,6 +460,7 @@ export function KanbanView(props: {
           canWrite={canWrite}
           actions={actions}
           groupBy={groupBy}
+          assigneePool={assigneePool}
           onItemContextMenu={(item, event) => {
             event.preventDefault();
             setContextMenu({ item, x: event.clientX, y: event.clientY });
@@ -505,6 +512,7 @@ export function KanbanView(props: {
         columns={board.columns}
         readonly={!canWrite || !!contextMenu?.item.externalManager}
         actions={actions}
+        assigneePool={assigneePool}
       />
       <Dialog
         isOpen={deleteTarget !== undefined}

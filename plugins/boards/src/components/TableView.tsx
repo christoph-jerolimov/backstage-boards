@@ -33,6 +33,7 @@ function ItemsTable(props: {
   items: BoardItem[];
   canWrite: boolean;
   actions: BoardActions;
+  assigneePool: string[];
   openItem: (itemId: string) => void;
   onItemContextMenu: (item: BoardItem, event: React.MouseEvent) => void;
   sort: ItemSortDescriptor | undefined;
@@ -124,6 +125,7 @@ function ItemsTable(props: {
                   columns={board.columns}
                   readonly={!canWrite || !!item.externalManager}
                   actions={actions}
+                  assigneePool={props.assigneePool}
                 />
               </MenuTrigger>
             </Cell>
@@ -143,6 +145,7 @@ export function TableView(props: {
   openItem: (itemId: string) => void;
 }) {
   const { board, items, canWrite, actions, groupBy, openItem } = props;
+  const assigneePool = [...new Set(items.flatMap(item => item.assignees))];
   const [sort, setSort] = useState<ItemSortDescriptor | undefined>(undefined);
   const [contextMenu, setContextMenu] = useState<
     ContextMenuState | undefined
@@ -158,6 +161,7 @@ export function TableView(props: {
       columns={board.columns}
       readonly={!canWrite || !!contextMenu?.item.externalManager}
       actions={actions}
+      assigneePool={assigneePool}
     />
   );
   if (groupBy === 'none') {
@@ -168,6 +172,7 @@ export function TableView(props: {
           items={items}
           canWrite={canWrite}
           actions={actions}
+          assigneePool={assigneePool}
           openItem={openItem}
           onItemContextMenu={onItemContextMenu}
           sort={sort}
@@ -189,6 +194,7 @@ export function TableView(props: {
             items={group.items}
             canWrite={canWrite}
             actions={actions}
+            assigneePool={assigneePool}
             openItem={openItem}
             onItemContextMenu={onItemContextMenu}
             sort={sort}
