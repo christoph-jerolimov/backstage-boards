@@ -1,0 +1,180 @@
+import { useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { useApi, useRouteRef } from '@backstage/frontend-plugin-api';
+import { useSignal } from '@backstage/plugin-signals-react';
+import { Badge, Button, Flex, Text } from '@backstage/ui';
+import { MyBoardItem } from '@internal/plugin-boards-common';
+import { boardsApiRef } from '../api';
+import { rootRouteRef } from '../routes';
+import { DueDateBadge, formatDueDate } from './DueDate';
+import {
+  filterDueEntries,
+  groupMyItems,
+  MyItemGroup,
+  MyItemsGroupBy,
+  NO_DUE_DATE,
+} from './grouping';
+
+export { BoardsWidgetProvider } from './widgetCommon';
+
+/** Which assigned items the card shows. */
+export type AssignedItemsScope = 'all' | 'due';
+
+/**
+ * Settings arrive from the home page grid as props, and an unconfigured
+ * card arrives with none at all — the schema's `default` is documentation,
+ * not a runtime guarantee. Hence the defaults here.
+ */
+export interface AssignedItemsContentProps {
+  scope?: AssignedItemsScope;
+  groupBy?: MyItemsGroupBy;
+}
+
+/** The group's heading: label, item count, and a link when it is a board. */
+function GroupHeading(props: {
+  group: MyItemGroup;
+  groupBy: MyItemsGroupBy;
+  onOpenBoard: (boardId: string) => void;
+}) {
+  const { group, groupBy, onOpenBoard } = props;
+  const label =
+    groupBy === 'dueDate' && group.key !== NO_DUE_DATE
+      ? formatDueDate(group.label)
+      : group.label;
+  const count = (
+    <Text variant="body-x-small" color="secondary">
+      {group.entries.length}
+    </Text>
+  );
+  if (groupBy === 'board') {
+    return (
+      <Flex align="center" gap="2">
+        <Button
+          variant="tertiary"
+          size="small"
+          onPress={() => onOpenBoard(group.key)}
+          aria-label={`Open board ${label}`}
+        >
+          <Text variant="body-small" weight="bold">
+            {label}
+          </Text>
+        </Button>
+        {count}
+      </Flex>
+    );
+  }
+  return (
+    <Flex align="center" gap="2">
+      <Text variant="body-small" weight="bold">
+        {label}
+      </Text>
+      {count}
+    </Flex>
+  );
+}
+
+function ItemRow(props: {
+  entry: MyBoardItem;
+  showStatus: boolean;
+  onOpenItem: (entry: MyBoardItem) => void;
+}) {
+  const { entry, showStatus, onOpenItem } = props;
+  return (
+    <Button
+      variant="tertiary"
+      size="small"
+      onPress={() => onOpenItem(entry)}
+      aria-label={`Open item ${entry.item.title}`}
+    >
+      <Flex align="center" gap="2">
+        <Text variant="body-small">{entry.item.title}</Text>
+        {showStatus && <Badge size="small">{entry.columnTitle}</Badge>}
+        <DueDateBadge dueDate={entry.item.dueDate} />
+      </Flex>
+    </Button>
+  );
+}
+
+/**
+ * The "Assigned items" home page card: the current user's items across
+ * every board they can read, filtered and grouped per the card's settings.
+ */
+export function AssignedItemsContent(props: AssignedItemsContentProps) {
+  const { scope = 'all', groupBy = 'board' } = props;
+  const boardsApi = useApi(boardsApiRef);
+  const navigate = useNavigate();
+  const rootLink = useRouteRef(rootRouteRef);
+  const basePath = rootLink?.() ?? '/boards';
+
+  const {
+    data: entries,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    // the same key the My items page uses, so both share one cache entry
+    queryKey: ['boards', 'my-items'],
+    queryFn: () => boardsApi.listMyItems(),
+  });
+
+  const { lastSignal } = useSignal('boards');
+  useEffect(() => {
+    if (lastSignal) {
+      refetch();
+    }
+  }, [lastSignal, refetch]);
+
+  const groups = useMemo(() => {
+    const all = entries ?? [];
+    return groupMyItems(scope === 'due' ? filterDueEntries(all) : all, groupBy);
+  }, [entries, scope, groupBy]);
+
+  const openBoard = (boardId: string) => navigate(`${basePath}/${boardId}`);
+  const openItem = (entry: MyBoardItem) =>
+    navigate(`${basePath}/${entry.boardId}?item=${entry.item.id}`);
+
+  if (isLoading) {
+    return <Text>Loading your items…</Text>;
+  }
+  if (error) {
+    return (
+      <Text style={{ color: 'var(--bui-fg-negative)' }}>
+        Your items could not be loaded: {(error as Error).message}
+      </Text>
+    );
+  }
+  if (groups.length === 0) {
+    return (
+      <Text color="secondary">
+        {scope === 'due'
+          ? 'Nothing of yours is due.'
+          : 'Nothing is assigned to you on any board.'}
+      </Text>
+    );
+  }
+  return (
+    <div style={{ maxHeight: '100%', overflowY: 'auto' }}>
+      <Flex direction="column" gap="3">
+        {groups.map(group => (
+          <Flex direction="column" gap="1" key={group.key}>
+            <GroupHeading
+              group={group}
+              groupBy={groupBy}
+              onOpenBoard={openBoard}
+            />
+            {group.entries.map(entry => (
+              <ItemRow
+                key={`${entry.boardId}/${entry.item.id}`}
+                entry={entry}
+                // redundant when the group already names the status
+                showStatus={groupBy !== 'status'}
+                onOpenItem={openItem}
+              />
+            ))}
+          </Flex>
+        ))}
+      </Flex>
+    </div>
+  );
+}

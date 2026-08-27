@@ -25,6 +25,8 @@ export interface BoardsApi {
   listBoards(options?: {
     favoritesOnly?: boolean;
     entityRef?: string;
+    /** Also return each board's per-column item counts. */
+    withCounts?: boolean;
   }): Promise<BoardListEntry[]>;
   createBoard(options: {
     name: string;
@@ -178,6 +180,7 @@ export class BoardsClient implements BoardsApi {
   async listBoards(options?: {
     favoritesOnly?: boolean;
     entityRef?: string;
+    withCounts?: boolean;
   }): Promise<BoardListEntry[]> {
     const params = new URLSearchParams();
     if (options?.favoritesOnly) {
@@ -185,6 +188,9 @@ export class BoardsClient implements BoardsApi {
     }
     if (options?.entityRef) {
       params.set('entityRef', options.entityRef);
+    }
+    if (options?.withCounts) {
+      params.set('counts', 'true');
     }
     const query = params.toString() ? `?${params.toString()}` : '';
     const result = await this.request<{ boards: BoardListEntry[] }>(

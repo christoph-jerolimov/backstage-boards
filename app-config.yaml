@@ -95,6 +95,16 @@ app:
               row: 9
               width: 4
               height: 4
+            - component: BoardsAssignedItems
+              column: 4
+              row: 13
+              width: 4
+              height: 6
+            - component: BoardsList
+              column: 8
+              row: 13
+              width: 4
+              height: 6
 
 organization:
   name: My Company

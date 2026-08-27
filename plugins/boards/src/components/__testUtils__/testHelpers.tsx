@@ -2,7 +2,12 @@ import { ReactElement } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderInTestApp } from '@backstage/frontend-test-utils';
 import { entityRouteRef } from '@backstage/plugin-catalog-react';
-import { BoardColumn, BoardItem } from '@internal/plugin-boards-common';
+import {
+  BoardColumn,
+  BoardItem,
+  BoardListEntry,
+  MyBoardItem,
+} from '@internal/plugin-boards-common';
 import { BoardsApi } from '../../api';
 import { BoardActions } from '../BoardView';
 
@@ -46,6 +51,38 @@ export function testItem(over: Partial<BoardItem> = {}): BoardItem {
     descriptionVersionCount: 0,
     assignees: [],
     tags: [],
+    ...over,
+  };
+}
+
+/** A my-items entry (item plus its board/column context) for tests. */
+export function testMyItem(
+  over: Omit<Partial<MyBoardItem>, 'item'> & { item?: Partial<BoardItem> } = {},
+): MyBoardItem {
+  const { item, ...rest } = over;
+  return {
+    item: testItem(item),
+    boardId: 'board-1',
+    boardName: 'Board One',
+    columnTitle: 'Todo',
+    ...rest,
+  };
+}
+
+/** A board list entry with sensible defaults for tests. */
+export function testBoardListEntry(
+  over: Partial<BoardListEntry> = {},
+): BoardListEntry {
+  return {
+    id: 'board-1',
+    name: 'Board One',
+    entityRefs: [],
+    visibility: 'private',
+    createdBy: 'user:default/alice',
+    createdAt: '2026-08-01T10:00:00.000Z',
+    updatedAt: '2026-08-02T10:00:00.000Z',
+    access: 'admin',
+    favorite: false,
     ...over,
   };
 }

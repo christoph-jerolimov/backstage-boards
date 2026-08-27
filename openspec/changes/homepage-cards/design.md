@@ -164,7 +164,11 @@ pages already ship. Cards are compact lists, not `TableRoot`s: a home
 page card is ~4 grid columns wide and a five-column table does not fit.
 
 - Assigned items: group heading (label + count, board headings link to
-  the board) then one row per item — title, `StatusBadge`, `DueDateBadge`.
+  the board) then one row per item — title, a plain `Badge` with the
+  column title, and `DueDateBadge`. (`StatusBadge` wants a `BoardColumn`
+  for its color; `MyBoardItem` carries only the column *title*, so the
+  my-items page's plain `Badge` is the honest reuse here.) The status
+  badge is dropped when the grouping already names the status.
 - Boards: one row per board — name, and when `showCounts` is on a row of
   `ColumnDot` + title + count chips built from `statusCounts`.
 - Navigation goes through `useRouteRef(rootRouteRef)` with the

@@ -7,6 +7,7 @@ import { boardsApiRef } from './api';
 import {
   invalidateBoard,
   queryKeys,
+  useBoardListQuery,
   useBoardQuery,
   useBoardsByEntityQuery,
   useBoardsQuery,
@@ -57,6 +58,45 @@ describe('query hooks', () => {
       expect(result.current.data).toEqual([{ id: 'board-1' }]),
     );
     expect(boardsApi.listBoards).toHaveBeenCalledWith();
+  });
+
+  it('caches each widget setting combination separately', async () => {
+    const { boardsApi, client, wrapper } = setup({
+      listBoards: jest.fn().mockResolvedValue([{ id: 'board-1' }]),
+    } as any);
+    const combinations = [
+      { favoritesOnly: false, withCounts: false },
+      { favoritesOnly: false, withCounts: true },
+      { favoritesOnly: true, withCounts: false },
+      { favoritesOnly: true, withCounts: true },
+    ];
+    for (const options of combinations) {
+      const { result } = renderHook(() => useBoardListQuery(options), {
+        wrapper,
+      });
+      await waitFor(() => expect(result.current.isLoading).toBe(false));
+    }
+
+    expect(client.getQueryCache().getAll()).toHaveLength(combinations.length);
+    expect(boardsApi.listBoards).toHaveBeenCalledTimes(combinations.length);
+    for (const options of combinations) {
+      expect(boardsApi.listBoards).toHaveBeenCalledWith(options);
+      expect(client.getQueryData(['boards', 'list', options] as const)).toEqual(
+        [{ id: 'board-1' }],
+      );
+    }
+  });
+
+  it('leaves the widget list untouched when a board is invalidated', async () => {
+    const { client } = setup();
+    const options = { favoritesOnly: true, withCounts: true };
+    client.setQueryData(['boards', 'list', options] as const, [
+      { id: 'board-1' },
+    ]);
+    await invalidateBoard(client, 'board-1');
+    expect(
+      client.getQueryState(['boards', 'list', options] as const)?.isInvalidated,
+    ).toBe(false);
   });
 
   it('loads the boards of one entity', async () => {

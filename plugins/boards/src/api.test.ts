@@ -118,6 +118,17 @@ describe('BoardsClient board endpoints', () => {
 
     await client.listBoards({ favoritesOnly: false });
     expect(calls[3].url).toBe('http://backstage/api/boards/boards');
+
+    await client.listBoards({ withCounts: true });
+    expect(calls[4].url).toBe('http://backstage/api/boards/boards?counts=true');
+
+    await client.listBoards({ favoritesOnly: true, withCounts: true });
+    expect(calls[5].url).toBe(
+      'http://backstage/api/boards/boards?favorites=true&counts=true',
+    );
+
+    await client.listBoards({ withCounts: false });
+    expect(calls[6].url).toBe('http://backstage/api/boards/boards');
   });
 
   it('unwraps my items', async () => {

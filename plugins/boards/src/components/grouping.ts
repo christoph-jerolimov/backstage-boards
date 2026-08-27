@@ -1,4 +1,9 @@
-import { BoardColumn, BoardItem } from '@internal/plugin-boards-common';
+import {
+  BoardColumn,
+  BoardItem,
+  MyBoardItem,
+  todayISO,
+} from '@internal/plugin-boards-common';
 
 export interface ItemSortDescriptor {
   column: 'title' | 'status' | 'dueDate' | 'createdBy' | 'updatedAt';
@@ -140,4 +145,74 @@ export function positionBefore(
     return next / 2;
   }
   return (prev + next) / 2;
+}
+
+/** How the "Assigned items" home page widget groups its entries. */
+export type MyItemsGroupBy = 'board' | 'status' | 'dueDate';
+
+export interface MyItemGroup {
+  /** Stable identity: board id, column title, or due date. */
+  key: string;
+  label: string;
+  entries: MyBoardItem[];
+}
+
+/**
+ * The entries that are due: due date today or in the past, in the
+ * viewer's local timezone. Entries without a due date are not due.
+ */
+export function filterDueEntries(
+  entries: MyBoardItem[],
+  now: Date = new Date(),
+): MyBoardItem[] {
+  const today = todayISO(now);
+  // both sides are `YYYY-MM-DD`, so string comparison is date comparison
+  return entries.filter(
+    entry => !!entry.item.dueDate && entry.item.dueDate <= today,
+  );
+}
+
+/**
+ * Groups my-items entries for the home page widget. Board and status
+ * groups are ordered alphabetically by label; due-date groups run
+ * chronologically with the most urgent first and undated entries last.
+ */
+export function groupMyItems(
+  entries: MyBoardItem[],
+  mode: MyItemsGroupBy,
+): MyItemGroup[] {
+  const groups = new Map<string, MyItemGroup>();
+  const undated: MyBoardItem[] = [];
+  for (const entry of entries) {
+    if (mode === 'dueDate' && !entry.item.dueDate) {
+      undated.push(entry);
+      continue;
+    }
+    let key: string;
+    let label: string;
+    if (mode === 'board') {
+      key = entry.boardId;
+      label = entry.boardName;
+    } else if (mode === 'status') {
+      key = entry.columnTitle;
+      label = entry.columnTitle;
+    } else {
+      key = entry.item.dueDate!;
+      label = key;
+    }
+    const group = groups.get(key) ?? { key, label, entries: [] };
+    group.entries.push(entry);
+    groups.set(key, group);
+  }
+  const result = [...groups.values()].sort((a, b) =>
+    // due dates are `YYYY-MM-DD`, so the same comparison sorts them
+    // chronologically
+    mode === 'dueDate'
+      ? a.key.localeCompare(b.key)
+      : a.label.localeCompare(b.label),
+  );
+  if (undated.length > 0) {
+    result.push({ key: NO_DUE_DATE, label: 'No due date', entries: undated });
+  }
+  return result;
 }

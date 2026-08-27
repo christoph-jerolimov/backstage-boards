@@ -67,9 +67,23 @@ export interface BoardWithContext extends Board {
   watching: boolean;
 }
 
+/** One column of a board with the number of items sitting in it. */
+export interface BoardStatusCount {
+  columnId: string;
+  title: string;
+  color?: ColumnColor;
+  /** Non-archived items in this column; 0 when the column is empty. */
+  count: number;
+}
+
 export interface BoardListEntry extends Board {
   access: BoardPermissionLevel;
   favorite: boolean;
+  /**
+   * Per-column item counts, in column order. Present only when the
+   * listing was requested with counts.
+   */
+  statusCounts?: BoardStatusCount[];
 }
 
 export interface BoardPermissionEntry {
