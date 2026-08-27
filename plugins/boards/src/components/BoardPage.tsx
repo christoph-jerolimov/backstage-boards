@@ -10,7 +10,7 @@ import {
   useRouteRef,
 } from '@backstage/frontend-plugin-api';
 import { useSignal } from '@backstage/plugin-signals-react';
-import { RiMore2Fill } from '@remixicon/react';
+import { RiGridLine, RiKanbanView, RiMore2Fill } from '@remixicon/react';
 import {
   Button,
   ButtonIcon,
@@ -318,8 +318,12 @@ export function BoardPage() {
               if (key) setView(key as 'board' | 'table');
             }}
           >
-            <ToggleButton id="board">Board</ToggleButton>
-            <ToggleButton id="table">Table</ToggleButton>
+            <ToggleButton id="board" aria-label="Board view">
+              <RiKanbanView size={16} />
+            </ToggleButton>
+            <ToggleButton id="table" aria-label="Table view">
+              <RiGridLine size={16} />
+            </ToggleButton>
           </ToggleButtonGroup>
           <MenuTrigger>
             <ButtonIcon
