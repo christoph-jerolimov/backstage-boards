@@ -228,3 +228,13 @@ permission:
 mcpActions:
   name: 'My Company Backstage' # defaults to "backstage"
   description: 'Tools for managing your software catalog, creating new services from templates, and exploring your developer portal' # optional
+
+# Scheduled reminders about board items; see plugins/boards-backend/config.d.ts
+# boards:
+#   reminders:
+#     - id: overdue-weekday-mornings
+#       cron: '0 8 * * 1-5'
+#       scope: overdue # all | with-due-date | due-today | overdue
+#       grouping: per-board # combined | per-board
+#       excludeUsers:
+#         metadata.labels.boards/notifications: 'false'
