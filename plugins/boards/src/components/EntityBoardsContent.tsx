@@ -1,23 +1,18 @@
 import { useMemo } from 'react';
-import { useApi, useRouteRef } from '@backstage/frontend-plugin-api';
+import { useRouteRef } from '@backstage/frontend-plugin-api';
 import { Flex, Link, Text } from '@backstage/ui';
 import { useEntity } from '@backstage/plugin-catalog-react';
 import { stringifyEntityRef } from '@backstage/catalog-model';
-import { boardsApiRef } from '../api';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { rootRouteRef } from '../routes';
-import { useAsyncData } from './common';
+import { boardsQueryClient, useBoardsQuery } from '../queries';
 
-/** Lists the boards assigned to the entity currently shown in the catalog. */
-export function EntityBoardsContent() {
+function EntityBoardsList() {
   const { entity } = useEntity();
-  const boardsApi = useApi(boardsApiRef);
   const boardsLink = useRouteRef(rootRouteRef);
   const entityRef = useMemo(() => stringifyEntityRef(entity), [entity]);
 
-  const { data: boards, loading } = useAsyncData(
-    () => boardsApi.listBoards(),
-    [boardsApi],
-  );
+  const { data: boards, isLoading: loading } = useBoardsQuery();
 
   if (loading) {
     return <Text>Loading boards…</Text>;
@@ -37,5 +32,14 @@ export function EntityBoardsContent() {
         </Link>
       ))}
     </Flex>
+  );
+}
+
+/** Lists the boards assigned to the entity currently shown in the catalog. */
+export function EntityBoardsContent() {
+  return (
+    <QueryClientProvider client={boardsQueryClient}>
+      <EntityBoardsList />
+    </QueryClientProvider>
   );
 }
