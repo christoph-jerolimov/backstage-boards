@@ -357,9 +357,13 @@ export class BoardsService {
 
   async listBoards(
     principal: BoardsPrincipal,
-    options?: { favoritesOnly?: boolean },
+    options?: { favoritesOnly?: boolean; entityRef?: string },
   ): Promise<BoardListEntry[]> {
-    const rows = await this.knex<BoardRow>('boards').orderBy('name');
+    const query = this.knex<BoardRow>('boards').orderBy('name');
+    if (options?.entityRef) {
+      query.where('entity_ref', options.entityRef);
+    }
+    const rows = await query;
     const userRef = principal.type === 'user' ? principal.userRef : undefined;
     const favoriteIds = new Set<string>(
       userRef

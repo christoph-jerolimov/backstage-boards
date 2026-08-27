@@ -74,6 +74,22 @@ describe('BoardsService', () => {
       expect(list.find(b => b.id === viaGroup.id)?.access).toBe('read');
     });
 
+    it('filters the listing by assigned entity, access still enforced', async () => {
+      const mine = await service.createBoard(alice, {
+        name: 'Mine',
+        entityRef: 'system:default/payments',
+      });
+      await service.createBoard(alice, { name: 'Other entity' });
+      await service.createBoard(bob, {
+        name: 'Inaccessible',
+        entityRef: 'system:default/payments',
+      });
+      const filtered = await service.listBoards(alice, {
+        entityRef: 'system:default/payments',
+      });
+      expect(filtered.map(board => board.id)).toEqual([mine.id]);
+    });
+
     it('effective level is the highest grant', async () => {
       const board = await service.createBoard(bob, { name: 'B' });
       await service.addPermission(bob, board.id, {
