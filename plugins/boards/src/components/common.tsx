@@ -233,6 +233,12 @@ export function changeSummary(change: {
   if (change.type === 'created') {
     return 'created this item';
   }
+  if (change.type === 'archived') {
+    return 'archived this item';
+  }
+  if (change.type === 'restored') {
+    return 'restored this item';
+  }
   if (change.type === 'moved') {
     return `moved this item from “${String(change.oldValue)}” to “${String(change.newValue)}”`;
   }

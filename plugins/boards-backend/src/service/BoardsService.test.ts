@@ -403,16 +403,81 @@ describe('BoardsService', () => {
       );
     });
 
-    it('deletes items', async () => {
+    it('archives items on delete and restores them with history', async () => {
       const board = await service.createBoard(alice, { name: 'B' });
+      const item = await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Item',
+      });
+      await service.addComment(alice, board.id, item.id, 'keep me');
+      await service.deleteItem(alice, board.id, item.id);
+      // hidden from views, but still archived-listable
+      expect(await service.listItems(alice, board.id)).toHaveLength(0);
+      const archived = await service.listArchivedItems(alice, board.id);
+      expect(archived.map(entry => entry.id)).toEqual([item.id]);
+      expect(archived[0].archivedBy).toBe('user:default/alice');
+      // mutations on archived items are rejected
+      await expect(
+        service.updateItem(alice, board.id, item.id, { title: 'X' }),
+      ).rejects.toThrow(/archived/);
+      await expect(
+        service.addComment(alice, board.id, item.id, 'nope'),
+      ).rejects.toThrow(/archived/);
+      // restore brings everything back
+      const restored = await service.restoreItem(alice, board.id, item.id);
+      expect(restored.archivedAt).toBeUndefined();
+      expect(await service.listItems(alice, board.id)).toHaveLength(1);
+      const timeline = await service.getTimeline(alice, board.id, item.id);
+      const types = timeline
+        .filter(entry => entry.kind === 'change')
+        .map(entry => (entry.kind === 'change' ? entry.change.type : ''));
+      expect(types).toContain('archived');
+      expect(types).toContain('restored');
+      expect(timeline.some(entry => entry.kind === 'comment')).toBe(true);
+    });
+
+    it('read-only users cannot restore', async () => {
+      const board = await service.createBoard(alice, {
+        name: 'B',
+        visibility: 'logged-in-read',
+      });
       const item = await service.createItem(alice, board.id, {
         columnId: board.columns[0].id,
         title: 'Item',
       });
       await service.deleteItem(alice, board.id, item.id);
       await expect(
-        service.getItem(alice, board.id, item.id),
-      ).rejects.toThrow(/not found/);
+        service.restoreItem(bob, board.id, item.id),
+      ).rejects.toThrow(/requires 'write'/);
+      await expect(service.listArchivedItems(bob, board.id)).rejects.toThrow(
+        /requires 'write'/,
+      );
+    });
+
+    it('purges only items archived before the cutoff', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const oldItem = await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Old',
+      });
+      const newItem = await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'New',
+      });
+      await service.deleteItem(alice, board.id, oldItem.id);
+      await service.deleteItem(alice, board.id, newItem.id);
+      // backdate the first archival beyond the retention window
+      const past = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000);
+      await knex('items')
+        .where('id', oldItem.id)
+        .update({ archived_at: past.toISOString() });
+      const purged = await service.purgeArchivedItems(
+        new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+      );
+      expect(purged).toBe(1);
+      const remaining = await service.listArchivedItems(alice, board.id);
+      expect(remaining.map(entry => entry.title)).toEqual(['New']);
+      expect(await knex('changes').where('item_id', oldItem.id)).toHaveLength(0);
     });
   });
 
@@ -873,13 +938,13 @@ describe('BoardsService', () => {
       ).rejects.toThrow(/not found/);
     });
 
-    it('notifies watchers when an item is deleted', async () => {
+    it('notifies watchers when an item is archived', async () => {
       const { board, item } = await setupWatchedItem();
       await service.setWatchItem(carol, board.id, item.id, true);
       await service.deleteItem(alice, board.id, item.id);
       expect(notifications.send).toHaveBeenCalledTimes(1);
       expect(notifications.send.mock.calls[0][0].payload.title).toMatch(
-        /deleted/i,
+        /archived/i,
       );
     });
   });

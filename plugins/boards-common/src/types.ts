@@ -69,6 +69,9 @@ export interface BoardItem {
   description?: string;
   /** Number of stored description versions (0 = never set). */
   descriptionVersionCount: number;
+  /** Set while the item is archived (soft-deleted, restorable for 30 days). */
+  archivedAt?: string;
+  archivedBy?: string;
   assignees: string[];
   labels: Record<string, string>;
   tags: string[];
@@ -99,7 +102,9 @@ export type ChangeType =
   | 'created'
   | 'updated'
   | 'moved'
-  | 'deleted';
+  | 'deleted'
+  | 'archived'
+  | 'restored';
 
 export interface ChangeRecord {
   id: string;

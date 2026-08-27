@@ -79,6 +79,8 @@ type ItemRow = {
   creator_ref: string | null;
   external_manager: string | null;
   description: string | null;
+  archived_at: string | null;
+  archived_by: string | null;
 };
 
 type ChangeRow = {
@@ -718,6 +720,8 @@ export class BoardsService {
       externalManager: row.external_manager ?? undefined,
       description: row.description ?? undefined,
       descriptionVersionCount: versionCountById.get(row.id) ?? 0,
+      archivedAt: row.archived_at ?? undefined,
+      archivedBy: row.archived_by ?? undefined,
       assignees: assignees
         .filter(a => a.item_id === row.id)
         .map(a => a.assignee_ref),
@@ -737,6 +741,7 @@ export class BoardsService {
     await this.requireBoard(principal, boardId, 'read');
     const query = this.knex<ItemRow>('items')
       .where('items.board_id', boardId)
+      .whereNull('items.archived_at')
       .orderBy('position');
     const text = filter?.text?.trim().toLocaleLowerCase('en-US');
     if (text) {
@@ -917,6 +922,7 @@ export class BoardsService {
     principal: BoardsPrincipal,
     boardId: string,
     itemId: string,
+    options?: { allowArchived?: boolean },
   ): Promise<ItemRow> {
     await this.requireBoard(principal, boardId, 'write');
     const row = await this.knex<ItemRow>('items')
@@ -929,6 +935,9 @@ export class BoardsService {
       throw new NotAllowedError(
         `This item is managed by '${row.external_manager}' and read-only`,
       );
+    }
+    if (row.archived_at && !options?.allowArchived) {
+      throw new ConflictError('Item is archived; restore it first');
     }
     return row;
   }
@@ -1108,6 +1117,7 @@ export class BoardsService {
     return this.getItem(principal, boardId, itemId);
   }
 
+  /** Archives (soft-deletes) an item; it stays restorable until purged. */
   async deleteItem(
     principal: BoardsPrincipal,
     boardId: string,
@@ -1115,20 +1125,104 @@ export class BoardsService {
   ): Promise<void> {
     const row = await this.requireMutableItem(principal, boardId, itemId);
     const actor = actorRef(principal);
-    // collect watchers before rows cascade away
-    const recipients = await this.watcherRefs(boardId, itemId, actor);
+    const timestamp = now();
     await this.knex.transaction(async trx => {
-      await trx('watches')
-        .where({ target_type: 'item', target_id: itemId })
-        .delete();
-      await trx('items').where('id', itemId).delete();
+      await trx('items').where('id', itemId).update({
+        archived_at: timestamp,
+        archived_by: actor,
+        updated_by: actor,
+        updated_at: timestamp,
+      });
+      await this.recordChange(trx, {
+        itemId,
+        boardId,
+        actor,
+        type: 'archived',
+      });
     });
     await this.emitBoardSignal(boardId, itemId);
-    await this.sendNotification(recipients, {
-      title: 'Item deleted',
-      description: `"${row.title}" was deleted`,
+    await this.notifyWatchers({
       boardId,
+      itemId,
+      actor,
+      title: 'Item archived',
+      description: `"${row.title}" was archived`,
     });
+  }
+
+  async listArchivedItems(
+    principal: BoardsPrincipal,
+    boardId: string,
+  ): Promise<BoardItem[]> {
+    await this.requireBoard(principal, boardId, 'write');
+    const rows = await this.knex<ItemRow>('items')
+      .where('board_id', boardId)
+      .whereNotNull('archived_at')
+      .orderBy('archived_at', 'desc');
+    return this.hydrateItems(
+      rows,
+      principal.type === 'user' ? principal.userRef : undefined,
+    );
+  }
+
+  async restoreItem(
+    principal: BoardsPrincipal,
+    boardId: string,
+    itemId: string,
+  ): Promise<BoardItem> {
+    const row = await this.requireMutableItem(principal, boardId, itemId, {
+      allowArchived: true,
+    });
+    if (!row.archived_at) {
+      throw new ConflictError('Item is not archived');
+    }
+    const actor = actorRef(principal);
+    const timestamp = now();
+    await this.knex.transaction(async trx => {
+      await trx('items').where('id', itemId).update({
+        archived_at: null,
+        archived_by: null,
+        updated_by: actor,
+        updated_at: timestamp,
+      });
+      await this.recordChange(trx, {
+        itemId,
+        boardId,
+        actor,
+        type: 'restored',
+      });
+    });
+    await this.emitBoardSignal(boardId, itemId);
+    await this.notifyWatchers({
+      boardId,
+      itemId,
+      actor,
+      title: 'Item restored',
+      description: `"${row.title}" was restored`,
+    });
+    return this.getItem(principal, boardId, itemId);
+  }
+
+  /** Permanently removes items archived before `olderThan`. */
+  async purgeArchivedItems(olderThan: Date): Promise<number> {
+    const cutoff = olderThan.toISOString();
+    const rows = await this.knex('items')
+      .whereNotNull('archived_at')
+      .where('archived_at', '<', cutoff)
+      .select('id');
+    const ids = rows.map(row => row.id as string);
+    if (ids.length === 0) {
+      return 0;
+    }
+    await this.knex.transaction(async trx => {
+      await trx('watches')
+        .where('target_type', 'item')
+        .whereIn('target_id', ids)
+        .delete();
+      await trx('items').whereIn('id', ids).delete();
+    });
+    this.logger.info(`Purged ${ids.length} archived board items`);
+    return ids.length;
   }
 
   // -------------------------------------------------------------- comments
@@ -1145,6 +1239,9 @@ export class BoardsService {
       .first();
     if (!item) {
       throw new NotFoundError(`Item ${itemId} not found`);
+    }
+    if (item.archived_at) {
+      throw new ConflictError('Item is archived; restore it first');
     }
     if (!text?.trim()) {
       throw new InputError('Comment text must not be empty');
