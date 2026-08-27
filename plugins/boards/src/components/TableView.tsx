@@ -1,9 +1,7 @@
 import { Fragment, useState } from 'react';
 import {
-  ButtonIcon,
   Cell,
   Column,
-  MenuTrigger,
   Row,
   TableBody,
   TableHeader,
@@ -18,8 +16,9 @@ import {
   sortItems,
 } from './grouping';
 import { GroupLabel } from './GroupLabel';
-import { ContextMenuState, ItemContextMenu, ItemMenu } from './ItemMenu';
-import type { BoardActions } from './KanbanView';
+import { ItemContextMenu, ItemMenu } from './ItemMenu';
+import { RowActionsMenu, useRowContextMenu } from './RowMenu';
+import type { BoardActions } from './BoardView';
 import { formatDate, RefDisplay } from './common';
 import { AssigneeAvatars } from './AssigneeAvatars';
 import { DueDateBadge } from './DueDate';
@@ -98,19 +97,7 @@ function ItemsTable(props: {
             </Cell>
             <Cell>{formatDate(item.updatedAt)}</Cell>
             <Cell>
-              <MenuTrigger>
-                <ButtonIcon
-                  aria-label={`Actions for ${item.title}`}
-                  variant="tertiary"
-                  size="small"
-                  icon={
-                    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden>
-                      <circle cx="5" cy="12" r="1.8" fill="currentColor" />
-                      <circle cx="12" cy="12" r="1.8" fill="currentColor" />
-                      <circle cx="19" cy="12" r="1.8" fill="currentColor" />
-                    </svg>
-                  }
-                />
+              <RowActionsMenu label={`Actions for ${item.title}`}>
                 <ItemMenu
                   item={item}
                   columns={board.columns}
@@ -118,7 +105,7 @@ function ItemsTable(props: {
                   actions={actions}
                   assigneePool={props.assigneePool}
                 />
-              </MenuTrigger>
+              </RowActionsMenu>
             </Cell>
           </Row>
         ))}
@@ -138,19 +125,14 @@ export function TableView(props: {
   const { board, items, canWrite, actions, groupBy, openItem } = props;
   const assigneePool = [...new Set(items.flatMap(item => item.assignees))];
   const [sort, setSort] = useState<ItemSortDescriptor | undefined>(undefined);
-  const [contextMenu, setContextMenu] = useState<
-    ContextMenuState | undefined
-  >();
-  const onItemContextMenu = (item: BoardItem, event: React.MouseEvent) => {
-    event.preventDefault();
-    setContextMenu({ item, x: event.clientX, y: event.clientY });
-  };
+  const contextMenu = useRowContextMenu<BoardItem>();
+  const onItemContextMenu = contextMenu.open;
   const contextMenuElement = (
     <ItemContextMenu
-      state={contextMenu}
-      onClose={() => setContextMenu(undefined)}
+      state={contextMenu.state}
+      onClose={contextMenu.close}
       columns={board.columns}
-      readonly={!canWrite || !!contextMenu?.item.externalManager}
+      readonly={!canWrite || !!contextMenu.state?.row.externalManager}
       actions={actions}
       assigneePool={assigneePool}
     />

@@ -54,7 +54,7 @@ import {
 } from '../queries';
 import { useQueryClient } from '@tanstack/react-query';
 import { InlineEdit } from './common';
-import { BoardActions, KanbanView } from './KanbanView';
+import { BoardActions, BoardView } from './BoardView';
 import { TableView } from './TableView';
 import { ItemDrawer } from './ItemDrawer';
 import { BoardSettingsDialog } from './BoardSettingsDialog';
@@ -474,7 +474,7 @@ export function BoardPageContent(props: {
       )}
 
       {view === 'board' ? (
-        <KanbanView
+        <BoardView
           board={board}
           items={filteredItems}
           canWrite={canWrite}

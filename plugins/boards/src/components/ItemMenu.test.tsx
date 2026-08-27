@@ -195,7 +195,7 @@ describe('ItemContextMenu', () => {
     const item = testItem({ title: 'Right-clicked' });
     renderWithProviders(
       <ItemContextMenu
-        state={{ item, x: 120, y: 80 }}
+        state={{ row: item, x: 120, y: 80 }}
         onClose={onClose}
         columns={columns}
         readonly={false}

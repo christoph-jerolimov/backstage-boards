@@ -53,20 +53,16 @@ describe('BoardListPage', () => {
       await screen.findByRole('tab', { name: 'Favorites (1)' }),
     ).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('tab', { name: 'All (2)' })).toBeInTheDocument();
+    expect(screen.getByRole('row', { name: /Roadmap/ })).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Open board Roadmap' }),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'Open board Support' }),
+      screen.queryByRole('row', { name: /Support/ }),
     ).not.toBeInTheDocument();
   });
 
   it('lists every accessible board on the All tab', async () => {
     renderPage();
     await userEvent.click(await screen.findByRole('tab', { name: 'All (2)' }));
-    expect(
-      screen.getByRole('button', { name: 'Open board Support' }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole('row', { name: /Support/ })).toBeInTheDocument();
     expect(
       await screen.findByRole('link', { name: 'www' }),
     ).toBeInTheDocument();
@@ -109,20 +105,52 @@ describe('BoardListPage', () => {
     await waitFor(() => expect(boardsApi.listBoards).toHaveBeenCalledTimes(2));
   });
 
-  it('opens a board', async () => {
+  it('opens a board when its row is activated', async () => {
+    renderPage();
+    await userEvent.click(await screen.findByRole('row', { name: /Roadmap/ }));
+    expect(mockNavigate).toHaveBeenCalledWith('board-1');
+  });
+
+  it('keeps My items on a tab rather than a header button', async () => {
+    renderPage();
+    expect(
+      await screen.findByRole('tab', { name: 'My items' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'My items' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('offers the board menu from the row', async () => {
     renderPage();
     await userEvent.click(
-      await screen.findByRole('button', { name: 'Open board Roadmap' }),
+      await screen.findByRole('button', { name: 'Actions for Roadmap' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Open board' }),
     );
     expect(mockNavigate).toHaveBeenCalledWith('board-1');
   });
 
-  it('navigates to the My items page', async () => {
-    renderPage();
+  it('toggles the favorite from the row menu', async () => {
+    const { boardsApi } = renderPage();
     await userEvent.click(
-      await screen.findByRole('button', { name: 'My items', hidden: false }),
+      await screen.findByRole('button', { name: 'Actions for Roadmap' }),
     );
-    expect(mockNavigate).toHaveBeenCalledWith('my-items');
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Remove from favorites' }),
+    );
+    expect(boardsApi.setFavorite).toHaveBeenCalledWith('board-1', false);
+  });
+
+  it('opens the board menu at the pointer on right-click', async () => {
+    renderPage();
+    const row = await screen.findByRole('row', { name: /Roadmap/ });
+    await userEvent.pointer({ target: row, keys: '[MouseRight]' });
+    expect(
+      await screen.findByRole('menuitem', { name: 'Open board' }),
+    ).toBeInTheDocument();
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it('creates a board and opens it', async () => {

@@ -64,11 +64,12 @@ describe('MyItemsList', () => {
     expect(
       screen.getByRole('button', { name: 'Open board Support' }),
     ).toBeInTheDocument();
+    expect(screen.getAllByRole('grid')).toHaveLength(2);
     expect(
-      screen.getByRole('button', { name: 'Open item Ship the docs' }),
+      screen.getByRole('row', { name: /Ship the docs/ }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Open item Fix the build' }),
+      screen.getByRole('row', { name: /Fix the build/ }),
     ).toBeInTheDocument();
   });
 
@@ -87,12 +88,33 @@ describe('MyItemsList', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/boards/board-2');
   });
 
-  it('opens an item on its board', async () => {
+  it('opens an item on its board when its row is activated', async () => {
     renderList();
     await userEvent.click(
-      await screen.findByRole('button', { name: 'Open item Ship the docs' }),
+      await screen.findByRole('row', { name: /Ship the docs/ }),
     );
     expect(mockNavigate).toHaveBeenCalledWith('/boards/board-1?item=item-1');
+  });
+
+  it('offers the item menu from the row', async () => {
+    renderList();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Actions for Ship the docs' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Open item' }),
+    );
+    expect(mockNavigate).toHaveBeenCalledWith('/boards/board-1?item=item-1');
+  });
+
+  it('opens the item menu at the pointer on right-click', async () => {
+    renderList();
+    const row = await screen.findByRole('row', { name: /Answer the ticket/ });
+    await userEvent.pointer({ target: row, keys: '[MouseRight]' });
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Open board' }),
+    );
+    expect(mockNavigate).toHaveBeenCalledWith('/boards/board-2');
   });
 
   it('says so when nothing is assigned', async () => {
