@@ -31,6 +31,7 @@ import {
   extractMentions,
   isTextRef,
   isValidActorRef,
+  isValidDueDate,
   isValidPrincipalRef,
   levelIncludes,
 } from '@internal/plugin-boards-common';
@@ -87,6 +88,7 @@ type ItemRow = {
   description: string | null;
   archived_at: string | null;
   archived_by: string | null;
+  due_date: string | null;
 };
 
 type ChangeRow = {
@@ -874,6 +876,7 @@ export class BoardsService {
       descriptionVersionCount: versionCountById.get(row.id) ?? 0,
       archivedAt: row.archived_at ?? undefined,
       archivedBy: row.archived_by ?? undefined,
+      dueDate: row.due_date ?? undefined,
       assignees: assignees
         .filter(a => a.item_id === row.id)
         .map(a => a.assignee_ref),
@@ -1168,6 +1171,22 @@ export class BoardsService {
       const prev = [...before.tags].sort();
       if (JSON.stringify(next) !== JSON.stringify(prev)) {
         changes.push({ field: 'tags', oldValue: prev, newValue: next });
+      }
+    }
+    if (update.dueDate !== undefined) {
+      const next = update.dueDate;
+      if (next !== null && !isValidDueDate(next)) {
+        throw new InputError(
+          `Invalid due date '${next}', expected YYYY-MM-DD`,
+        );
+      }
+      if ((next ?? null) !== row.due_date) {
+        patch.due_date = next ?? null;
+        changes.push({
+          field: 'dueDate',
+          oldValue: row.due_date ?? undefined,
+          newValue: next ?? undefined,
+        });
       }
     }
 

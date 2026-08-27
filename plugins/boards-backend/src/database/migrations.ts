@@ -269,12 +269,28 @@ const boardArchival: Migration = {
   },
 };
 
+const itemDueDates: Migration = {
+  name: '20260827_06_item_due_dates',
+  async up(knex) {
+    await knex.schema.alterTable('items', table => {
+      // plain YYYY-MM-DD calendar date, no time component
+      table.string('due_date').nullable();
+    });
+  },
+  async down(knex) {
+    await knex.schema.alterTable('items', table => {
+      table.dropColumn('due_date');
+    });
+  },
+};
+
 const migrations: Migration[] = [
   initial,
   itemDescriptions,
   itemArchival,
   columnColors,
   boardArchival,
+  itemDueDates,
 ];
 
 class BoardsMigrationSource implements Knex.MigrationSource<Migration> {

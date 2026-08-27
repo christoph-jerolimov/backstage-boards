@@ -20,6 +20,7 @@ import {
 } from './grouping';
 import { formatDate, RefDisplay } from './common';
 import { AssigneeAvatars } from './AssigneeAvatars';
+import { DueDateBadge } from './DueDate';
 import { StatusBadge } from './StatusBadge';
 
 function ItemsTable(props: {
@@ -49,6 +50,9 @@ function ItemsTable(props: {
         <Column id="status" allowsSorting>
           Status
         </Column>
+        <Column id="dueDate" allowsSorting>
+          Due
+        </Column>
         <Column>Assignees</Column>
         <Column>Labels</Column>
         <Column>Tags</Column>
@@ -68,6 +72,9 @@ function ItemsTable(props: {
             </Cell>
             <Cell>
               <StatusBadge column={columnOf(item.columnId)} />
+            </Cell>
+            <Cell>
+              <DueDateBadge dueDate={item.dueDate} />
             </Cell>
             <Cell>
               <AssigneeAvatars refs={item.assignees} />

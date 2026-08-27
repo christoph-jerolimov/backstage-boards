@@ -22,10 +22,14 @@ import {
   BoardWithContext,
   COLUMN_COLORS,
   ColumnColor,
+  fridayISO,
+  todayISO,
+  tomorrowISO,
 } from '@internal/plugin-boards-common';
 import { groupByAssignee, positionBefore, UNASSIGNED } from './grouping';
 import { InlineEdit, RefDisplay } from './common';
 import { AssigneeAvatars } from './AssigneeAvatars';
+import { DueDateBadge } from './DueDate';
 import { ColumnDot } from './StatusBadge';
 
 const DRAG_TYPE = 'application/x-boards-item';
@@ -43,6 +47,7 @@ export interface BoardActions {
   deleteColumn: (columnId: string, moveItemsTo?: string) => Promise<void>;
   openItem: (itemId: string) => void;
   renameItem: (itemId: string, title: string) => Promise<void>;
+  setItemDueDate: (itemId: string, dueDate: string | null) => Promise<void>;
 }
 
 function MoreIcon() {
@@ -158,6 +163,42 @@ function ItemCard(props: {
                   </Menu>
                 </SubmenuTrigger>
               )}
+              {!readonly && (
+                <SubmenuTrigger>
+                  <MenuItem>Due date</MenuItem>
+                  <Menu>
+                    <MenuItem
+                      onAction={() =>
+                        actions.setItemDueDate(item.id, todayISO())
+                      }
+                    >
+                      Today
+                    </MenuItem>
+                    <MenuItem
+                      onAction={() =>
+                        actions.setItemDueDate(item.id, tomorrowISO())
+                      }
+                    >
+                      Tomorrow
+                    </MenuItem>
+                    <MenuItem
+                      onAction={() =>
+                        actions.setItemDueDate(item.id, fridayISO())
+                      }
+                    >
+                      This week (Fri)
+                    </MenuItem>
+                    {item.dueDate && (
+                      <MenuItem
+                        color="danger"
+                        onAction={() => actions.setItemDueDate(item.id, null)}
+                      >
+                        Remove due date
+                      </MenuItem>
+                    )}
+                  </Menu>
+                </SubmenuTrigger>
+              )}
             </Menu>
           </MenuTrigger>
         </div>
@@ -167,6 +208,7 @@ function ItemCard(props: {
           Managed by {item.externalManager} (read-only)
         </Text>
       )}
+      <DueDateBadge dueDate={item.dueDate} />
       <AssigneeAvatars refs={item.assignees} />
       {item.tags.length > 0 && (
         <Text variant="body-x-small" color="secondary">
