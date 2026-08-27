@@ -1,0 +1,1386 @@
+import { LoggerService } from '@backstage/backend-plugin-api';
+import {
+  ConflictError,
+  InputError,
+  NotAllowedError,
+  NotFoundError,
+} from '@backstage/errors';
+import { NotificationService } from '@backstage/plugin-notifications-node';
+import {
+  Board,
+  BoardColumn,
+  BoardItem,
+  BoardListEntry,
+  BoardPermissionEntry,
+  BoardPermissionLevel,
+  BoardUpdate,
+  BoardVisibility,
+  BoardWithContext,
+  ChangeRecord,
+  CommentVersion,
+  ItemComment,
+  ItemUpdate,
+  NewItem,
+  TimelineEntry,
+  ALL_VISIBILITIES,
+  isTextRef,
+  isValidActorRef,
+  isValidPrincipalRef,
+  levelIncludes,
+} from '@internal/plugin-boards-common';
+import { Knex } from 'knex';
+import { randomUUID as uuid } from 'crypto';
+import {
+  BoardsPrincipal,
+  actorRef,
+  computeEffectiveLevel,
+} from './access';
+
+const DEFAULT_COLUMNS = ['To do', 'In progress', 'Done'];
+const POSITION_STEP = 1000;
+
+type BoardRow = {
+  id: string;
+  name: string;
+  entity_ref: string | null;
+  visibility: BoardVisibility;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+type ColumnRow = {
+  id: string;
+  board_id: string;
+  title: string;
+  position: number;
+};
+
+type PermissionRow = {
+  id: string;
+  board_id: string;
+  principal_ref: string;
+  level: BoardPermissionLevel;
+};
+
+type ItemRow = {
+  id: string;
+  board_id: string;
+  column_id: string;
+  position: number;
+  title: string;
+  created_by: string;
+  created_at: string;
+  updated_by: string;
+  updated_at: string;
+  creator_ref: string | null;
+  external_manager: string | null;
+};
+
+type ChangeRow = {
+  id: string;
+  item_id: string;
+  board_id: string;
+  actor_ref: string;
+  at: string;
+  type: string;
+  field: string | null;
+  old_value: string | null;
+  new_value: string | null;
+};
+
+function now(): string {
+  return new Date().toISOString();
+}
+
+function toBoard(row: BoardRow): Board {
+  return {
+    id: row.id,
+    name: row.name,
+    entityRef: row.entity_ref ?? undefined,
+    visibility: row.visibility,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function toColumn(row: ColumnRow): BoardColumn {
+  return {
+    id: row.id,
+    boardId: row.board_id,
+    title: row.title,
+    position: row.position,
+  };
+}
+
+function toPermission(row: PermissionRow): BoardPermissionEntry {
+  return {
+    id: row.id,
+    boardId: row.board_id,
+    principalRef: row.principal_ref,
+    level: row.level,
+  };
+}
+
+function toChange(row: ChangeRow): ChangeRecord {
+  return {
+    id: row.id,
+    itemId: row.item_id,
+    boardId: row.board_id,
+    actorRef: row.actor_ref,
+    at: row.at,
+    type: row.type as ChangeRecord['type'],
+    field: row.field ?? undefined,
+    oldValue: row.old_value === null ? undefined : JSON.parse(row.old_value),
+    newValue: row.new_value === null ? undefined : JSON.parse(row.new_value),
+  };
+}
+
+export interface BoardsServiceOptions {
+  knex: Knex;
+  logger: LoggerService;
+  notifications?: NotificationService;
+  /** Base path used in notification links, e.g. `/boards`. */
+  appLinkBase?: string;
+}
+
+export class BoardsService {
+  private readonly knex: Knex;
+  private readonly logger: LoggerService;
+  private readonly notifications?: NotificationService;
+  private readonly appLinkBase: string;
+
+  constructor(options: BoardsServiceOptions) {
+    this.knex = options.knex;
+    this.logger = options.logger;
+    this.notifications = options.notifications;
+    this.appLinkBase = options.appLinkBase ?? '/boards';
+  }
+
+  // ---------------------------------------------------------------- access
+
+  private async permissionRows(boardId: string): Promise<PermissionRow[]> {
+    return this.knex<PermissionRow>('board_permissions').where(
+      'board_id',
+      boardId,
+    );
+  }
+
+  private async effectiveLevel(
+    principal: BoardsPrincipal,
+    board: BoardRow,
+  ): Promise<BoardPermissionLevel | undefined> {
+    const entries = (await this.permissionRows(board.id)).map(row => ({
+      principalRef: row.principal_ref,
+      level: row.level,
+    }));
+    return computeEffectiveLevel({
+      principal,
+      visibility: board.visibility,
+      entries,
+    });
+  }
+
+  /**
+   * Loads a board and asserts the principal has at least the required
+   * level. Boards the principal cannot read at all surface as not-found.
+   */
+  private async requireBoard(
+    principal: BoardsPrincipal,
+    boardId: string,
+    required: BoardPermissionLevel,
+  ): Promise<{ board: BoardRow; level: BoardPermissionLevel }> {
+    const board = await this.knex<BoardRow>('boards')
+      .where('id', boardId)
+      .first();
+    if (!board) {
+      throw new NotFoundError(`Board ${boardId} not found`);
+    }
+    const level = await this.effectiveLevel(principal, board);
+    if (!level) {
+      throw new NotFoundError(`Board ${boardId} not found`);
+    }
+    if (!levelIncludes(level, required)) {
+      throw new NotAllowedError(
+        `This operation requires '${required}' access to the board`,
+      );
+    }
+    return { board, level };
+  }
+
+  private requireUserRef(principal: BoardsPrincipal): string {
+    if (principal.type !== 'user') {
+      throw new NotAllowedError('This operation requires a logged-in user');
+    }
+    return principal.userRef;
+  }
+
+  // ---------------------------------------------------------------- boards
+
+  async createBoard(
+    principal: BoardsPrincipal,
+    options: {
+      name: string;
+      columns?: string[];
+      entityRef?: string;
+      visibility?: BoardVisibility;
+      /** Additional admin grants, mainly for service callers. */
+      admins?: string[];
+    },
+  ): Promise<BoardWithContext> {
+    if (principal.type === 'anonymous') {
+      throw new NotAllowedError('Creating a board requires authentication');
+    }
+    const name = options.name?.trim();
+    if (!name) {
+      throw new InputError('Board name must not be empty');
+    }
+    if (options.visibility && !ALL_VISIBILITIES.includes(options.visibility)) {
+      throw new InputError(`Invalid visibility '${options.visibility}'`);
+    }
+
+    const boardId = uuid();
+    const timestamp = now();
+    const creator = actorRef(principal);
+    const columnTitles =
+      options.columns && options.columns.length > 0
+        ? options.columns
+        : DEFAULT_COLUMNS;
+
+    await this.knex.transaction(async trx => {
+      await trx<BoardRow>('boards').insert({
+        id: boardId,
+        name,
+        entity_ref: options.entityRef ?? null,
+        visibility: options.visibility ?? 'private',
+        created_by: creator,
+        created_at: timestamp,
+        updated_at: timestamp,
+      });
+      await trx<ColumnRow>('board_columns').insert(
+        columnTitles.map((title, index) => ({
+          id: uuid(),
+          board_id: boardId,
+          title,
+          position: (index + 1) * POSITION_STEP,
+        })),
+      );
+      const adminRefs = new Set<string>(options.admins ?? []);
+      if (principal.type === 'user') {
+        adminRefs.add(principal.userRef);
+      }
+      for (const ref of adminRefs) {
+        if (!isValidPrincipalRef(ref)) {
+          throw new InputError(
+            `Invalid principal '${ref}', expected a user or group entity ref`,
+          );
+        }
+      }
+      if (adminRefs.size > 0) {
+        await trx<PermissionRow>('board_permissions').insert(
+          [...adminRefs].map(ref => ({
+            id: uuid(),
+            board_id: boardId,
+            principal_ref: ref,
+            level: 'admin' as const,
+          })),
+        );
+      }
+    });
+
+    return this.getBoard(principal, boardId);
+  }
+
+  async getBoard(
+    principal: BoardsPrincipal,
+    boardId: string,
+  ): Promise<BoardWithContext> {
+    const { board, level } = await this.requireBoard(principal, boardId, 'read');
+    const columns = await this.knex<ColumnRow>('board_columns')
+      .where('board_id', boardId)
+      .orderBy('position');
+    const userRef = principal.type === 'user' ? principal.userRef : undefined;
+    const favorite = userRef
+      ? !!(await this.knex('favorites')
+          .where({ user_ref: userRef, board_id: boardId })
+          .first())
+      : false;
+    const watching = userRef
+      ? !!(await this.knex('watches')
+          .where({
+            user_ref: userRef,
+            target_type: 'board',
+            target_id: boardId,
+          })
+          .first())
+      : false;
+    return {
+      ...toBoard(board),
+      columns: columns.map(toColumn),
+      access: level,
+      favorite,
+      watching,
+    };
+  }
+
+  async listBoards(
+    principal: BoardsPrincipal,
+    options?: { favoritesOnly?: boolean },
+  ): Promise<BoardListEntry[]> {
+    const rows = await this.knex<BoardRow>('boards').orderBy('name');
+    const userRef = principal.type === 'user' ? principal.userRef : undefined;
+    const favoriteIds = new Set<string>(
+      userRef
+        ? (
+            await this.knex('favorites')
+              .where('user_ref', userRef)
+              .select('board_id')
+          ).map(row => row.board_id)
+        : [],
+    );
+
+    const result: BoardListEntry[] = [];
+    for (const row of rows) {
+      const level = await this.effectiveLevel(principal, row);
+      if (!level) {
+        continue;
+      }
+      if (options?.favoritesOnly && !favoriteIds.has(row.id)) {
+        continue;
+      }
+      result.push({
+        ...toBoard(row),
+        access: level,
+        favorite: favoriteIds.has(row.id),
+      });
+    }
+    return result;
+  }
+
+  async updateBoard(
+    principal: BoardsPrincipal,
+    boardId: string,
+    update: BoardUpdate,
+  ): Promise<BoardWithContext> {
+    await this.requireBoard(principal, boardId, 'admin');
+    const patch: Partial<BoardRow> = { updated_at: now() };
+    if (update.name !== undefined) {
+      const name = update.name.trim();
+      if (!name) {
+        throw new InputError('Board name must not be empty');
+      }
+      patch.name = name;
+    }
+    if (update.entityRef !== undefined) {
+      patch.entity_ref = update.entityRef;
+    }
+    if (update.visibility !== undefined) {
+      if (!ALL_VISIBILITIES.includes(update.visibility)) {
+        throw new InputError(`Invalid visibility '${update.visibility}'`);
+      }
+      patch.visibility = update.visibility;
+    }
+    await this.knex<BoardRow>('boards').where('id', boardId).update(patch);
+    return this.getBoard(principal, boardId);
+  }
+
+  async deleteBoard(
+    principal: BoardsPrincipal,
+    boardId: string,
+  ): Promise<void> {
+    await this.requireBoard(principal, boardId, 'admin');
+    await this.knex.transaction(async trx => {
+      // changes/comments/items/columns/permissions/favorites cascade from FKs
+      await trx('watches')
+        .where({ target_type: 'board', target_id: boardId })
+        .delete();
+      const itemIds = (
+        await trx('items').where('board_id', boardId).select('id')
+      ).map(row => row.id);
+      if (itemIds.length > 0) {
+        await trx('watches')
+          .where('target_type', 'item')
+          .whereIn('target_id', itemIds)
+          .delete();
+      }
+      await trx('boards').where('id', boardId).delete();
+    });
+  }
+
+  async setFavorite(
+    principal: BoardsPrincipal,
+    boardId: string,
+    favorite: boolean,
+  ): Promise<void> {
+    const userRef = this.requireUserRef(principal);
+    await this.requireBoard(principal, boardId, 'read');
+    await this.knex('favorites')
+      .where({ user_ref: userRef, board_id: boardId })
+      .delete();
+    if (favorite) {
+      await this.knex('favorites').insert({
+        user_ref: userRef,
+        board_id: boardId,
+      });
+    }
+  }
+
+  // ----------------------------------------------------------- permissions
+
+  async listPermissions(
+    principal: BoardsPrincipal,
+    boardId: string,
+  ): Promise<BoardPermissionEntry[]> {
+    await this.requireBoard(principal, boardId, 'admin');
+    return (await this.permissionRows(boardId)).map(toPermission);
+  }
+
+  async addPermission(
+    principal: BoardsPrincipal,
+    boardId: string,
+    entry: { principalRef: string; level: BoardPermissionLevel },
+  ): Promise<BoardPermissionEntry> {
+    await this.requireBoard(principal, boardId, 'admin');
+    if (!isValidPrincipalRef(entry.principalRef)) {
+      throw new InputError(
+        `Invalid principal '${entry.principalRef}', expected a user or group entity ref`,
+      );
+    }
+    this.assertLevel(entry.level);
+    const existing = await this.knex<PermissionRow>('board_permissions')
+      .where({ board_id: boardId, principal_ref: entry.principalRef })
+      .first();
+    if (existing) {
+      throw new ConflictError(
+        `'${entry.principalRef}' already has access to this board`,
+      );
+    }
+    const row: PermissionRow = {
+      id: uuid(),
+      board_id: boardId,
+      principal_ref: entry.principalRef,
+      level: entry.level,
+    };
+    await this.knex('board_permissions').insert(row);
+    return toPermission(row);
+  }
+
+  async updatePermission(
+    principal: BoardsPrincipal,
+    boardId: string,
+    permissionId: string,
+    level: BoardPermissionLevel,
+  ): Promise<BoardPermissionEntry> {
+    await this.requireBoard(principal, boardId, 'admin');
+    this.assertLevel(level);
+    const row = await this.knex<PermissionRow>('board_permissions')
+      .where({ id: permissionId, board_id: boardId })
+      .first();
+    if (!row) {
+      throw new NotFoundError(`Permission entry not found`);
+    }
+    if (row.level === 'admin' && level !== 'admin') {
+      await this.assertNotLastAdmin(boardId);
+    }
+    await this.knex('board_permissions')
+      .where('id', permissionId)
+      .update({ level });
+    return { ...toPermission(row), level };
+  }
+
+  async removePermission(
+    principal: BoardsPrincipal,
+    boardId: string,
+    permissionId: string,
+  ): Promise<void> {
+    await this.requireBoard(principal, boardId, 'admin');
+    const row = await this.knex<PermissionRow>('board_permissions')
+      .where({ id: permissionId, board_id: boardId })
+      .first();
+    if (!row) {
+      throw new NotFoundError(`Permission entry not found`);
+    }
+    if (row.level === 'admin') {
+      await this.assertNotLastAdmin(boardId);
+    }
+    await this.knex('board_permissions').where('id', permissionId).delete();
+  }
+
+  private assertLevel(level: string): void {
+    if (!['read', 'write', 'admin'].includes(level)) {
+      throw new InputError(`Invalid permission level '${level}'`);
+    }
+  }
+
+  private async assertNotLastAdmin(boardId: string): Promise<void> {
+    const admins = await this.knex('board_permissions')
+      .where({ board_id: boardId, level: 'admin' })
+      .count({ count: '*' })
+      .first();
+    if (Number(admins?.count ?? 0) <= 1) {
+      throw new ConflictError(
+        'A board must keep at least one admin; add another admin first',
+      );
+    }
+  }
+
+  // --------------------------------------------------------------- columns
+
+  async addColumn(
+    principal: BoardsPrincipal,
+    boardId: string,
+    options: { title: string; position?: number },
+  ): Promise<BoardColumn> {
+    await this.requireBoard(principal, boardId, 'write');
+    const title = options.title?.trim();
+    if (!title) {
+      throw new InputError('Column title must not be empty');
+    }
+    let position = options.position;
+    if (position === undefined) {
+      const max = await this.knex('board_columns')
+        .where('board_id', boardId)
+        .max({ max: 'position' })
+        .first();
+      position = Number(max?.max ?? 0) + POSITION_STEP;
+    }
+    const row: ColumnRow = {
+      id: uuid(),
+      board_id: boardId,
+      title,
+      position,
+    };
+    await this.knex('board_columns').insert(row);
+    return toColumn(row);
+  }
+
+  async updateColumn(
+    principal: BoardsPrincipal,
+    boardId: string,
+    columnId: string,
+    update: { title?: string; position?: number },
+  ): Promise<BoardColumn> {
+    await this.requireBoard(principal, boardId, 'write');
+    const row = await this.knex<ColumnRow>('board_columns')
+      .where({ id: columnId, board_id: boardId })
+      .first();
+    if (!row) {
+      throw new NotFoundError(`Column ${columnId} not found`);
+    }
+    const patch: Partial<ColumnRow> = {};
+    if (update.title !== undefined) {
+      const title = update.title.trim();
+      if (!title) {
+        throw new InputError('Column title must not be empty');
+      }
+      patch.title = title;
+    }
+    if (update.position !== undefined) {
+      patch.position = update.position;
+    }
+    if (Object.keys(patch).length > 0) {
+      await this.knex('board_columns').where('id', columnId).update(patch);
+    }
+    return toColumn({ ...row, ...patch });
+  }
+
+  async deleteColumn(
+    principal: BoardsPrincipal,
+    boardId: string,
+    columnId: string,
+    options?: { moveItemsTo?: string },
+  ): Promise<void> {
+    await this.requireBoard(principal, boardId, 'write');
+    const row = await this.knex<ColumnRow>('board_columns')
+      .where({ id: columnId, board_id: boardId })
+      .first();
+    if (!row) {
+      throw new NotFoundError(`Column ${columnId} not found`);
+    }
+    const itemCount = Number(
+      (
+        await this.knex('items')
+          .where('column_id', columnId)
+          .count({ count: '*' })
+          .first()
+      )?.count ?? 0,
+    );
+    if (itemCount > 0) {
+      const target = options?.moveItemsTo;
+      if (!target) {
+        throw new ConflictError(
+          'Column still contains items; choose a column to move them to',
+        );
+      }
+      if (target === columnId) {
+        throw new InputError('Target column must differ from the deleted one');
+      }
+      const targetRow = await this.knex<ColumnRow>('board_columns')
+        .where({ id: target, board_id: boardId })
+        .first();
+      if (!targetRow) {
+        throw new NotFoundError(`Target column ${target} not found`);
+      }
+      await this.knex.transaction(async trx => {
+        await trx('items')
+          .where('column_id', columnId)
+          .update({ column_id: target });
+        await trx('board_columns').where('id', columnId).delete();
+      });
+      return;
+    }
+    await this.knex('board_columns').where('id', columnId).delete();
+  }
+
+  // ----------------------------------------------------------------- items
+
+  private async hydrateItems(
+    rows: ItemRow[],
+    userRef?: string,
+  ): Promise<BoardItem[]> {
+    const ids = rows.map(row => row.id);
+    if (ids.length === 0) {
+      return [];
+    }
+    const assignees = await this.knex('item_assignees')
+      .whereIn('item_id', ids)
+      .select('item_id', 'assignee_ref');
+    const labels = await this.knex('item_labels')
+      .whereIn('item_id', ids)
+      .select('item_id', 'key', 'value');
+    const tags = await this.knex('item_tags')
+      .whereIn('item_id', ids)
+      .select('item_id', 'tag');
+    const watches = userRef
+      ? await this.knex('watches')
+          .where({ user_ref: userRef, target_type: 'item' })
+          .whereIn('target_id', ids)
+          .select('target_id')
+      : [];
+    const watchedIds = new Set(watches.map(row => row.target_id));
+
+    return rows.map(row => ({
+      id: row.id,
+      boardId: row.board_id,
+      columnId: row.column_id,
+      position: row.position,
+      title: row.title,
+      createdBy: row.created_by,
+      createdAt: row.created_at,
+      updatedBy: row.updated_by,
+      updatedAt: row.updated_at,
+      creatorRef: row.creator_ref ?? undefined,
+      externalManager: row.external_manager ?? undefined,
+      assignees: assignees
+        .filter(a => a.item_id === row.id)
+        .map(a => a.assignee_ref),
+      labels: Object.fromEntries(
+        labels.filter(l => l.item_id === row.id).map(l => [l.key, l.value]),
+      ),
+      tags: tags.filter(t => t.item_id === row.id).map(t => t.tag),
+      watching: watchedIds.has(row.id),
+    }));
+  }
+
+  async listItems(
+    principal: BoardsPrincipal,
+    boardId: string,
+  ): Promise<BoardItem[]> {
+    await this.requireBoard(principal, boardId, 'read');
+    const rows = await this.knex<ItemRow>('items')
+      .where('board_id', boardId)
+      .orderBy('position');
+    return this.hydrateItems(
+      rows,
+      principal.type === 'user' ? principal.userRef : undefined,
+    );
+  }
+
+  async getItem(
+    principal: BoardsPrincipal,
+    boardId: string,
+    itemId: string,
+  ): Promise<BoardItem> {
+    await this.requireBoard(principal, boardId, 'read');
+    const row = await this.knex<ItemRow>('items')
+      .where({ id: itemId, board_id: boardId })
+      .first();
+    if (!row) {
+      throw new NotFoundError(`Item ${itemId} not found`);
+    }
+    const [item] = await this.hydrateItems(
+      [row],
+      principal.type === 'user' ? principal.userRef : undefined,
+    );
+    return item;
+  }
+
+  private validateActorRefs(refs: string[]): void {
+    for (const ref of refs) {
+      if (!isValidActorRef(ref)) {
+        throw new InputError(
+          `Invalid reference '${ref}': must be a catalog entity ref or start with 'text:'`,
+        );
+      }
+    }
+  }
+
+  async createItem(
+    principal: BoardsPrincipal,
+    boardId: string,
+    item: NewItem,
+  ): Promise<BoardItem> {
+    await this.requireBoard(principal, boardId, 'write');
+    const title = item.title?.trim();
+    if (!title) {
+      throw new InputError('Item title must not be empty');
+    }
+    if (item.externalManager && principal.type !== 'service') {
+      throw new NotAllowedError(
+        'Only service callers may create externally managed items',
+      );
+    }
+    const column = await this.knex<ColumnRow>('board_columns')
+      .where({ id: item.columnId, board_id: boardId })
+      .first();
+    if (!column) {
+      throw new NotFoundError(`Column ${item.columnId} not found`);
+    }
+    this.validateActorRefs([
+      ...(item.creatorRef ? [item.creatorRef] : []),
+      ...(item.assignees ?? []),
+    ]);
+
+    let position = item.position;
+    if (position === undefined) {
+      const max = await this.knex('items')
+        .where('column_id', item.columnId)
+        .max({ max: 'position' })
+        .first();
+      position = Number(max?.max ?? 0) + POSITION_STEP;
+    }
+
+    const timestamp = now();
+    const actor = actorRef(principal);
+    const itemId = uuid();
+    await this.knex.transaction(async trx => {
+      await trx<ItemRow>('items').insert({
+        id: itemId,
+        board_id: boardId,
+        column_id: item.columnId,
+        position: position!,
+        title,
+        created_by: actor,
+        created_at: timestamp,
+        updated_by: actor,
+        updated_at: timestamp,
+        creator_ref: item.creatorRef ?? null,
+        external_manager: item.externalManager ?? null,
+      });
+      await this.writeAssociations(trx, itemId, item);
+      await this.recordChange(trx, {
+        itemId,
+        boardId,
+        actor,
+        type: 'created',
+        newValue: title,
+      });
+    });
+
+    await this.notifyWatchers({
+      boardId,
+      itemId,
+      actor,
+      title: `New item on board`,
+      description: `"${title}" was added`,
+    });
+
+    return this.getItem(principal, boardId, itemId);
+  }
+
+  private async writeAssociations(
+    trx: Knex.Transaction,
+    itemId: string,
+    item: { assignees?: string[]; labels?: Record<string, string>; tags?: string[] },
+  ): Promise<void> {
+    if (item.assignees !== undefined) {
+      await trx('item_assignees').where('item_id', itemId).delete();
+      if (item.assignees.length > 0) {
+        await trx('item_assignees').insert(
+          [...new Set(item.assignees)].map(assignee => ({
+            item_id: itemId,
+            assignee_ref: assignee,
+          })),
+        );
+      }
+    }
+    if (item.labels !== undefined) {
+      await trx('item_labels').where('item_id', itemId).delete();
+      const entries = Object.entries(item.labels);
+      if (entries.length > 0) {
+        await trx('item_labels').insert(
+          entries.map(([key, value]) => ({ item_id: itemId, key, value })),
+        );
+      }
+    }
+    if (item.tags !== undefined) {
+      await trx('item_tags').where('item_id', itemId).delete();
+      if (item.tags.length > 0) {
+        await trx('item_tags').insert(
+          [...new Set(item.tags)].map(tag => ({ item_id: itemId, tag })),
+        );
+      }
+    }
+  }
+
+  private async requireMutableItem(
+    principal: BoardsPrincipal,
+    boardId: string,
+    itemId: string,
+  ): Promise<ItemRow> {
+    await this.requireBoard(principal, boardId, 'write');
+    const row = await this.knex<ItemRow>('items')
+      .where({ id: itemId, board_id: boardId })
+      .first();
+    if (!row) {
+      throw new NotFoundError(`Item ${itemId} not found`);
+    }
+    if (row.external_manager && principal.type !== 'service') {
+      throw new NotAllowedError(
+        `This item is managed by '${row.external_manager}' and read-only`,
+      );
+    }
+    return row;
+  }
+
+  async updateItem(
+    principal: BoardsPrincipal,
+    boardId: string,
+    itemId: string,
+    update: ItemUpdate,
+  ): Promise<BoardItem> {
+    const row = await this.requireMutableItem(principal, boardId, itemId);
+    const [before] = await this.hydrateItems([row]);
+    const actor = actorRef(principal);
+    const timestamp = now();
+    const changes: Array<{
+      field: string;
+      oldValue: unknown;
+      newValue: unknown;
+    }> = [];
+
+    const patch: Partial<ItemRow> = {
+      updated_by: actor,
+      updated_at: timestamp,
+    };
+    if (update.title !== undefined && update.title !== row.title) {
+      const title = update.title.trim();
+      if (!title) {
+        throw new InputError('Item title must not be empty');
+      }
+      patch.title = title;
+      changes.push({ field: 'title', oldValue: row.title, newValue: title });
+    }
+    if (update.creatorRef !== undefined) {
+      const creator = update.creatorRef;
+      if (creator) {
+        this.validateActorRefs([creator]);
+      }
+      if ((creator ?? null) !== row.creator_ref) {
+        patch.creator_ref = creator ?? null;
+        changes.push({
+          field: 'creator',
+          oldValue: row.creator_ref ?? undefined,
+          newValue: creator ?? undefined,
+        });
+      }
+    }
+    if (update.assignees !== undefined) {
+      this.validateActorRefs(update.assignees);
+      const next = [...new Set(update.assignees)].sort();
+      const prev = [...before.assignees].sort();
+      if (JSON.stringify(next) !== JSON.stringify(prev)) {
+        changes.push({ field: 'assignees', oldValue: prev, newValue: next });
+      }
+    }
+    if (update.labels !== undefined) {
+      if (JSON.stringify(update.labels) !== JSON.stringify(before.labels)) {
+        changes.push({
+          field: 'labels',
+          oldValue: before.labels,
+          newValue: update.labels,
+        });
+      }
+    }
+    if (update.tags !== undefined) {
+      const next = [...new Set(update.tags)].sort();
+      const prev = [...before.tags].sort();
+      if (JSON.stringify(next) !== JSON.stringify(prev)) {
+        changes.push({ field: 'tags', oldValue: prev, newValue: next });
+      }
+    }
+
+    if (changes.length > 0) {
+      await this.knex.transaction(async trx => {
+        await trx('items').where('id', itemId).update(patch);
+        await this.writeAssociations(trx, itemId, update as NewItem);
+        for (const change of changes) {
+          await this.recordChange(trx, {
+            itemId,
+            boardId,
+            actor,
+            type: 'updated',
+            field: change.field,
+            oldValue: change.oldValue,
+            newValue: change.newValue,
+          });
+        }
+      });
+      await this.notifyWatchers({
+        boardId,
+        itemId,
+        actor,
+        title: 'Item updated',
+        description: `"${patch.title ?? row.title}": ${changes
+          .map(change => change.field)
+          .join(', ')} changed`,
+      });
+    }
+
+    return this.getItem(principal, boardId, itemId);
+  }
+
+  async moveItem(
+    principal: BoardsPrincipal,
+    boardId: string,
+    itemId: string,
+    target: { columnId: string; position?: number },
+  ): Promise<BoardItem> {
+    const row = await this.requireMutableItem(principal, boardId, itemId);
+    const targetColumn = await this.knex<ColumnRow>('board_columns')
+      .where({ id: target.columnId, board_id: boardId })
+      .first();
+    if (!targetColumn) {
+      throw new NotFoundError(`Column ${target.columnId} not found`);
+    }
+    let position = target.position;
+    if (position === undefined) {
+      const max = await this.knex('items')
+        .where('column_id', target.columnId)
+        .max({ max: 'position' })
+        .first();
+      position = Number(max?.max ?? 0) + POSITION_STEP;
+    }
+    const actor = actorRef(principal);
+    const movedColumns = row.column_id !== target.columnId;
+    await this.knex.transaction(async trx => {
+      await trx('items').where('id', itemId).update({
+        column_id: target.columnId,
+        position,
+        updated_by: actor,
+        updated_at: now(),
+      });
+      if (movedColumns) {
+        const oldColumn = await trx<ColumnRow>('board_columns')
+          .where('id', row.column_id)
+          .first();
+        await this.recordChange(trx, {
+          itemId,
+          boardId,
+          actor,
+          type: 'moved',
+          field: 'status',
+          oldValue: oldColumn?.title ?? row.column_id,
+          newValue: targetColumn.title,
+        });
+      }
+    });
+    if (movedColumns) {
+      await this.notifyWatchers({
+        boardId,
+        itemId,
+        actor,
+        title: 'Item moved',
+        description: `"${row.title}" moved to "${targetColumn.title}"`,
+      });
+    }
+    return this.getItem(principal, boardId, itemId);
+  }
+
+  async deleteItem(
+    principal: BoardsPrincipal,
+    boardId: string,
+    itemId: string,
+  ): Promise<void> {
+    const row = await this.requireMutableItem(principal, boardId, itemId);
+    const actor = actorRef(principal);
+    // collect watchers before rows cascade away
+    const recipients = await this.watcherRefs(boardId, itemId, actor);
+    await this.knex.transaction(async trx => {
+      await trx('watches')
+        .where({ target_type: 'item', target_id: itemId })
+        .delete();
+      await trx('items').where('id', itemId).delete();
+    });
+    await this.sendNotification(recipients, {
+      title: 'Item deleted',
+      description: `"${row.title}" was deleted`,
+      boardId,
+    });
+  }
+
+  // -------------------------------------------------------------- comments
+
+  async addComment(
+    principal: BoardsPrincipal,
+    boardId: string,
+    itemId: string,
+    text: string,
+  ): Promise<ItemComment> {
+    await this.requireBoard(principal, boardId, 'write');
+    const item = await this.knex<ItemRow>('items')
+      .where({ id: itemId, board_id: boardId })
+      .first();
+    if (!item) {
+      throw new NotFoundError(`Item ${itemId} not found`);
+    }
+    if (!text?.trim()) {
+      throw new InputError('Comment text must not be empty');
+    }
+    const actor = actorRef(principal);
+    const timestamp = now();
+    const commentId = uuid();
+    await this.knex.transaction(async trx => {
+      await trx('comments').insert({
+        id: commentId,
+        item_id: itemId,
+        author_ref: actor,
+        created_at: timestamp,
+      });
+      await trx('comment_versions').insert({
+        id: uuid(),
+        comment_id: commentId,
+        text,
+        edited_by: actor,
+        edited_at: timestamp,
+      });
+    });
+    await this.notifyWatchers({
+      boardId,
+      itemId,
+      actor,
+      title: 'New comment',
+      description: `New comment on "${item.title}"`,
+    });
+    const [comment] = await this.hydrateComments([commentId]);
+    return comment;
+  }
+
+  private async hydrateComments(commentIds: string[]): Promise<ItemComment[]> {
+    if (commentIds.length === 0) {
+      return [];
+    }
+    const comments = await this.knex('comments').whereIn('id', commentIds);
+    const versions = await this.knex('comment_versions')
+      .whereIn('comment_id', commentIds)
+      .orderBy('edited_at');
+    return comments.map(comment => {
+      const own = versions.filter(v => v.comment_id === comment.id);
+      const latest = own[own.length - 1];
+      return {
+        id: comment.id,
+        itemId: comment.item_id,
+        authorRef: comment.author_ref,
+        createdAt: comment.created_at,
+        text: latest?.text ?? '',
+        editedBy: own.length > 1 ? latest.edited_by : undefined,
+        editedAt: own.length > 1 ? latest.edited_at : undefined,
+        versionCount: own.length,
+      };
+    });
+  }
+
+  private async requireCommentAccess(
+    principal: BoardsPrincipal,
+    boardId: string,
+    itemId: string,
+    commentId: string,
+  ): Promise<{ comment: any; itemTitle: string }> {
+    const { board, level } = await this.requireBoard(
+      principal,
+      boardId,
+      'write',
+    );
+    const item = await this.knex<ItemRow>('items')
+      .where({ id: itemId, board_id: board.id })
+      .first();
+    if (!item) {
+      throw new NotFoundError(`Item ${itemId} not found`);
+    }
+    const comment = await this.knex('comments')
+      .where({ id: commentId, item_id: itemId })
+      .first();
+    if (!comment) {
+      throw new NotFoundError(`Comment not found`);
+    }
+    const isAuthor = comment.author_ref === actorRef(principal);
+    const isAdmin = levelIncludes(level, 'admin');
+    if (!isAuthor && !isAdmin) {
+      throw new NotAllowedError(
+        'Only the comment author or a board admin may modify a comment',
+      );
+    }
+    return { comment, itemTitle: item.title };
+  }
+
+  async updateComment(
+    principal: BoardsPrincipal,
+    boardId: string,
+    itemId: string,
+    commentId: string,
+    text: string,
+  ): Promise<ItemComment> {
+    const { itemTitle } = await this.requireCommentAccess(
+      principal,
+      boardId,
+      itemId,
+      commentId,
+    );
+    if (!text?.trim()) {
+      throw new InputError('Comment text must not be empty');
+    }
+    const actor = actorRef(principal);
+    await this.knex('comment_versions').insert({
+      id: uuid(),
+      comment_id: commentId,
+      text,
+      edited_by: actor,
+      edited_at: now(),
+    });
+    await this.notifyWatchers({
+      boardId,
+      itemId,
+      actor,
+      title: 'Comment edited',
+      description: `A comment on "${itemTitle}" was edited`,
+    });
+    const [comment] = await this.hydrateComments([commentId]);
+    return comment;
+  }
+
+  async deleteComment(
+    principal: BoardsPrincipal,
+    boardId: string,
+    itemId: string,
+    commentId: string,
+  ): Promise<void> {
+    await this.requireCommentAccess(principal, boardId, itemId, commentId);
+    await this.knex('comments').where('id', commentId).delete();
+  }
+
+  async listCommentVersions(
+    principal: BoardsPrincipal,
+    boardId: string,
+    itemId: string,
+    commentId: string,
+  ): Promise<CommentVersion[]> {
+    await this.requireBoard(principal, boardId, 'read');
+    const comment = await this.knex('comments')
+      .where({ id: commentId, item_id: itemId })
+      .first();
+    if (!comment) {
+      throw new NotFoundError(`Comment not found`);
+    }
+    const versions = await this.knex('comment_versions')
+      .where('comment_id', commentId)
+      .orderBy('edited_at');
+    return versions.map(version => ({
+      id: version.id,
+      commentId: version.comment_id,
+      text: version.text,
+      editedBy: version.edited_by,
+      editedAt: version.edited_at,
+    }));
+  }
+
+  // -------------------------------------------------------------- timeline
+
+  async getTimeline(
+    principal: BoardsPrincipal,
+    boardId: string,
+    itemId: string,
+  ): Promise<TimelineEntry[]> {
+    await this.requireBoard(principal, boardId, 'read');
+    const item = await this.knex<ItemRow>('items')
+      .where({ id: itemId, board_id: boardId })
+      .first();
+    if (!item) {
+      throw new NotFoundError(`Item ${itemId} not found`);
+    }
+    const commentRows = await this.knex('comments').where('item_id', itemId);
+    const comments = await this.hydrateComments(
+      commentRows.map(row => row.id),
+    );
+    const changeRows = await this.knex<ChangeRow>('changes').where(
+      'item_id',
+      itemId,
+    );
+    const entries: TimelineEntry[] = [
+      ...comments.map(comment => ({
+        kind: 'comment' as const,
+        at: comment.createdAt,
+        comment,
+      })),
+      ...changeRows.map(row => {
+        const change = toChange(row);
+        return { kind: 'change' as const, at: change.at, change };
+      }),
+    ];
+    return entries.sort((a, b) => a.at.localeCompare(b.at));
+  }
+
+  // --------------------------------------------------------------- watches
+
+  async setWatchBoard(
+    principal: BoardsPrincipal,
+    boardId: string,
+    watching: boolean,
+  ): Promise<void> {
+    const userRef = this.requireUserRef(principal);
+    await this.requireBoard(principal, boardId, 'read');
+    await this.setWatch(userRef, 'board', boardId, watching);
+  }
+
+  async setWatchItem(
+    principal: BoardsPrincipal,
+    boardId: string,
+    itemId: string,
+    watching: boolean,
+  ): Promise<void> {
+    const userRef = this.requireUserRef(principal);
+    await this.requireBoard(principal, boardId, 'read');
+    const item = await this.knex('items')
+      .where({ id: itemId, board_id: boardId })
+      .first();
+    if (!item) {
+      throw new NotFoundError(`Item ${itemId} not found`);
+    }
+    await this.setWatch(userRef, 'item', itemId, watching);
+  }
+
+  private async setWatch(
+    userRef: string,
+    targetType: 'board' | 'item',
+    targetId: string,
+    watching: boolean,
+  ): Promise<void> {
+    await this.knex('watches')
+      .where({ user_ref: userRef, target_type: targetType, target_id: targetId })
+      .delete();
+    if (watching) {
+      await this.knex('watches').insert({
+        user_ref: userRef,
+        target_type: targetType,
+        target_id: targetId,
+      });
+    }
+  }
+
+  /** Watchers of the item or its board, excluding the actor. */
+  private async watcherRefs(
+    boardId: string,
+    itemId: string,
+    actor: string,
+  ): Promise<string[]> {
+    const rows = await this.knex('watches')
+      .where(builder =>
+        builder
+          .where({ target_type: 'item', target_id: itemId })
+          .orWhere({ target_type: 'board', target_id: boardId }),
+      )
+      .select('user_ref');
+    return [
+      ...new Set(rows.map(row => row.user_ref as string)),
+    ].filter(ref => ref !== actor && !isTextRef(ref));
+  }
+
+  private async notifyWatchers(options: {
+    boardId: string;
+    itemId: string;
+    actor: string;
+    title: string;
+    description: string;
+  }): Promise<void> {
+    const recipients = await this.watcherRefs(
+      options.boardId,
+      options.itemId,
+      options.actor,
+    );
+    await this.sendNotification(recipients, {
+      title: options.title,
+      description: options.description,
+      boardId: options.boardId,
+      itemId: options.itemId,
+    });
+  }
+
+  private async sendNotification(
+    recipients: string[],
+    payload: {
+      title: string;
+      description: string;
+      boardId: string;
+      itemId?: string;
+    },
+  ): Promise<void> {
+    if (!this.notifications || recipients.length === 0) {
+      return;
+    }
+    const link = payload.itemId
+      ? `${this.appLinkBase}/${payload.boardId}?item=${payload.itemId}`
+      : `${this.appLinkBase}/${payload.boardId}`;
+    try {
+      await this.notifications.send({
+        recipients: { type: 'entity', entityRef: recipients },
+        payload: {
+          title: payload.title,
+          description: payload.description,
+          link,
+          topic: `boards:${payload.boardId}`,
+        },
+      });
+    } catch (error) {
+      this.logger.warn(`Failed to send board notification: ${error}`);
+    }
+  }
+
+  // --------------------------------------------------------------- changes
+
+  private async recordChange(
+    trx: Knex.Transaction,
+    change: {
+      itemId: string;
+      boardId: string;
+      actor: string;
+      type: string;
+      field?: string;
+      oldValue?: unknown;
+      newValue?: unknown;
+    },
+  ): Promise<void> {
+    await trx('changes').insert({
+      id: uuid(),
+      item_id: change.itemId,
+      board_id: change.boardId,
+      actor_ref: change.actor,
+      at: now(),
+      type: change.type,
+      field: change.field ?? null,
+      old_value:
+        change.oldValue === undefined ? null : JSON.stringify(change.oldValue),
+      new_value:
+        change.newValue === undefined ? null : JSON.stringify(change.newValue),
+    });
+  }
+}
