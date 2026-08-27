@@ -247,28 +247,33 @@ export function ItemDrawer(props: {
               </Text>
             )}
 
-            <div>
-              <Text variant="body-small" color="secondary">
-                Description
-              </Text>
-              <EditableMarkdown
-                text={item.description ?? ''}
-                canEdit={!readonly}
-                versionCount={item.descriptionVersionCount}
-                allowEmpty
-                emptyText="No description yet."
-                editAriaLabel="Edit description"
-                loadVersions={() =>
-                  boardsApi.listDescriptionVersions(board.id, item.id)
-                }
-                onSave={async text => {
-                  await boardsApi.updateItem(board.id, item.id, {
-                    description: text,
-                  });
-                  await changed();
+            <Flex align="center" gap="2" justify="between">
+              <WatchButton
+                watching={!!item.watching}
+                targetLabel="this item"
+                onToggle={async watching => {
+                  await boardsApi.setWatchItem(board.id, item.id, watching);
+                  await onChanged();
                 }}
+                loadWatchers={() =>
+                  boardsApi.listItemWatchers(board.id, item.id)
+                }
               />
-            </div>
+              {!readonly && (
+                <Button
+                  variant="secondary"
+                  size="small"
+                  destructive
+                  onPress={async () => {
+                    await boardsApi.deleteItem(board.id, item.id);
+                    onClose();
+                    await onChanged();
+                  }}
+                >
+                  Delete item
+                </Button>
+              )}
+            </Flex>
 
             <Flex align="center" gap="2">
               <StatusBadge
@@ -414,6 +419,29 @@ export function ItemDrawer(props: {
 
             <div>
               <Text variant="body-small" color="secondary">
+                Description
+              </Text>
+              <EditableMarkdown
+                text={item.description ?? ''}
+                canEdit={!readonly}
+                versionCount={item.descriptionVersionCount}
+                allowEmpty
+                emptyText="No description yet."
+                editAriaLabel="Edit description"
+                loadVersions={() =>
+                  boardsApi.listDescriptionVersions(board.id, item.id)
+                }
+                onSave={async text => {
+                  await boardsApi.updateItem(board.id, item.id, {
+                    description: text,
+                  });
+                  await changed();
+                }}
+              />
+            </div>
+
+            <div>
+              <Text variant="body-small" color="secondary">
                 Labels
               </Text>
               {editLabels ? (
@@ -503,34 +531,6 @@ export function ItemDrawer(props: {
                 Updated by <RefDisplay refString={item.updatedBy} /> at{' '}
                 {formatDate(item.updatedAt)}
               </Text>
-            </Flex>
-
-            <Flex align="center" gap="2" justify="between">
-              <WatchButton
-                watching={!!item.watching}
-                targetLabel="this item"
-                onToggle={async watching => {
-                  await boardsApi.setWatchItem(board.id, item.id, watching);
-                  await onChanged();
-                }}
-                loadWatchers={() =>
-                  boardsApi.listItemWatchers(board.id, item.id)
-                }
-              />
-              {!readonly && (
-                <Button
-                  variant="secondary"
-                  size="small"
-                  destructive
-                  onPress={async () => {
-                    await boardsApi.deleteItem(board.id, item.id);
-                    onClose();
-                    await onChanged();
-                  }}
-                >
-                  Delete item
-                </Button>
-              )}
             </Flex>
 
             <Text variant="body-medium" weight="bold" as="h3">
