@@ -487,6 +487,46 @@ describe('BoardsService', () => {
       expect(item.tags).toEqual(['bug']);
     });
 
+    it('sets, tracks, and clears due dates', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const item = await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Item',
+      });
+      const withDue = await service.updateItem(alice, board.id, item.id, {
+        dueDate: '2026-09-04',
+      });
+      expect(withDue.dueDate).toBe('2026-09-04');
+      const cleared = await service.updateItem(alice, board.id, item.id, {
+        dueDate: null,
+      });
+      expect(cleared.dueDate).toBeUndefined();
+      const timeline = await service.getTimeline(alice, board.id, item.id);
+      const dueChanges = timeline.filter(
+        entry =>
+          entry.kind === 'change' && entry.change.field === 'dueDate',
+      );
+      expect(dueChanges).toHaveLength(2);
+    });
+
+    it('rejects invalid due dates', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const item = await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Item',
+      });
+      await expect(
+        service.updateItem(alice, board.id, item.id, {
+          dueDate: '04.09.2026',
+        }),
+      ).rejects.toThrow(/Invalid due date/);
+      await expect(
+        service.updateItem(alice, board.id, item.id, {
+          dueDate: '2026-02-30',
+        }),
+      ).rejects.toThrow(/Invalid due date/);
+    });
+
     it('rejects empty titles and invalid refs', async () => {
       const board = await service.createBoard(alice, { name: 'B' });
       const columnId = board.columns[0].id;

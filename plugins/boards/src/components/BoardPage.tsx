@@ -159,6 +159,8 @@ export function BoardPage() {
         guarded(() =>
           boardsApi.deleteColumn(boardId, columnId, { moveItemsTo }),
         ),
+      setItemDueDate: (itemId, dueDate) =>
+        guarded(() => boardsApi.updateItem(boardId, itemId, { dueDate })),
       openItem: itemId => {
         searchParams.set('item', itemId);
         setSearchParams(searchParams);

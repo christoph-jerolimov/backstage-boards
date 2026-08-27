@@ -337,6 +337,7 @@ export async function createRouter(
           assignees: req.body.assignees,
           labels: req.body.labels,
           tags: req.body.tags,
+          dueDate: req.body.dueDate,
         },
       ),
     );

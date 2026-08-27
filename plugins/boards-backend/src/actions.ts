@@ -297,7 +297,7 @@ export function registerActions(options: ActionsOptions): void {
     name: 'update-item',
     title: 'Update Board Item',
     description:
-      "Updates an item's title, description, creator, or assignees.",
+      "Updates an item's title, description, creator, assignees, or due date.",
     schema: {
       input: z =>
         z.object({
@@ -310,6 +310,11 @@ export function registerActions(options: ActionsOptions): void {
             .describe('Markdown description; empty string clears it'),
           creatorRef: z.string().nullable().optional(),
           assignees: z.array(z.string()).optional(),
+          dueDate: z
+            .string()
+            .nullable()
+            .optional()
+            .describe('Due date as YYYY-MM-DD, or null to clear it'),
         }),
       output: z => z.object({ id: z.string() }),
     },
@@ -323,6 +328,7 @@ export function registerActions(options: ActionsOptions): void {
           description: input.description,
           creatorRef: input.creatorRef,
           assignees: input.assignees,
+          dueDate: input.dueDate,
         },
       );
       return { output: { id: item.id } };

@@ -17,6 +17,7 @@ import {
 } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
 import { WatchButton } from './WatchButton';
+import { DueDateBadge } from './DueDate';
 import { EditableMarkdown } from './EditableMarkdown';
 import { PrincipalPicker } from './PrincipalPicker';
 import {
@@ -291,6 +292,57 @@ export function ItemDrawer(props: {
                 }
               }}
             />
+
+            <div>
+              <Text variant="body-small" color="secondary">
+                Due date
+              </Text>
+              <Flex align="center" gap="2">
+                {item.dueDate ? (
+                  <DueDateBadge dueDate={item.dueDate} />
+                ) : (
+                  <Text variant="body-small" color="secondary">
+                    No due date
+                  </Text>
+                )}
+                {!readonly && (
+                  <input
+                    type="date"
+                    aria-label="Due date"
+                    value={item.dueDate ?? ''}
+                    onChange={async event => {
+                      const value = event.target.value;
+                      await boardsApi.updateItem(board.id, item.id, {
+                        dueDate: value === '' ? null : value,
+                      });
+                      await changed();
+                    }}
+                    style={{
+                      background: 'var(--bui-bg-neutral-1)',
+                      color: 'inherit',
+                      border: '1px solid var(--bui-border-1)',
+                      borderRadius: 4,
+                      padding: '4px 8px',
+                      font: 'inherit',
+                    }}
+                  />
+                )}
+                {!readonly && item.dueDate && (
+                  <Button
+                    variant="tertiary"
+                    size="small"
+                    onPress={async () => {
+                      await boardsApi.updateItem(board.id, item.id, {
+                        dueDate: null,
+                      });
+                      await changed();
+                    }}
+                  >
+                    Clear
+                  </Button>
+                )}
+              </Flex>
+            </div>
 
             <div>
               <Text variant="body-small" color="secondary">

@@ -102,6 +102,8 @@ export interface BoardItem {
   assignees: string[];
   labels: Record<string, string>;
   tags: string[];
+  /** Optional due date as a plain `YYYY-MM-DD` calendar date. */
+  dueDate?: string;
   watching?: boolean;
 }
 
@@ -173,6 +175,8 @@ export interface ItemUpdate {
   assignees?: string[];
   labels?: Record<string, string>;
   tags?: string[];
+  /** New due date as `YYYY-MM-DD`, or null to clear it. */
+  dueDate?: string | null;
 }
 
 export interface BoardUpdate {

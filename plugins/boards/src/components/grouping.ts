@@ -1,7 +1,7 @@
 import { BoardColumn, BoardItem } from '@internal/plugin-boards-common';
 
 export interface ItemSortDescriptor {
-  column: 'title' | 'status' | 'createdBy' | 'updatedAt';
+  column: 'title' | 'status' | 'dueDate' | 'createdBy' | 'updatedAt';
   direction: 'ascending' | 'descending';
 }
 
@@ -25,6 +25,9 @@ export function sortItems(
         return item.title.toLocaleLowerCase('en-US');
       case 'status':
         return columnTitle(item.columnId).toLocaleLowerCase('en-US');
+      case 'dueDate':
+        // items without a due date sort last in both directions
+        return item.dueDate ?? '9999-99-99';
       case 'createdBy':
         return item.createdBy.toLocaleLowerCase('en-US');
       case 'updatedAt':
