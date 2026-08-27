@@ -325,6 +325,26 @@ const boardEntities: Migration = {
   },
 };
 
+const dropItemLabels: Migration = {
+  name: '20260827_08_drop_item_labels',
+  async up(knex) {
+    await knex.schema.dropTableIfExists('item_labels');
+  },
+  async down(knex) {
+    await knex.schema.createTable('item_labels', table => {
+      table
+        .string('item_id')
+        .notNullable()
+        .references('id')
+        .inTable('items')
+        .onDelete('CASCADE');
+      table.string('key').notNullable();
+      table.string('value').notNullable();
+      table.unique(['item_id', 'key']);
+    });
+  },
+};
+
 const migrations: Migration[] = [
   initial,
   itemDescriptions,
@@ -333,6 +353,7 @@ const migrations: Migration[] = [
   boardArchival,
   itemDueDates,
   boardEntities,
+  dropItemLabels,
 ];
 
 class BoardsMigrationSource implements Knex.MigrationSource<Migration> {

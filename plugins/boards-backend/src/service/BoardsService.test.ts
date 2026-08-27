@@ -265,7 +265,6 @@ describe('BoardsService', () => {
         columnId: board.columns[1].id,
         title: 'Copied task',
         assignees: ['user:default/bob'],
-        labels: { priority: 'high' },
         tags: ['bug'],
       });
       await service.updateItem(alice, board.id, item.id, {
@@ -289,7 +288,6 @@ describe('BoardsService', () => {
       expect(items[0].title).toBe('Copied task');
       expect(items[0].columnId).toBe(copy.columns[1].id);
       expect(items[0].assignees).toEqual(['user:default/bob']);
-      expect(items[0].labels).toEqual({ priority: 'high' });
       expect(items[0].tags).toEqual(['bug']);
       expect(items[0].dueDate).toBe('2026-09-04');
       expect(items[0].description).toBe('details');
@@ -581,7 +579,6 @@ describe('BoardsService', () => {
         columnId: board.columns[0].id,
         title: 'Fix login bug',
         assignees: ['user:default/bob', 'text:Jane (agency)'],
-        labels: { priority: 'high' },
         tags: ['bug'],
       });
       expect(item.createdBy).toBe('user:default/alice');
@@ -590,7 +587,6 @@ describe('BoardsService', () => {
         'text:Jane (agency)',
         'user:default/bob',
       ]);
-      expect(item.labels).toEqual({ priority: 'high' });
       expect(item.tags).toEqual(['bug']);
     });
 
@@ -925,13 +921,11 @@ describe('BoardsService', () => {
         columnId,
         title: 'Fix login bug',
         tags: ['bug', 'urgent'],
-        labels: { priority: 'high', env: 'prod' },
       });
       const withDescription = await service.createItem(alice, board.id, {
         columnId,
         title: 'Improve docs',
         tags: ['docs'],
-        labels: { priority: 'low' },
       });
       await service.updateItem(alice, board.id, withDescription.id, {
         description: 'covers the LOGIN flow',
@@ -951,7 +945,7 @@ describe('BoardsService', () => {
       ]);
     });
 
-    it('requires all tags and all label pairs', async () => {
+    it('requires all tags', async () => {
       const board = await seedFilterBoard();
       expect(
         (await service.listItems(alice, board.id, { tags: ['bug'] })).map(
@@ -963,18 +957,6 @@ describe('BoardsService', () => {
           tags: ['bug', 'missing'],
         }),
       ).toHaveLength(0);
-      expect(
-        (
-          await service.listItems(alice, board.id, {
-            labels: { priority: 'high', env: 'prod' },
-          })
-        ).map(i => i.title),
-      ).toEqual(['Fix login bug']);
-      expect(
-        await service.listItems(alice, board.id, {
-          labels: { priority: 'nope' },
-        }),
-      ).toHaveLength(0);
     });
 
     it('combines filters with AND', async () => {
@@ -984,15 +966,13 @@ describe('BoardsService', () => {
           await service.listItems(alice, board.id, {
             text: 'login',
             tags: ['bug'],
-            labels: { env: 'prod' },
           })
         ).map(i => i.title),
       ).toEqual(['Fix login bug']);
       expect(
         await service.listItems(alice, board.id, {
           text: 'login',
-          tags: ['docs'],
-          labels: { env: 'prod' },
+          tags: ['docs', 'bug'],
         }),
       ).toHaveLength(0);
     });

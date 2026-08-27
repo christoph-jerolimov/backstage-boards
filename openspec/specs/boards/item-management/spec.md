@@ -6,7 +6,7 @@ Defines the work items on a board — their fields, lifecycle, read-only externa
 ## Requirements
 
 ### Requirement: Item fields
-An item SHALL belong to exactly one board and one of its columns (the item's status). An item SHALL have: a required title; audit fields (created by, created at, updated by, updated at); labels as key-value pairs; tags as a flat list of strings; an optional creator; and one or more assignees. Creator and assignees SHALL be entity refs (e.g. `user:default/christoph`, `group:default/team-a`) or free-text identities using the `text:` prefix (e.g. `text:External Contractor`).
+An item SHALL belong to exactly one board and one of its columns (the item's status). An item SHALL have: a required title; audit fields (created by, created at, updated by, updated at); tags as a flat list of strings; an optional creator; and one or more assignees. Creator and assignees SHALL be entity refs (e.g. `user:default/christoph`, `group:default/team-a`) or free-text identities using the `text:` prefix (e.g. `text:External Contractor`).
 
 #### Scenario: Create an item
 - **WHEN** a user with write access adds an item with title "Fix login bug" to the "Todo" column
@@ -51,7 +51,7 @@ All items of a board SHALL be viewable as a kanban board (one lane per column, i
 
 #### Scenario: Switch views
 - **WHEN** a user switches from board view to table view
-- **THEN** the same set of items is shown as table rows including title, status, assignees, labels, and tags
+- **THEN** the same set of items is shown as table rows including title, status, assignees, and tags
 
 ### Requirement: Group items by assignee
 Both the board view and the table view SHALL offer an option to group items by assignee. An item with multiple assignees SHALL appear in each of its assignees' groups; an item with no assignee SHALL appear in an "Unassigned" group.
@@ -91,7 +91,7 @@ An item SHALL have an optional markdown description using the same markdown subs
 - **THEN** the description is rendered without any edit controls
 
 ### Requirement: Filter and search items
-The board page SHALL provide a filter bar with free-text search matching item titles and descriptions (case-insensitive), a tag filter offering the tags in use on the board, and label `key=value` filters. Active filters SHALL apply to both the board view and the table view; an item matches only if it satisfies every active filter (all selected tags, all label pairs, and the text). The items API SHALL accept the same filters.
+The board page SHALL provide a filter bar with free-text search matching item titles and descriptions (case-insensitive) and a tag filter offering the tags in use on the board. Active filters SHALL apply to both the board view and the table view; an item matches only if it satisfies every active filter (all selected tags and the text). The items API SHALL accept the same filters.
 
 #### Scenario: Text search
 - **WHEN** a user types "login" into the search field
@@ -101,16 +101,12 @@ The board page SHALL provide a filter bar with free-text search matching item ti
 - **WHEN** a user selects the tags "bug" and "urgent"
 - **THEN** only items carrying both tags remain visible
 
-#### Scenario: Label filter
-- **WHEN** a user activates the label filter `priority=high`
-- **THEN** only items with label `priority` equal to `high` remain visible
-
 #### Scenario: Filters combine and clear
-- **WHEN** text, tag, and label filters are active and the user clears them
+- **WHEN** text and tag filters are active and the user clears them
 - **THEN** matching intersects all filters while active, and clearing restores the full item set
 
 #### Scenario: API filtering
-- **WHEN** the items endpoint is called with `?text=…&tag=…&label=key=value`
+- **WHEN** the items endpoint is called with `?text=…&tag=…`
 - **THEN** only matching items are returned
 
 ### Requirement: Item archival, restore, and purge

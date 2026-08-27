@@ -14,7 +14,6 @@ const item: BoardItem = {
   updatedBy: 'user:default/alice',
   updatedAt: '2026-01-01T00:00:00Z',
   assignees: [],
-  labels: { priority: 'high', env: 'prod' },
   tags: ['bug', 'urgent'],
 };
 
@@ -38,21 +37,11 @@ describe('itemMatchesFilter', () => {
     expect(itemMatchesFilter(item, { tags: ['bug', 'missing'] })).toBe(false);
   });
 
-  it('requires all label pairs', () => {
-    expect(itemMatchesFilter(item, { labels: { priority: 'high' } })).toBe(true);
-    expect(
-      itemMatchesFilter(item, { labels: { priority: 'high', env: 'prod' } }),
-    ).toBe(true);
-    expect(itemMatchesFilter(item, { labels: { priority: 'low' } })).toBe(false);
-    expect(itemMatchesFilter(item, { labels: { missing: 'x' } })).toBe(false);
-  });
-
   it('combines filters with AND', () => {
     expect(
       itemMatchesFilter(item, {
         text: 'login',
         tags: ['bug'],
-        labels: { env: 'prod' },
       }),
     ).toBe(true);
     expect(

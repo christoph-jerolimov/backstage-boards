@@ -22,7 +22,6 @@ function item(id: string, assignees: string[]): BoardItem {
     updatedAt: '2026-01-01T00:00:00Z',
     assignees,
     descriptionVersionCount: 0,
-    labels: {},
     tags: [],
   };
 }
@@ -128,8 +127,7 @@ describe('groupItems', () => {
       updatedAt: '',
       descriptionVersionCount: 0,
       assignees: over.assignees ?? [],
-      labels: {},
-      tags: over.tags ?? [],
+        tags: over.tags ?? [],
       dueDate: over.dueDate,
     }) as BoardItem;
 

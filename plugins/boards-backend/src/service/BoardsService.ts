@@ -698,9 +698,8 @@ export class BoardsService {
       .where('board_id', sourceBoardId)
       .whereNull('archived_at');
     const itemIds = items.map(item => item.id);
-    const [assignees, labels, tags] = await Promise.all([
+    const [assignees, tags] = await Promise.all([
       this.knex('item_assignees').whereIn('item_id', itemIds),
-      this.knex('item_labels').whereIn('item_id', itemIds),
       this.knex('item_tags').whereIn('item_id', itemIds),
     ]);
     const columnIdMap = new Map<string, string>();
@@ -741,10 +740,6 @@ export class BoardsService {
         const newAssignees = links(assignees);
         if (newAssignees.length > 0) {
           await trx('item_assignees').insert(newAssignees);
-        }
-        const newLabels = links(labels);
-        if (newLabels.length > 0) {
-          await trx('item_labels').insert(newLabels);
         }
         const newTags = links(tags);
         if (newTags.length > 0) {
@@ -995,9 +990,6 @@ export class BoardsService {
     const assignees = await this.knex('item_assignees')
       .whereIn('item_id', ids)
       .select('item_id', 'assignee_ref');
-    const labels = await this.knex('item_labels')
-      .whereIn('item_id', ids)
-      .select('item_id', 'key', 'value');
     const tags = await this.knex('item_tags')
       .whereIn('item_id', ids)
       .select('item_id', 'tag');
@@ -1038,9 +1030,6 @@ export class BoardsService {
       assignees: assignees
         .filter(a => a.item_id === row.id)
         .map(a => a.assignee_ref),
-      labels: Object.fromEntries(
-        labels.filter(l => l.item_id === row.id).map(l => [l.key, l.value]),
-      ),
       tags: tags.filter(t => t.item_id === row.id).map(t => t.tag),
       watching: watchedIds.has(row.id),
     }));
@@ -1074,16 +1063,6 @@ export class BoardsService {
           .from('item_tags')
           .whereRaw('item_tags.item_id = items.id')
           .where('item_tags.tag', tag),
-      );
-    }
-    for (const [key, value] of Object.entries(filter?.labels ?? {})) {
-      query.whereExists(builder =>
-        builder
-          .select('*')
-          .from('item_labels')
-          .whereRaw('item_labels.item_id = items.id')
-          .where('item_labels.key', key)
-          .where('item_labels.value', value),
       );
     }
     const rows = await query;
@@ -1266,7 +1245,7 @@ export class BoardsService {
   private async writeAssociations(
     trx: Knex.Transaction,
     itemId: string,
-    item: { assignees?: string[]; labels?: Record<string, string>; tags?: string[] },
+    item: { assignees?: string[]; tags?: string[] },
   ): Promise<void> {
     if (item.assignees !== undefined) {
       await trx('item_assignees').where('item_id', itemId).delete();
@@ -1276,15 +1255,6 @@ export class BoardsService {
             item_id: itemId,
             assignee_ref: assignee,
           })),
-        );
-      }
-    }
-    if (item.labels !== undefined) {
-      await trx('item_labels').where('item_id', itemId).delete();
-      const entries = Object.entries(item.labels);
-      if (entries.length > 0) {
-        await trx('item_labels').insert(
-          entries.map(([key, value]) => ({ item_id: itemId, key, value })),
         );
       }
     }
@@ -1381,15 +1351,6 @@ export class BoardsService {
       const prev = [...before.assignees].sort();
       if (JSON.stringify(next) !== JSON.stringify(prev)) {
         changes.push({ field: 'assignees', oldValue: prev, newValue: next });
-      }
-    }
-    if (update.labels !== undefined) {
-      if (JSON.stringify(update.labels) !== JSON.stringify(before.labels)) {
-        changes.push({
-          field: 'labels',
-          oldValue: before.labels,
-          newValue: update.labels,
-        });
       }
     }
     if (update.tags !== undefined) {

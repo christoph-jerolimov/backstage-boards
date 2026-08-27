@@ -205,7 +205,7 @@ export function registerActions(options: ActionsOptions): void {
     name: 'list-items',
     title: 'List Board Items',
     description:
-      'Lists the items of a board, optionally filtered by text, tags (all must match), and labels (all key=value pairs must match).',
+      'Lists the items of a board, optionally filtered by text and tags (all must match).',
     attributes: { readOnly: true },
     schema: {
       input: z =>
@@ -213,7 +213,6 @@ export function registerActions(options: ActionsOptions): void {
           boardId: z.string(),
           text: z.string().optional(),
           tags: z.array(z.string()).optional(),
-          labels: z.record(z.string(), z.string()).optional(),
         }),
       output: z =>
         z.object({
@@ -223,7 +222,6 @@ export function registerActions(options: ActionsOptions): void {
               title: z.string(),
               columnId: z.string(),
               tags: z.array(z.string()),
-              labels: z.record(z.string(), z.string()),
               assignees: z.array(z.string()),
             }),
           ),
@@ -233,7 +231,7 @@ export function registerActions(options: ActionsOptions): void {
       const items = await service.listItems(
         await toPrincipal(credentials),
         input.boardId,
-        { text: input.text, tags: input.tags, labels: input.labels },
+        { text: input.text, tags: input.tags },
       );
       return {
         output: {
@@ -242,7 +240,6 @@ export function registerActions(options: ActionsOptions): void {
             title: item.title,
             columnId: item.columnId,
             tags: item.tags,
-            labels: item.labels,
             assignees: item.assignees,
           })),
         },
@@ -263,7 +260,6 @@ export function registerActions(options: ActionsOptions): void {
           title: z.string(),
           creatorRef: z.string().optional(),
           assignees: z.array(z.string()).optional(),
-          labels: z.record(z.string(), z.string()).optional(),
           tags: z.array(z.string()).optional(),
           externalManager: z
             .string()
@@ -283,7 +279,6 @@ export function registerActions(options: ActionsOptions): void {
           title: input.title,
           creatorRef: input.creatorRef,
           assignees: input.assignees,
-          labels: input.labels,
           tags: input.tags,
           externalManager: input.externalManager,
         },
@@ -426,30 +421,6 @@ export function registerActions(options: ActionsOptions): void {
         input.text,
       );
       return { output: { id: comment.id } };
-    },
-  });
-
-  actionsRegistry.register({
-    name: 'set-item-labels',
-    title: 'Set Item Labels',
-    description: 'Replaces the key-value labels of an item.',
-    schema: {
-      input: z =>
-        z.object({
-          boardId: z.string(),
-          itemId: z.string(),
-          labels: z.record(z.string(), z.string()),
-        }),
-      output: z => z.object({ id: z.string() }),
-    },
-    action: async ({ input, credentials }) => {
-      const item = await service.updateItem(
-        await toPrincipal(credentials),
-        input.boardId,
-        input.itemId,
-        { labels: input.labels },
-      );
-      return { output: { id: item.id } };
     },
   });
 

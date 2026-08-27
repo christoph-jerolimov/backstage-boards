@@ -10,7 +10,6 @@ describe('migrations', () => {
       'board_permissions',
       'items',
       'item_assignees',
-      'item_labels',
       'item_tags',
       'comments',
       'comment_versions',
@@ -20,6 +19,8 @@ describe('migrations', () => {
     ]) {
       expect(await knex.schema.hasTable(table)).toBe(true);
     }
+    // labels were removed
+    expect(await knex.schema.hasTable('item_labels')).toBe(false);
     await knex.destroy();
   });
 

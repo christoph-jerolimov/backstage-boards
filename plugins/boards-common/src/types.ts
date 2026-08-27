@@ -101,7 +101,6 @@ export interface BoardItem {
   archivedAt?: string;
   archivedBy?: string;
   assignees: string[];
-  labels: Record<string, string>;
   tags: string[];
   /** Optional due date as a plain `YYYY-MM-DD` calendar date. */
   dueDate?: string;
@@ -171,7 +170,6 @@ export interface NewItem {
   position?: number;
   creatorRef?: string;
   assignees?: string[];
-  labels?: Record<string, string>;
   tags?: string[];
   externalManager?: string;
 }
@@ -182,7 +180,6 @@ export interface ItemUpdate {
   /** New description text; an empty string clears the description. */
   description?: string;
   assignees?: string[];
-  labels?: Record<string, string>;
   tags?: string[];
   /** New due date as `YYYY-MM-DD`, or null to clear it. */
   dueDate?: string | null;
