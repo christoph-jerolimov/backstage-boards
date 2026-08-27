@@ -66,15 +66,18 @@ export async function createTestService(): Promise<{
   service: BoardsService;
   notifications: { send: jest.Mock };
   signals: { publish: jest.Mock };
+  onEntityRefsChanged: jest.Mock;
 }> {
   const knex = await createTestKnex();
   const notifications = { send: jest.fn().mockResolvedValue(undefined) };
   const signals = { publish: jest.fn().mockResolvedValue(undefined) };
+  const onEntityRefsChanged = jest.fn();
   const service = new BoardsService({
     knex,
     logger: testLogger,
     notifications: notifications as unknown as NotificationService,
     signals: signals as any,
+    onEntityRefsChanged,
   });
-  return { knex, service, notifications, signals };
+  return { knex, service, notifications, signals, onEntityRefsChanged };
 }

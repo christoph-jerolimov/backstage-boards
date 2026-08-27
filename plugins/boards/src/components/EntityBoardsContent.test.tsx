@@ -79,10 +79,12 @@ describe('EntityBoardsContent', () => {
     });
   });
 
-  it('says so when the entity has no board', async () => {
+  it('names the access caveat when no board is readable', async () => {
     renderTab([]);
     expect(
-      await screen.findByText('No boards are assigned to this entity.'),
+      await screen.findByText(
+        'No boards are assigned to this entity that you can access.',
+      ),
     ).toBeInTheDocument();
   });
 

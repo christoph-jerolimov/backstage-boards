@@ -5226,6 +5226,18 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@internal/plugin-catalog-backend-module-boards@workspace:^, @internal/plugin-catalog-backend-module-boards@workspace:plugins/catalog-backend-module-boards":
+  version: 0.0.0-use.local
+  resolution: "@internal/plugin-catalog-backend-module-boards@workspace:plugins/catalog-backend-module-boards"
+  dependencies:
+    "@backstage/backend-plugin-api": "npm:^1.10.0"
+    "@backstage/catalog-model": "npm:^1.10.0"
+    "@backstage/cli": "npm:^0.36.5"
+    "@backstage/plugin-catalog-node": "npm:^2.2.4"
+    "@internal/plugin-boards-common": "workspace:^"
+  languageName: unknown
+  linkType: soft
+
 "@internationalized/date@npm:^3.12.0, @internationalized/date@npm:^3.12.1, @internationalized/date@npm:^3.12.3":
   version: 3.12.3
   resolution: "@internationalized/date@npm:3.12.3"
@@ -13256,6 +13268,7 @@ __metadata:
     "@backstage/plugin-techdocs-backend": "npm:^2.2.3"
     "@backstage/plugin-user-settings-backend": "npm:^0.4.6"
     "@internal/plugin-boards-backend": "workspace:^"
+    "@internal/plugin-catalog-backend-module-boards": "workspace:^"
     app: "link:../app"
     better-sqlite3: "npm:^12.0.0"
     node-gyp: "npm:^10.0.0"

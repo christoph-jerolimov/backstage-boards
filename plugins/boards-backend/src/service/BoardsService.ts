@@ -176,6 +176,13 @@ export interface BoardsServiceOptions {
   signals?: SignalsService;
   /** Base path used in notification links, e.g. `/boards`. */
   appLinkBase?: string;
+  /**
+   * Called with the entity refs whose set of referencing boards may have
+   * changed, so the catalog can re-derive the `boards` label on them. Kept
+   * as a hook rather than a catalog dependency so the service stays
+   * catalog-agnostic; failures are the hook's own to handle.
+   */
+  onEntityRefsChanged?: (entityRefs: string[]) => void;
 }
 
 export class BoardsService {
@@ -184,6 +191,7 @@ export class BoardsService {
   private readonly notifications?: NotificationService;
   private readonly signals?: SignalsService;
   private readonly appLinkBase: string;
+  private readonly onEntityRefsChanged?: (entityRefs: string[]) => void;
 
   constructor(options: BoardsServiceOptions) {
     this.knex = options.knex;
@@ -191,6 +199,26 @@ export class BoardsService {
     this.notifications = options.notifications;
     this.signals = options.signals;
     this.appLinkBase = options.appLinkBase ?? '/boards';
+    this.onEntityRefsChanged = options.onEntityRefsChanged;
+  }
+
+  /**
+   * Reports entity refs whose board references changed. Deduped, and never
+   * called with an empty list.
+   */
+  private notifyEntityRefsChanged(...refs: string[][]): void {
+    if (!this.onEntityRefsChanged) {
+      return;
+    }
+    const unique = [...new Set(refs.flat())];
+    if (unique.length === 0) {
+      return;
+    }
+    try {
+      this.onEntityRefsChanged(unique);
+    } catch (error) {
+      this.logger.warn(`Failed to report changed entity refs: ${error}`);
+    }
   }
 
   /**
@@ -364,6 +392,8 @@ export class BoardsService {
       }
     });
 
+    this.notifyEntityRefsChanged(entityRefs);
+
     return this.getBoard(principal, boardId);
   }
 
@@ -421,6 +451,24 @@ export class BoardsService {
       map.set(row.board_id, [...(map.get(row.board_id) ?? []), row.entity_ref]);
     }
     return map;
+  }
+
+  /**
+   * Whether any non-archived board references the given entity.
+   *
+   * Deliberately independent of any principal: it answers for the catalog
+   * processor that labels referenced entities, and the route exposing it is
+   * restricted to service-to-service callers. Matching is exact, the same as
+   * the `entityRef` filter of {@link listBoards}, so the label and the tab's
+   * listing always agree on what "referenced" means.
+   */
+  async isEntityReferenced(entityRef: string): Promise<boolean> {
+    const row = await this.knex('board_entities')
+      .join('boards', 'boards.id', 'board_entities.board_id')
+      .whereNull('boards.archived_at')
+      .where('board_entities.entity_ref', entityRef)
+      .first('board_entities.board_id');
+    return !!row;
   }
 
   async listBoards(
@@ -486,6 +534,7 @@ export class BoardsService {
     }
     if (update.entityRefs !== undefined) {
       const refs = normalizeEntityRefs(update.entityRefs);
+      const previous = (await this.entityRefsByBoard([boardId])).get(boardId);
       await this.knex.transaction(async trx => {
         await trx('board_entities').where('board_id', boardId).delete();
         if (refs.length > 0) {
@@ -494,6 +543,8 @@ export class BoardsService {
           );
         }
       });
+      // both sides: entities that lost the board and entities that gained it
+      this.notifyEntityRefsChanged(previous ?? [], refs);
     }
     if (update.visibility !== undefined) {
       if (!ALL_VISIBILITIES.includes(update.visibility)) {
@@ -512,6 +563,7 @@ export class BoardsService {
     boardId: string,
   ): Promise<void> {
     await this.requireBoard(principal, boardId, 'admin');
+    const refs = (await this.entityRefsByBoard([boardId])).get(boardId) ?? [];
     await this.knex('boards')
       .where('id', boardId)
       .update({
@@ -519,6 +571,7 @@ export class BoardsService {
         archived_by: actorRef(principal),
         updated_at: now(),
       });
+    this.notifyEntityRefsChanged(refs);
     await this.emitBoardSignal(boardId);
   }
 
@@ -535,7 +588,9 @@ export class BoardsService {
     if (!board.archived_at) {
       throw new ConflictError('Only archived boards can be deleted');
     }
+    const refs = (await this.entityRefsByBoard([boardId])).get(boardId) ?? [];
     await this.cascadeDeleteBoards([boardId]);
+    this.notifyEntityRefsChanged(refs);
     await this.emitBoardSignal(boardId);
   }
 
@@ -557,6 +612,9 @@ export class BoardsService {
       archived_by: null,
       updated_at: now(),
     });
+    this.notifyEntityRefsChanged(
+      (await this.entityRefsByBoard([boardId])).get(boardId) ?? [],
+    );
     await this.emitBoardSignal(boardId);
   }
 

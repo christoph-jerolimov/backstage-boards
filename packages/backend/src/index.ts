@@ -68,6 +68,9 @@ backend.add(import('@backstage/plugin-signals-backend'));
 
 // boards plugin
 backend.add(import('@internal/plugin-boards-backend'));
+// labels entities referenced by a board, which is what the catalog "Boards"
+// tab filters on
+backend.add(import('@internal/plugin-catalog-backend-module-boards'));
 
 // mcp actions plugin
 backend.add(import('@backstage/plugin-mcp-actions-backend'));

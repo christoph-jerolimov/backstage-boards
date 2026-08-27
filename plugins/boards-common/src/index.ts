@@ -5,6 +5,7 @@
  */
 
 export * from './types';
+export * from './entityLabel';
 export * from './refs';
 export * from './filter';
 export * from './mentions';
