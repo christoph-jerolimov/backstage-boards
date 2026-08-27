@@ -22,12 +22,10 @@ import {
   BoardWithContext,
   COLUMN_COLORS,
   ColumnColor,
-  fridayISO,
-  todayISO,
-  tomorrowISO,
 } from '@internal/plugin-boards-common';
 import { GroupByMode, groupItems, positionBefore } from './grouping';
 import { GroupLabel } from './GroupLabel';
+import { ContextMenuState, ItemContextMenu, ItemMenu } from './ItemMenu';
 import { InlineEdit } from './common';
 import { AssigneeAvatars } from './AssigneeAvatars';
 import { DueDateBadge } from './DueDate';
@@ -67,6 +65,7 @@ function ItemCard(props: {
   canWrite: boolean;
   actions: BoardActions;
   onDropBefore: (droppedItemId: string) => void;
+  onContextMenu: (event: React.MouseEvent) => void;
 }) {
   const { item, columns, canWrite, actions } = props;
   const readonly = !canWrite || !!item.externalManager;
@@ -118,6 +117,7 @@ function ItemCard(props: {
         cursor: 'pointer',
       }}
       onClick={() => actions.openItem(item.id)}
+      onContextMenu={props.onContextMenu}
     >
       <Flex align="center" gap="2" justify="between">
         {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions,jsx-a11y/click-events-have-key-events */}
@@ -153,66 +153,12 @@ function ItemCard(props: {
               size="small"
               icon={<MoreIcon />}
             />
-            <Menu>
-              <MenuItem onAction={() => actions.openItem(item.id)}>
-                Open details
-              </MenuItem>
-              {!readonly && (
-                <SubmenuTrigger>
-                  <MenuItem>Move to column</MenuItem>
-                  <Menu>
-                    {columns
-                      .filter(column => column.id !== item.columnId)
-                      .map(column => (
-                        <MenuItem
-                          key={column.id}
-                          onAction={() =>
-                            actions.moveItem(item.id, { columnId: column.id })
-                          }
-                        >
-                          {column.title}
-                        </MenuItem>
-                      ))}
-                  </Menu>
-                </SubmenuTrigger>
-              )}
-              {!readonly && (
-                <SubmenuTrigger>
-                  <MenuItem>Due date</MenuItem>
-                  <Menu>
-                    <MenuItem
-                      onAction={() =>
-                        actions.setItemDueDate(item.id, todayISO())
-                      }
-                    >
-                      Today
-                    </MenuItem>
-                    <MenuItem
-                      onAction={() =>
-                        actions.setItemDueDate(item.id, tomorrowISO())
-                      }
-                    >
-                      Tomorrow
-                    </MenuItem>
-                    <MenuItem
-                      onAction={() =>
-                        actions.setItemDueDate(item.id, fridayISO())
-                      }
-                    >
-                      This week (Fri)
-                    </MenuItem>
-                    {item.dueDate && (
-                      <MenuItem
-                        color="danger"
-                        onAction={() => actions.setItemDueDate(item.id, null)}
-                      >
-                        Remove due date
-                      </MenuItem>
-                    )}
-                  </Menu>
-                </SubmenuTrigger>
-              )}
-            </Menu>
+            <ItemMenu
+              item={item}
+              columns={columns}
+              readonly={readonly}
+              actions={actions}
+            />
           </MenuTrigger>
         </div>
       </Flex>
@@ -300,6 +246,7 @@ function ColumnLane(props: {
   actions: BoardActions;
   groupBy: GroupByMode;
   onRequestDelete: (column: BoardColumn, hasItems: boolean) => void;
+  onItemContextMenu: (item: BoardItem, event: React.MouseEvent) => void;
 }) {
   const { board, column, items, canWrite, actions, groupBy } = props;
   const laneRef = useRef<HTMLDivElement>(null);
@@ -336,6 +283,7 @@ function ColumnLane(props: {
           position: positionBefore(sorted, itemIndex),
         });
       }}
+      onContextMenu={event => props.onItemContextMenu(item, event)}
     />
   );
 
@@ -479,6 +427,7 @@ export function KanbanView(props: {
   groupBy: GroupByMode;
 }) {
   const { board, items, canWrite, actions, groupBy } = props;
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | undefined>();
   const [deleteTarget, setDeleteTarget] = useState<BoardColumn | undefined>();
   const [moveItemsTo, setMoveItemsTo] = useState<string | undefined>();
   const [addingColumn, setAddingColumn] = useState(false);
@@ -504,6 +453,10 @@ export function KanbanView(props: {
           canWrite={canWrite}
           actions={actions}
           groupBy={groupBy}
+          onItemContextMenu={(item, event) => {
+            event.preventDefault();
+            setContextMenu({ item, x: event.clientX, y: event.clientY });
+          }}
           onRequestDelete={(target, hasItems) => {
             if (hasItems) {
               setDeleteTarget(target);
@@ -545,6 +498,13 @@ export function KanbanView(props: {
             + Add column
           </Button>
         ))}
+      <ItemContextMenu
+        state={contextMenu}
+        onClose={() => setContextMenu(undefined)}
+        columns={board.columns}
+        readonly={!canWrite || !!contextMenu?.item.externalManager}
+        actions={actions}
+      />
       <Dialog
         isOpen={deleteTarget !== undefined}
         onOpenChange={open => {
