@@ -106,18 +106,32 @@ Google Chrome build Playwright expects. The `PLAYWRIGHT_CHROMIUM_PATH`
 escape hatch already in `playwright.config.ts` stays for container
 environments and is not used by CI.
 
-**Serve e2e from the built backend on 7007, with env overrides rather
-than `app-config.production.yaml`.**
+**Serve e2e on 7007 with env overrides rather than
+`app-config.production.yaml`.**
 The CI branch of `playwright.config.ts` already expects
-`http://localhost:7007`, which is the app-backend shape:
-`yarn build:all` bundles the frontend into `packages/app/dist` and the
-backend serves it. Loading `app-config.production.yaml` would give the
-right base URLs but would also switch the database to Postgres and
-demand a service container for no gain. Instead the job runs the backend
-against `app-config.yaml` — in-memory SQLite, guest auth, no services —
-with `APP_CONFIG_app_baseUrl` and `APP_CONFIG_backend_cors_origin`
-overridden to `http://localhost:7007` so the served app talks to the
-origin it is served from.
+`http://localhost:7007`, which is the app-backend shape: `yarn
+build:all` bundles the frontend into `packages/app/dist` and the backend
+serves it from there. Loading `app-config.production.yaml` would give
+the right base URLs but would also switch the database to Postgres and
+demand a service container for no gain. Instead the job runs against
+`app-config.yaml` — in-memory SQLite, guest auth, no services — with
+`APP_CONFIG_app_baseUrl` and `APP_CONFIG_backend_cors_origin` overridden
+to `http://localhost:7007` so the served app talks to the origin it is
+served from.
+
+**Start that backend with `yarn workspace backend start`, not
+`node packages/backend`.**
+Corrected during implementation. This design originally assumed the
+deployment entry point, but in Backstage 1.54 `yarn build:all` (and
+`yarn workspace backend build`) emit only `bundle.tar.gz` and
+`skeleton.tar.gz` under `packages/backend/dist` — there is no
+`dist/index.cjs.js` left to run, so `node packages/backend` fails with
+MODULE_NOT_FOUND. Running the deployment bundle instead would mean
+extracting it and doing a second production-only install inside it, for
+a signal the e2e suite does not need: what it exercises is the built
+frontend bundle plus the API, and the backend serves the same
+`packages/app/dist` either way. The dev entry point starts in about six
+seconds and needs no extra install.
 
 Rejected alternative: run `yarn start` (the dev servers on 3000 and
 7007) in CI and point `PLAYWRIGHT_URL` at 3000. It is closer to how the
