@@ -113,6 +113,11 @@ export interface ChangeRecord {
   newValue?: unknown;
 }
 
+export interface BoardChangeEntry {
+  change: ChangeRecord;
+  itemTitle: string;
+}
+
 export type TimelineEntry =
   | { kind: 'comment'; at: string; comment: ItemComment }
   | { kind: 'change'; at: string; change: ChangeRecord };

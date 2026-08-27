@@ -20,6 +20,7 @@ import { WatchButton } from './WatchButton';
 import { EditableMarkdown } from './EditableMarkdown';
 import { PrincipalPicker } from './PrincipalPicker';
 import {
+  changeSummary,
   formatDate,
   InlineEdit,
   RefDisplay,
@@ -122,22 +123,9 @@ function Timeline(props: {
           );
         }
         const { change } = entry;
-        let summary: string;
-        if (change.type === 'created') {
-          summary = 'created this item';
-        } else if (change.type === 'moved') {
-          summary = `moved this item from “${String(change.oldValue)}” to “${String(change.newValue)}”`;
-        } else if (
-          change.oldValue === undefined &&
-          change.newValue === undefined
-        ) {
-          summary = `changed the ${change.field}`;
-        } else {
-          summary = `changed ${change.field}: ${JSON.stringify(change.oldValue) ?? '(empty)'} → ${JSON.stringify(change.newValue) ?? '(empty)'}`;
-        }
         return (
           <Text key={`change-${index}`} variant="body-small" color="secondary">
-            <RefDisplay refString={change.actorRef} /> {summary} ·{' '}
+            <RefDisplay refString={change.actorRef} /> {changeSummary(change)} ·{' '}
             {formatDate(change.at)}
           </Text>
         );

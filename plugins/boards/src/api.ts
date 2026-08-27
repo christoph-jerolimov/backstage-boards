@@ -5,6 +5,7 @@ import {
 } from '@backstage/frontend-plugin-api';
 import {
   Board,
+  BoardChangeEntry,
   BoardColumn,
   BoardItem,
   BoardListEntry,
@@ -78,6 +79,10 @@ export interface BoardsApi {
     watching: boolean,
   ): Promise<void>;
   listBoardWatchers(boardId: string): Promise<string[]>;
+  getBoardChanges(
+    boardId: string,
+    options?: { limit?: number },
+  ): Promise<BoardChangeEntry[]>;
   listItemWatchers(boardId: string, itemId: string): Promise<string[]>;
 
   addComment(
@@ -305,6 +310,18 @@ export class BoardsClient implements BoardsApi {
       watching ? 'PUT' : 'DELETE',
       `/boards/${boardId}/items/${itemId}/watch`,
     );
+  }
+
+  async getBoardChanges(
+    boardId: string,
+    options?: { limit?: number },
+  ): Promise<BoardChangeEntry[]> {
+    const query = options?.limit ? `?limit=${options.limit}` : '';
+    const result = await this.request<{ changes: BoardChangeEntry[] }>(
+      'GET',
+      `/boards/${boardId}/changes${query}`,
+    );
+    return result.changes;
   }
 
   async listBoardWatchers(boardId: string): Promise<string[]> {
