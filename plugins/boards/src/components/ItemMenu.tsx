@@ -61,7 +61,7 @@ export function ItemMenu(props: {
   const mark = (ref: string, label: string) =>
     item.assignees.includes(ref) ? `✓ ${label}` : label;
   return (
-    <Menu>
+    <Menu placement="right top">
       <MenuItem onAction={() => actions.openItem(item.id)}>
         Open details
       </MenuItem>
