@@ -674,8 +674,10 @@ export class BoardsService {
   }
 
   /**
-   * Duplicates a board's structure (never its items). Share settings can
-   * only be copied by admins of the source board.
+   * Duplicates a board, optionally copying its columns, items, entity
+   * references and share settings. Items can only be copied together with
+   * their columns; share settings can only be copied by admins of the
+   * source board.
    */
   async duplicateBoard(
     principal: BoardsPrincipal,

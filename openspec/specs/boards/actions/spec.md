@@ -24,7 +24,7 @@ The backend SHALL register actions to add, update, and remove board permission e
 - **THEN** the permission entry is created and effective immediately
 
 ### Requirement: Item actions
-The backend SHALL register actions to add an item, update an item's fields, move an item (column and position), and delete an item, as well as actions to add or edit a comment, and to set labels and tags on an item. Item mutations performed through actions SHALL produce the same change records and notifications as UI mutations. Actions invoked by an integration marked as an external manager SHALL be able to create and update items with the external-management marker.
+The backend SHALL register actions to add an item, update an item's fields, move an item (column and position), and delete an item, as well as actions to add or edit a comment, and to set an item's tags. Item mutations performed through actions SHALL produce the same change records and notifications as UI mutations. Actions invoked by an integration marked as an external manager SHALL be able to create and update items with the external-management marker.
 
 #### Scenario: Add item via action
 - **WHEN** the `add-item` action is invoked with a board id, column, and title
@@ -39,7 +39,7 @@ The backend SHALL register actions to add an item, update an item's fields, move
 - **THEN** the previous comment version is retained and the new text becomes current, matching the UI editing behavior
 
 ### Requirement: List items action
-The backend SHALL register a read-only `list-items` action that returns a board's items, honoring the same text, tag, and label filters as the items endpoint and the same permission rules.
+The backend SHALL register a read-only `list-items` action that returns a board's items, honoring the same text and tag filters as the items endpoint and the same permission rules.
 
 #### Scenario: List with filters
 - **WHEN** the `list-items` action is invoked with a board id and a tag filter
