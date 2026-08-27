@@ -58,6 +58,23 @@ export async function createRouter(
     res.json({ items: await service.listMyItems(principal) });
   });
 
+  // ---- service-to-service
+
+  // Answers whether any non-archived board references an entity, for the
+  // catalog processor that labels referenced entities. Restricted to service
+  // principals: the answer ignores board visibility, so exposing it to users
+  // would leak the existence of boards they cannot read. The plugin's router
+  // allows unauthenticated requests through (public boards), so this handler
+  // has to demand service credentials itself.
+  router.get('/service/entity-references', async (req, res) => {
+    await options.httpAuth.credentials(req, { allow: ['service'] });
+    const entityRef = req.query.entityRef;
+    if (typeof entityRef !== 'string' || !entityRef.trim()) {
+      throw new InputError('entityRef is required');
+    }
+    res.json({ referenced: await service.isEntityReferenced(entityRef) });
+  });
+
   // ---- boards
 
   router.get('/boards', async (req, res) => {

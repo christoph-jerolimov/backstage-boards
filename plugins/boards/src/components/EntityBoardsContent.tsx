@@ -19,7 +19,11 @@ function EntityBoardsList() {
   }
   const assigned = boards ?? [];
   if (assigned.length === 0) {
-    return <Text>No boards are assigned to this entity.</Text>;
+    // The tab only appears on entities a board references, so an empty list
+    // means the viewer cannot access any of those boards.
+    return (
+      <Text>No boards are assigned to this entity that you can access.</Text>
+    );
   }
   if (assigned.length === 1) {
     return <BoardPageContent boardId={assigned[0].id} embedded />;

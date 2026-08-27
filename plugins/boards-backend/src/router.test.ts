@@ -3,12 +3,13 @@ import {
   HttpAuthService,
   UserInfoService,
 } from '@backstage/backend-plugin-api';
+import { AuthenticationError, NotAllowedError } from '@backstage/errors';
 import express from 'express';
 import request from 'supertest';
 import { Knex } from 'knex';
 import { createRouter } from './router';
 import { BoardsService } from './service/BoardsService';
-import { createTestService, alice } from './service/testUtils';
+import { createTestService, alice, bob } from './service/testUtils';
 
 const USERS: Record<
   string,
@@ -25,27 +26,38 @@ const USERS: Record<
 };
 
 // Resolves credentials from the `x-test-user` / `x-test-service` headers so
-// tests can act as different principals without a real auth setup.
+// tests can act as different principals without a real auth setup. The
+// `allow` option is honoured the way the real service does, so handlers
+// restricting themselves to a principal type are covered.
 const httpAuth = {
-  credentials: async (req: express.Request) => {
+  credentials: async (
+    req: express.Request,
+    options?: { allow?: Array<'user' | 'service' | 'none'> },
+  ) => {
     const user = req.header('x-test-user');
-    if (user) {
-      return {
-        $$type: '@backstage/BackstageCredentials',
-        principal: { type: 'user', userEntityRef: USERS[user].userEntityRef },
-      };
-    }
     const svc = req.header('x-test-service');
-    if (svc) {
-      return {
-        $$type: '@backstage/BackstageCredentials',
-        principal: { type: 'service', subject: svc },
-      };
+    let principal: { type: string; [key: string]: unknown } = { type: 'none' };
+    if (user) {
+      principal = { type: 'user', userEntityRef: USERS[user].userEntityRef };
+    } else if (svc) {
+      principal = { type: 'service', subject: svc };
     }
-    return {
+    const credentials = {
       $$type: '@backstage/BackstageCredentials',
-      principal: { type: 'none' },
+      principal,
     };
+    const type = credentials.principal.type as 'user' | 'service' | 'none';
+    if (options?.allow && !options.allow.includes(type)) {
+      // mirrors the real service: missing credentials are a 401, present but
+      // disallowed ones a 403
+      if (type === 'none') {
+        throw new AuthenticationError('Missing credentials');
+      }
+      throw new NotAllowedError(
+        `This endpoint does not allow '${type}' credentials`,
+      );
+    }
+    return credentials;
   },
 } as unknown as HttpAuthService;
 
@@ -77,6 +89,7 @@ function errorMiddleware(): express.ErrorRequestHandler {
       {
         NotFoundError: 404,
         NotAllowedError: 403,
+        AuthenticationError: 401,
         InputError: 400,
         ConflictError: 409,
       }[err.name as string] ?? 500;
@@ -373,5 +386,50 @@ describe('createRouter', () => {
       .set('x-test-user', 'alice')
       .send({ title: 'Nope' })
       .expect(403);
+  });
+
+  describe('GET /service/entity-references', () => {
+    it('answers service callers regardless of who can read the board', async () => {
+      // bob's private board is invisible to alice, but the entity is still
+      // referenced — the answer exists for the catalog processor only.
+      await service.createBoard(bob, {
+        name: 'Private',
+        entityRefs: ['component:default/payments'],
+      });
+      const referenced = await request(app)
+        .get('/service/entity-references?entityRef=component:default/payments')
+        .set('x-test-service', 'plugin:catalog')
+        .expect(200);
+      expect(referenced.body).toEqual({ referenced: true });
+
+      const unreferenced = await request(app)
+        .get('/service/entity-references?entityRef=component:default/other')
+        .set('x-test-service', 'plugin:catalog')
+        .expect(200);
+      expect(unreferenced.body).toEqual({ referenced: false });
+    });
+
+    it('rejects logged-in users and unauthenticated callers', async () => {
+      await service.createBoard(alice, {
+        name: 'Board',
+        entityRefs: ['component:default/payments'],
+      });
+      const asUser = await request(app)
+        .get('/service/entity-references?entityRef=component:default/payments')
+        .set('x-test-user', 'alice')
+        .expect(403);
+      expect(asUser.body).not.toHaveProperty('referenced');
+      const anonymous = await request(app)
+        .get('/service/entity-references?entityRef=component:default/payments')
+        .expect(401);
+      expect(anonymous.body).not.toHaveProperty('referenced');
+    });
+
+    it('requires an entityRef', async () => {
+      await request(app)
+        .get('/service/entity-references')
+        .set('x-test-service', 'plugin:catalog')
+        .expect(400);
+    });
   });
 });

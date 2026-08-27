@@ -55,11 +55,33 @@ export const boardsPlugin = createBackendPlugin({
         const knex = (await database.getClient()) as unknown as Knex;
         await applyDatabaseMigrations(knex);
 
+        const refreshEntities = async (entityRefs: string[]) => {
+          const credentials = await auth.getOwnServiceCredentials();
+          for (const entityRef of entityRefs) {
+            try {
+              await catalog.refreshEntity(entityRef, { credentials });
+            } catch (error) {
+              logger.warn(
+                `Failed to refresh catalog entity ${entityRef}: ${error}`,
+              );
+            }
+          }
+        };
+
         const service = new BoardsService({
           knex,
           logger,
           notifications,
           signals,
+          // Board assignments decide the `boards` label the catalog processor
+          // derives, so a refresh makes the catalog re-derive it right away
+          // instead of at the next processing sweep. Best effort: refs the
+          // catalog does not know are normal and must not fail a board write.
+          onEntityRefsChanged: entityRefs => {
+            refreshEntities(entityRefs).catch(error => {
+              logger.warn(`Failed to refresh catalog entities: ${error}`);
+            });
+          },
         });
 
         httpRouter.use(

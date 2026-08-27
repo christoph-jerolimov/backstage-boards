@@ -14,9 +14,11 @@ describe('BoardsService', () => {
   let service: BoardsService;
   let notifications: { send: jest.Mock };
   let signals: { publish: jest.Mock };
+  let onEntityRefsChanged: jest.Mock;
 
   beforeEach(async () => {
-    ({ knex, service, notifications, signals } = await createTestService());
+    ({ knex, service, notifications, signals, onEntityRefsChanged } =
+      await createTestService());
   });
 
   afterEach(async () => {
@@ -909,6 +911,116 @@ describe('BoardsService', () => {
       await expect(service.getBoardChanges(bob, board.id)).rejects.toThrow(
         /not found/,
       );
+    });
+  });
+
+  describe('entity references', () => {
+    it('reports entities referenced by any board, regardless of access', async () => {
+      await service.createBoard(bob, {
+        name: 'Private board of bob',
+        entityRefs: ['component:default/payments'],
+      });
+      await expect(
+        service.isEntityReferenced('component:default/payments'),
+      ).resolves.toBe(true);
+      await expect(
+        service.isEntityReferenced('component:default/other'),
+      ).resolves.toBe(false);
+    });
+
+    it('ignores archived boards until they are unarchived', async () => {
+      const board = await service.createBoard(alice, {
+        name: 'Board',
+        entityRefs: ['component:default/payments'],
+      });
+      await service.deleteBoard(alice, board.id);
+      await expect(
+        service.isEntityReferenced('component:default/payments'),
+      ).resolves.toBe(false);
+      await service.unarchiveBoard(alice, board.id);
+      await expect(
+        service.isEntityReferenced('component:default/payments'),
+      ).resolves.toBe(true);
+    });
+  });
+
+  describe('catalog entity refresh hook', () => {
+    const reportedRefs = () =>
+      onEntityRefsChanged.mock.calls.map(call => [...call[0]].sort());
+
+    it('reports the refs of a new board', async () => {
+      await service.createBoard(alice, {
+        name: 'B',
+        entityRefs: ['component:default/a', 'component:default/b'],
+      });
+      expect(reportedRefs()).toEqual([
+        ['component:default/a', 'component:default/b'],
+      ]);
+    });
+
+    it('is silent for a board without entities', async () => {
+      await service.createBoard(alice, { name: 'B' });
+      expect(onEntityRefsChanged).not.toHaveBeenCalled();
+    });
+
+    it('reports both the old and the new refs on reassignment', async () => {
+      const board = await service.createBoard(alice, {
+        name: 'B',
+        entityRefs: ['component:default/a'],
+      });
+      onEntityRefsChanged.mockClear();
+      await service.updateBoard(alice, board.id, {
+        entityRefs: ['component:default/b'],
+      });
+      expect(reportedRefs()).toEqual([
+        ['component:default/a', 'component:default/b'],
+      ]);
+    });
+
+    it('reports on archive, unarchive, and permanent deletion', async () => {
+      const board = await service.createBoard(alice, {
+        name: 'B',
+        entityRefs: ['component:default/a'],
+      });
+      onEntityRefsChanged.mockClear();
+
+      await service.deleteBoard(alice, board.id);
+      expect(reportedRefs()).toEqual([['component:default/a']]);
+      onEntityRefsChanged.mockClear();
+
+      await service.unarchiveBoard(alice, board.id);
+      expect(reportedRefs()).toEqual([['component:default/a']]);
+      onEntityRefsChanged.mockClear();
+
+      await service.deleteBoard(alice, board.id);
+      onEntityRefsChanged.mockClear();
+      await service.hardDeleteBoard(alice, board.id);
+      expect(reportedRefs()).toEqual([['component:default/a']]);
+    });
+
+    it('reports the copied refs of a duplicated board', async () => {
+      const board = await service.createBoard(alice, {
+        name: 'B',
+        entityRefs: ['component:default/a'],
+      });
+      onEntityRefsChanged.mockClear();
+      await service.duplicateBoard(alice, board.id, {
+        copyColumns: true,
+        copyEntities: true,
+        copyPermissions: false,
+      });
+      expect(reportedRefs()).toEqual([['component:default/a']]);
+    });
+
+    it('does not fail the board operation when the hook throws', async () => {
+      onEntityRefsChanged.mockImplementation(() => {
+        throw new Error('catalog unreachable');
+      });
+      const board = await service.createBoard(alice, {
+        name: 'B',
+        entityRefs: ['component:default/a'],
+      });
+      expect(board.entityRefs).toEqual(['component:default/a']);
     });
   });
 
