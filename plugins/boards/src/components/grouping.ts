@@ -70,8 +70,12 @@ export function groupItems(
   const groups = new Map<string, BoardItem[]>();
   const rest: BoardItem[] = [];
   for (const item of items) {
-    const keys =
-      mode === 'dueDate' ? (item.dueDate ? [item.dueDate] : []) : item.tags;
+    let keys: string[];
+    if (mode === 'dueDate') {
+      keys = item.dueDate ? [item.dueDate] : [];
+    } else {
+      keys = item.tags;
+    }
     if (keys.length === 0) {
       rest.push(item);
       continue;
@@ -84,7 +88,7 @@ export function groupItems(
   }
   const result = [...groups.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, groupItems_]) => ({ key, items: groupItems_ }));
+    .map(([key, grouped]) => ({ key, items: grouped }));
   if (rest.length > 0) {
     result.push({
       key: mode === 'dueDate' ? NO_DUE_DATE : UNTAGGED,
@@ -118,7 +122,7 @@ export function groupByAssignee(
   }
   const result = [...groups.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, groupItems]) => ({ key, items: groupItems }));
+    .map(([key, grouped]) => ({ key, items: grouped }));
   if (unassigned.length > 0) {
     result.push({ key: UNASSIGNED, items: unassigned });
   }

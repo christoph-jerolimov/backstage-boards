@@ -148,7 +148,7 @@ describe('groupItems', () => {
       '2026-09-01',
       NO_DUE_DATE,
     ]);
-    expect(groups[1].items.map(item => item.id)).toEqual(['1', '4']);
+    expect(groups[1].items.map(entry => entry.id)).toEqual(['1', '4']);
   });
 
   it('groups by tags with multi-membership and untagged last', () => {
@@ -161,7 +161,7 @@ describe('groupItems', () => {
       'tags',
     );
     expect(groups.map(group => group.key)).toEqual(['bug', 'ui', UNTAGGED]);
-    expect(groups[0].items.map(item => item.id)).toEqual(['1', '2']);
+    expect(groups[0].items.map(entry => entry.id)).toEqual(['1', '2']);
   });
 
   it('none returns a single group', () => {
