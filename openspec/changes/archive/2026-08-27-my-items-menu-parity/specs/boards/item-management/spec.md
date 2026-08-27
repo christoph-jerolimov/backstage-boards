@@ -12,7 +12,7 @@ SHALL be rendered as a table whose last column is an actions column
 holding a menu button, and that menu SHALL also open at the pointer on
 right-click. That menu SHALL offer the same item actions as the item menu
 on a board — open details, move to another column, set or clear the due
-date, and change assignees and delete the item — subject to the same
+date, change assignees, and delete the item — subject to the same
 write-access and externally-managed restrictions, plus an entry that
 opens the item's board. After such an action the listing SHALL reflect
 the result, including removing an item that is no longer assigned to the
