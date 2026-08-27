@@ -16,6 +16,7 @@ import {
   CommentVersion,
   ItemComment,
   ItemUpdate,
+  MyBoardItem,
   NewItem,
   TimelineEntry,
 } from '@internal/plugin-boards-common';
@@ -30,6 +31,8 @@ export interface BoardsApi {
     columns?: string[];
     entityRef?: string;
   }): Promise<BoardWithContext>;
+  /** All items assigned to the current user across readable boards. */
+  listMyItems(): Promise<MyBoardItem[]>;
   getBoard(boardId: string): Promise<BoardWithContext>;
   updateBoard(boardId: string, update: BoardUpdate): Promise<BoardWithContext>;
   /** Archives the board (read-only, purged after 30 days). */
@@ -182,6 +185,14 @@ export class BoardsClient implements BoardsApi {
       `/boards${query}`,
     );
     return result.boards;
+  }
+
+  async listMyItems(): Promise<MyBoardItem[]> {
+    const result = await this.request<{ items: MyBoardItem[] }>(
+      'GET',
+      '/my-items',
+    );
+    return result.items;
   }
 
   createBoard(options: {

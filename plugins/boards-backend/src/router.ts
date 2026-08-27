@@ -53,6 +53,11 @@ export async function createRouter(
 
   const principalOf = (req: Request) => resolvePrincipal(req, options);
 
+  router.get('/my-items', async (req, res) => {
+    const principal = await principalOf(req);
+    res.json({ items: await service.listMyItems(principal) });
+  });
+
   // ---- boards
 
   router.get('/boards', async (req, res) => {

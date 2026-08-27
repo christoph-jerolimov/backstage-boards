@@ -487,6 +487,59 @@ describe('BoardsService', () => {
       expect(item.tags).toEqual(['bug']);
     });
 
+    it('lists my items across readable boards only', async () => {
+      const own = await service.createBoard(alice, { name: 'A Own' });
+      const shared = await service.createBoard(bob, {
+        name: 'B Shared',
+        visibility: 'logged-in-read',
+      });
+      const hidden = await service.createBoard(bob, { name: 'C Hidden' });
+
+      const mine = await service.createItem(alice, own.id, {
+        columnId: own.columns[0].id,
+        title: 'Direct',
+        assignees: ['user:default/alice'],
+      });
+      await service.createItem(bob, shared.id, {
+        columnId: shared.columns[0].id,
+        title: 'Via group',
+        assignees: ['group:default/team-a'],
+      });
+      // assigned to alice on a board she cannot read: must not leak
+      await service.createItem(bob, hidden.id, {
+        columnId: hidden.columns[0].id,
+        title: 'Invisible',
+        assignees: ['user:default/alice'],
+      });
+      // assigned to someone else: not hers
+      await service.createItem(alice, own.id, {
+        columnId: own.columns[0].id,
+        title: 'Not mine',
+        assignees: ['user:default/bob'],
+      });
+      // archived assignment disappears
+      const archived = await service.createItem(alice, own.id, {
+        columnId: own.columns[0].id,
+        title: 'Archived',
+        assignees: ['user:default/alice'],
+      });
+      await service.deleteItem(alice, own.id, archived.id);
+
+      const entries = await service.listMyItems(alice);
+      expect(entries.map(entry => entry.item.title)).toEqual([
+        'Direct',
+        'Via group',
+      ]);
+      expect(entries[0].boardName).toBe('A Own');
+      expect(entries[0].boardId).toBe(own.id);
+      expect(entries[0].columnTitle).toBe(own.columns[0].title);
+      expect(entries[0].item.id).toBe(mine.id);
+
+      await expect(service.listMyItems(anonymous)).rejects.toThrow(
+        /requires a logged-in user/,
+      );
+    });
+
     it('sets, tracks, and clears due dates', async () => {
       const board = await service.createBoard(alice, { name: 'B' });
       const item = await service.createItem(alice, board.id, {

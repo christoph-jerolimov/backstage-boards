@@ -156,6 +156,14 @@ export type TimelineEntry =
   | { kind: 'comment'; at: string; comment: ItemComment }
   | { kind: 'change'; at: string; change: ChangeRecord };
 
+/** An item of the current user together with its board context. */
+export interface MyBoardItem {
+  item: BoardItem;
+  boardId: string;
+  boardName: string;
+  columnTitle: string;
+}
+
 export interface NewItem {
   columnId: string;
   title: string;
