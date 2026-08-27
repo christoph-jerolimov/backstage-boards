@@ -33,6 +33,7 @@ import {
   isTextRef,
   isValidActorRef,
   isValidDueDate,
+  normalizeTags,
   isValidPrincipalRef,
   levelIncludes,
 } from '@internal/plugin-boards-common';
@@ -1133,9 +1134,10 @@ export class BoardsService {
     }
     if (item.tags !== undefined) {
       await trx('item_tags').where('item_id', itemId).delete();
-      if (item.tags.length > 0) {
+      const tags = normalizeTags(item.tags);
+      if (tags.length > 0) {
         await trx('item_tags').insert(
-          [...new Set(item.tags)].map(tag => ({ item_id: itemId, tag })),
+          tags.map(tag => ({ item_id: itemId, tag })),
         );
       }
     }
@@ -1235,7 +1237,7 @@ export class BoardsService {
       }
     }
     if (update.tags !== undefined) {
-      const next = [...new Set(update.tags)].sort();
+      const next = [...normalizeTags(update.tags)].sort();
       const prev = [...before.tags].sort();
       if (JSON.stringify(next) !== JSON.stringify(prev)) {
         changes.push({ field: 'tags', oldValue: prev, newValue: next });

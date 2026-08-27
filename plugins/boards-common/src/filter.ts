@@ -42,3 +42,20 @@ export function itemMatchesFilter(item: BoardItem, filter: ItemFilter): boolean 
   }
   return true;
 }
+
+/**
+ * Normalizes tags for storage: strips every `#`, trims whitespace,
+ * drops empty results, and removes duplicates preserving order.
+ */
+export function normalizeTags(tags: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const tag of tags) {
+    const cleaned = tag.replaceAll('#', '').trim();
+    if (cleaned && !seen.has(cleaned)) {
+      seen.add(cleaned);
+      result.push(cleaned);
+    }
+  }
+  return result;
+}

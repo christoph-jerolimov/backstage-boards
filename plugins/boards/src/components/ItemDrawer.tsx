@@ -468,7 +468,7 @@ export function ItemDrawer(props: {
               ) : (
                 <Flex align="center" gap="2">
                   <Text variant="body-small">
-                    {item.tags.map(tag => `#${tag}`).join(' ') || '—'}
+                    {item.tags.join(', ') || '—'}
                   </Text>
                   {!readonly && (
                     <Button

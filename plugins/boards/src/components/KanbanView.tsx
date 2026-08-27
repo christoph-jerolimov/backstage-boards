@@ -224,7 +224,7 @@ function ItemCard(props: {
       <AssigneeAvatars refs={item.assignees} />
       {item.tags.length > 0 && (
         <Text variant="body-x-small" color="secondary">
-          {item.tags.map(tag => `#${tag}`).join(' ')}
+          {item.tags.join(', ')}
         </Text>
       )}
     </div>

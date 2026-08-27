@@ -112,7 +112,7 @@ export function MyItemsPage() {
                   </div>
                   {item.tags.length > 0 && (
                     <Text variant="body-x-small" color="secondary">
-                      {item.tags.map(tag => `#${tag}`).join(' ')}
+                      {item.tags.join(', ')}
                     </Text>
                   )}
                   <DueDateBadge dueDate={item.dueDate} />

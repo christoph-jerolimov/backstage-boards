@@ -1,4 +1,4 @@
-import { isEmptyFilter, itemMatchesFilter } from './filter';
+import { isEmptyFilter, itemMatchesFilter, normalizeTags } from './filter';
 import { BoardItem } from './types';
 
 const item: BoardItem = {
@@ -58,5 +58,15 @@ describe('itemMatchesFilter', () => {
     expect(
       itemMatchesFilter(item, { text: 'login', tags: ['missing'] }),
     ).toBe(false);
+  });
+});
+
+describe('normalizeTags', () => {
+  it('strips #, trims, dedupes, drops empties', () => {
+    expect(normalizeTags(['#bug', 'bug', ' ui ', '#', '', 'a#b'])).toEqual([
+      'bug',
+      'ui',
+      'ab',
+    ]);
   });
 });
