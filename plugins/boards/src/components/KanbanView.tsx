@@ -334,7 +334,7 @@ function ColumnLane(props: {
               size="small"
               icon={<MoreIcon />}
             />
-            <Menu>
+            <Menu placement="right top">
               {index > 0 && (
                 <MenuItem
                   onAction={() =>
