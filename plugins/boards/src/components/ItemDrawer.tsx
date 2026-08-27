@@ -12,10 +12,12 @@ import {
 import {
   BoardItem,
   BoardWithContext,
+  isTextRef,
   ItemComment,
   TimelineEntry,
 } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
+import { AssigneeAvatars } from './AssigneeAvatars';
 import { WatchButton } from './WatchButton';
 import { DueDateBadge } from './DueDate';
 import { EditableMarkdown } from './EditableMarkdown';
@@ -363,7 +365,11 @@ export function ItemDrawer(props: {
                           padding: '2px 4px 2px 8px',
                         }}
                       >
-                        <RefDisplay refString={assignee} />
+                        {isTextRef(assignee) ? (
+                          <RefDisplay refString={assignee} />
+                        ) : (
+                          <AssigneeAvatars refs={[assignee]} />
+                        )}
                         {!readonly && (
                           <Button
                             variant="tertiary"
