@@ -8,7 +8,6 @@ import {
   Flex,
   Select,
   Text,
-  TextField,
 } from '@backstage/ui';
 import {
   ALL_LEVELS,
@@ -17,6 +16,7 @@ import {
   BoardWithContext,
 } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
+import { PrincipalPicker } from './PrincipalPicker';
 import { RefDisplay, useAsyncData } from './common';
 
 const VISIBILITY_OPTIONS: Array<{ value: BoardVisibility; label: string }> = [
@@ -111,12 +111,20 @@ export function ShareDialog(props: {
             </Flex>
           ))}
           <Flex align="end" gap="2">
-            <TextField
-              label="Add user or group"
-              placeholder="user:default/jane or group:default/team-a"
-              value={principalRef}
-              onChange={setPrincipalRef}
-            />
+            <div style={{ flexGrow: 1 }}>
+              <PrincipalPicker
+                ariaLabel="Add user or group"
+                label="Add user or group"
+                allowText={false}
+                exclude={(permissions ?? []).map(entry => entry.principalRef)}
+                onSelect={setPrincipalRef}
+              />
+            </div>
+            {principalRef && (
+              <Text variant="body-small">
+                <RefDisplay refString={principalRef} />
+              </Text>
+            )}
             <Select
               aria-label="Level for new entry"
               options={ALL_LEVELS.map(l => ({ value: l, label: l }))}
