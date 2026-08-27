@@ -36,6 +36,14 @@ export function useBoardsQuery() {
   });
 }
 
+export function useBoardsByEntityQuery(entityRef: string) {
+  const boardsApi = useApi(boardsApiRef);
+  return useQuery({
+    queryKey: ['boards', 'byEntity', entityRef],
+    queryFn: () => boardsApi.listBoards({ entityRef }),
+  });
+}
+
 export function useBoardQuery(boardId: string) {
   const boardsApi = useApi(boardsApiRef);
   return useQuery({

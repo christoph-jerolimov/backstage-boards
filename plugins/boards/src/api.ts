@@ -21,7 +21,10 @@ import {
 } from '@internal/plugin-boards-common';
 
 export interface BoardsApi {
-  listBoards(options?: { favoritesOnly?: boolean }): Promise<BoardListEntry[]>;
+  listBoards(options?: {
+    favoritesOnly?: boolean;
+    entityRef?: string;
+  }): Promise<BoardListEntry[]>;
   createBoard(options: {
     name: string;
     columns?: string[];
@@ -157,8 +160,16 @@ export class BoardsClient implements BoardsApi {
 
   async listBoards(options?: {
     favoritesOnly?: boolean;
+    entityRef?: string;
   }): Promise<BoardListEntry[]> {
-    const query = options?.favoritesOnly ? '?favorites=true' : '';
+    const params = new URLSearchParams();
+    if (options?.favoritesOnly) {
+      params.set('favorites', 'true');
+    }
+    if (options?.entityRef) {
+      params.set('entityRef', options.entityRef);
+    }
+    const query = params.toString() ? `?${params.toString()}` : '';
     const result = await this.request<{ boards: BoardListEntry[] }>(
       'GET',
       `/boards${query}`,

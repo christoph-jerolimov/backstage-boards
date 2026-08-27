@@ -59,6 +59,10 @@ export async function createRouter(
     const principal = await principalOf(req);
     const boards = await service.listBoards(principal, {
       favoritesOnly: req.query.favorites === 'true',
+      entityRef:
+        typeof req.query.entityRef === 'string'
+          ? req.query.entityRef
+          : undefined,
     });
     res.json({ boards });
   });
