@@ -25,6 +25,7 @@ import {
   ItemComment,
   ItemFilter,
   ItemUpdate,
+  MyBoardItem,
   NewItem,
   TimelineEntry,
   ALL_VISIBILITIES,
@@ -933,6 +934,73 @@ export class BoardsService {
       rows,
       principal.type === 'user' ? principal.userRef : undefined,
     );
+  }
+
+  /**
+   * All items assigned to the user (directly or via an ownership group)
+   * across readable, non-archived boards.
+   */
+  async listMyItems(principal: BoardsPrincipal): Promise<MyBoardItem[]> {
+    if (principal.type !== 'user') {
+      throw new NotAllowedError(
+        'Listing your items requires a logged-in user',
+      );
+    }
+    const refs = [
+      ...new Set([principal.userRef, ...principal.ownershipRefs]),
+    ];
+    const itemIds = (
+      await this.knex('item_assignees')
+        .whereIn('assignee_ref', refs)
+        .select('item_id')
+    ).map(row => row.item_id as string);
+    if (itemIds.length === 0) {
+      return [];
+    }
+    const rows = await this.knex<ItemRow>('items')
+      .whereIn('id', itemIds)
+      .whereNull('archived_at');
+    const boardIds = [...new Set(rows.map(row => row.board_id))];
+    const boards = await this.knex<BoardRow>('boards')
+      .whereIn('id', boardIds)
+      .whereNull('archived_at');
+    const readable = new Map<string, BoardRow>();
+    for (const board of boards) {
+      if (await this.effectiveLevel(principal, board)) {
+        readable.set(board.id, board);
+      }
+    }
+    const visible = rows.filter(row => readable.has(row.board_id));
+    if (visible.length === 0) {
+      return [];
+    }
+    const columns = await this.knex<ColumnRow>('board_columns').whereIn('id', [
+      ...new Set(visible.map(row => row.column_id)),
+    ]);
+    const columnTitles = new Map(columns.map(col => [col.id, col.title]));
+    const items = await this.hydrateItems(visible, principal.userRef);
+    const itemsById = new Map(items.map(item => [item.id, item]));
+    return visible
+      .flatMap(row => {
+        const item = itemsById.get(row.id);
+        const board = readable.get(row.board_id);
+        if (!item || !board) {
+          return [];
+        }
+        return [
+          {
+            item,
+            boardId: board.id,
+            boardName: board.name,
+            columnTitle: columnTitles.get(row.column_id) ?? '',
+          },
+        ];
+      })
+      .sort(
+        (a, b) =>
+          a.boardName.localeCompare(b.boardName) ||
+          a.item.position - b.item.position,
+      );
   }
 
   async getItem(

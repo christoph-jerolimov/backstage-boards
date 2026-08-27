@@ -146,9 +146,14 @@ export function BoardListPage() {
         <Text variant="title-medium" as="h1">
           Boards
         </Text>
-        <Button variant="primary" onPress={() => setCreateOpen(true)}>
-          Create board
-        </Button>
+        <Flex gap="2">
+          <Button variant="secondary" onPress={() => navigate('my-items')}>
+            My items
+          </Button>
+          <Button variant="primary" onPress={() => setCreateOpen(true)}>
+            Create board
+          </Button>
+        </Flex>
       </Flex>
       {error && <Text color="danger">{error}</Text>}
       {loading ? (
