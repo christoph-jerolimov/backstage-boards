@@ -1,5 +1,9 @@
 import { Text } from '@backstage/ui';
-import { DueState, dueState } from '@internal/plugin-boards-common';
+import {
+  DueState,
+  dueState,
+  relativeDueLabel,
+} from '@internal/plugin-boards-common';
 
 const DUE_COLORS: Record<DueState, string | undefined> = {
   overdue: 'var(--bui-fg-negative)',
@@ -30,7 +34,10 @@ export function DueDateBadge(props: { dueDate?: string }) {
   }
   const state = dueState(dueDate);
   const color = DUE_COLORS[state];
-  const prefix = state === 'overdue' ? 'Overdue' : 'Due';
+  const relative = relativeDueLabel(dueDate);
+  const label = relative
+    ? `Due ${relative}`
+    : `${state === 'overdue' ? 'Overdue' : 'Due'} ${formatDueDate(dueDate)}`;
   return (
     <Text
       variant="body-x-small"
@@ -38,7 +45,7 @@ export function DueDateBadge(props: { dueDate?: string }) {
       style={color ? { color, fontWeight: 600 } : undefined}
       data-due-state={state}
     >
-      {prefix} {formatDueDate(dueDate)}
+      {label}
     </Text>
   );
 }
