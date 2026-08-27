@@ -18,7 +18,8 @@ import {
   sortItems,
   UNASSIGNED,
 } from './grouping';
-import { formatDate, RefChips, RefDisplay } from './common';
+import { formatDate, RefDisplay } from './common';
+import { AssigneeAvatars } from './AssigneeAvatars';
 import { StatusBadge } from './StatusBadge';
 
 function ItemsTable(props: {
@@ -69,7 +70,7 @@ function ItemsTable(props: {
               <StatusBadge column={columnOf(item.columnId)} />
             </Cell>
             <Cell>
-              <RefChips refs={item.assignees} />
+              <AssigneeAvatars refs={item.assignees} />
             </Cell>
             <Cell>
               {Object.entries(item.labels)

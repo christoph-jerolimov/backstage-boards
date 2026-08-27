@@ -24,7 +24,8 @@ import {
   ColumnColor,
 } from '@internal/plugin-boards-common';
 import { groupByAssignee, positionBefore, UNASSIGNED } from './grouping';
-import { InlineEdit, RefChips, RefDisplay } from './common';
+import { InlineEdit, RefDisplay } from './common';
+import { AssigneeAvatars } from './AssigneeAvatars';
 import { ColumnDot } from './StatusBadge';
 
 const DRAG_TYPE = 'application/x-boards-item';
@@ -166,7 +167,7 @@ function ItemCard(props: {
           Managed by {item.externalManager} (read-only)
         </Text>
       )}
-      <RefChips refs={item.assignees} />
+      <AssigneeAvatars refs={item.assignees} />
       {item.tags.length > 0 && (
         <Text variant="body-x-small" color="secondary">
           {item.tags.map(tag => `#${tag}`).join(' ')}
