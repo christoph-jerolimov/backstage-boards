@@ -65,6 +65,10 @@ export interface BoardItem {
   creatorRef?: string;
   /** Set when the item is managed by an external system (e.g. `github`); such items are read-only for users. */
   externalManager?: string;
+  /** Markdown description; same subset and auto-linking as comments. */
+  description?: string;
+  /** Number of stored description versions (0 = never set). */
+  descriptionVersionCount: number;
   assignees: string[];
   labels: Record<string, string>;
   tags: string[];
@@ -127,6 +131,8 @@ export interface NewItem {
 export interface ItemUpdate {
   title?: string;
   creatorRef?: string | null;
+  /** New description text; an empty string clears the description. */
+  description?: string;
   assignees?: string[];
   labels?: Record<string, string>;
   tags?: string[];

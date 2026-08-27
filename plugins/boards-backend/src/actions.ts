@@ -247,13 +247,17 @@ export function registerActions(options: ActionsOptions): void {
     name: 'update-item',
     title: 'Update Board Item',
     description:
-      "Updates an item's title, creator, or assignees.",
+      "Updates an item's title, description, creator, or assignees.",
     schema: {
       input: z =>
         z.object({
           boardId: z.string(),
           itemId: z.string(),
           title: z.string().optional(),
+          description: z
+            .string()
+            .optional()
+            .describe('Markdown description; empty string clears it'),
           creatorRef: z.string().nullable().optional(),
           assignees: z.array(z.string()).optional(),
         }),
@@ -266,6 +270,7 @@ export function registerActions(options: ActionsOptions): void {
         input.itemId,
         {
           title: input.title,
+          description: input.description,
           creatorRef: input.creatorRef,
           assignees: input.assignees,
         },

@@ -51,3 +51,14 @@ The item detail view (opened as a drawer or modal from the board or table view) 
 #### Scenario: Unified timeline
 - **WHEN** a user opens an item's detail view
 - **THEN** they see the item's fields plus one chronological stream containing both comments and change entries, each with actor and timestamp
+
+### Requirement: Description version history
+Every edit to an item's description SHALL retain the previous version, viewable from the item detail view, and SHALL add an entry to the item's change history noting that the description changed.
+
+#### Scenario: Description edit keeps history
+- **WHEN** a user edits an existing description
+- **THEN** the new text is displayed, prior versions remain accessible with editor and timestamp, and the item's timeline shows a "description changed" entry
+
+#### Scenario: Versions ordered chronologically
+- **WHEN** a user opens the description history
+- **THEN** versions are listed with editor and timestamp in chronological order

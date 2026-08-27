@@ -195,7 +195,35 @@ const initial: Migration = {
   },
 };
 
-const migrations: Migration[] = [initial];
+const itemDescriptions: Migration = {
+  name: '20260827_02_item_descriptions',
+  async up(knex) {
+    await knex.schema.alterTable('items', table => {
+      table.text('description').nullable();
+    });
+    await knex.schema.createTable('item_description_versions', table => {
+      table.string('id').primary();
+      table
+        .string('item_id')
+        .notNullable()
+        .references('id')
+        .inTable('items')
+        .onDelete('CASCADE');
+      table.text('text').notNullable();
+      table.string('edited_by').notNullable();
+      table.string('edited_at').notNullable();
+      table.index(['item_id']);
+    });
+  },
+  async down(knex) {
+    await knex.schema.dropTableIfExists('item_description_versions');
+    await knex.schema.alterTable('items', table => {
+      table.dropColumn('description');
+    });
+  },
+};
+
+const migrations: Migration[] = [initial, itemDescriptions];
 
 class BoardsMigrationSource implements Knex.MigrationSource<Migration> {
   async getMigrations(): Promise<Migration[]> {

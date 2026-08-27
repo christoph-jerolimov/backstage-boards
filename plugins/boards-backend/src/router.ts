@@ -258,6 +258,7 @@ export async function createRouter(
         {
           title: req.body.title,
           creatorRef: req.body.creatorRef,
+          description: req.body.description,
           assignees: req.body.assignees,
           labels: req.body.labels,
           tags: req.body.tags,
@@ -265,6 +266,20 @@ export async function createRouter(
       ),
     );
   });
+
+  router.get(
+    '/boards/:boardId/items/:itemId/description/versions',
+    async (req, res) => {
+      const principal = await principalOf(req);
+      res.json({
+        versions: await service.listDescriptionVersions(
+          principal,
+          req.params.boardId,
+          req.params.itemId,
+        ),
+      });
+    },
+  );
 
   router.post('/boards/:boardId/items/:itemId/move', async (req, res) => {
     const principal = await principalOf(req);

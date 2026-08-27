@@ -17,11 +17,11 @@ import {
 } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
 import { WatchButton } from './WatchButton';
+import { EditableMarkdown } from './EditableMarkdown';
 import { PrincipalPicker } from './PrincipalPicker';
 import {
   formatDate,
   InlineEdit,
-  MarkdownContent,
   RefDisplay,
   useAsyncData,
 } from './common';
@@ -68,26 +68,6 @@ function CommentBlock(props: {
 }) {
   const { boardId, itemId, comment, canWrite, onChanged } = props;
   const boardsApi = useApi(boardsApiRef);
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(comment.text);
-  const [showVersions, setShowVersions] = useState(false);
-  const { data: versions, refresh: refreshVersions } = useAsyncData(
-    () =>
-      showVersions
-        ? boardsApi.listCommentVersions(boardId, itemId, comment.id)
-        : Promise.resolve(undefined),
-    [boardsApi, boardId, itemId, comment.id, showVersions, comment.versionCount],
-  );
-
-  const save = async () => {
-    const text = draft.trim();
-    setEditing(false);
-    if (text && text !== comment.text) {
-      await boardsApi.updateComment(boardId, itemId, comment.id, text);
-      await onChanged();
-      await refreshVersions();
-    }
-  };
 
   return (
     <div
@@ -97,70 +77,24 @@ function CommentBlock(props: {
         padding: 8,
       }}
     >
-      <Flex align="center" gap="2" justify="between">
-        <Text variant="body-small">
-          <RefDisplay refString={comment.authorRef} />{' '}
-          commented {formatDate(comment.createdAt)}
-          {comment.versionCount > 1 ? ' (edited)' : ''}
-        </Text>
-        <Flex gap="1">
-          {comment.versionCount > 1 && (
-            <Button
-              variant="tertiary"
-              size="small"
-              onPress={() => setShowVersions(!showVersions)}
-            >
-              {showVersions ? 'Hide history' : 'History'}
-            </Button>
-          )}
-          {canWrite && !editing && (
-            <Button
-              variant="tertiary"
-              size="small"
-              onPress={() => {
-                setDraft(comment.text);
-                setEditing(true);
-              }}
-            >
-              Edit
-            </Button>
-          )}
-        </Flex>
-      </Flex>
-      {editing ? (
-        <Flex direction="column" gap="2">
-          <TextAreaField
-            aria-label="Edit comment"
-            value={draft}
-            onChange={setDraft}
-            // eslint-disable-next-line jsx-a11y/no-autofocus -- focus moves into a field the user just revealed
-            autoFocus
-          />
-          <Flex gap="2">
-            <Button variant="secondary" size="small" onPress={() => setEditing(false)}>
-              Cancel
-            </Button>
-            <Button variant="primary" size="small" onPress={save}>
-              Save
-            </Button>
-          </Flex>
-        </Flex>
-      ) : (
-        <MarkdownContent text={comment.text} />
-      )}
-      {showVersions && versions && (
-        <div style={{ marginTop: 8, paddingLeft: 8, borderLeft: '2px solid var(--bui-border, #ddd)' }}>
-          {versions.map(version => (
-            <div key={version.id}>
-              <Text variant="body-x-small" color="secondary">
-                {formatDate(version.editedAt)} by{' '}
-                <RefDisplay refString={version.editedBy} />
-              </Text>
-              <MarkdownContent text={version.text} />
-            </div>
-          ))}
-        </div>
-      )}
+      <Text variant="body-small">
+        <RefDisplay refString={comment.authorRef} />{' '}
+        commented {formatDate(comment.createdAt)}
+        {comment.versionCount > 1 ? ' (edited)' : ''}
+      </Text>
+      <EditableMarkdown
+        text={comment.text}
+        canEdit={canWrite}
+        versionCount={comment.versionCount}
+        editAriaLabel="Edit comment"
+        loadVersions={() =>
+          boardsApi.listCommentVersions(boardId, itemId, comment.id)
+        }
+        onSave={async text => {
+          await boardsApi.updateComment(boardId, itemId, comment.id, text);
+          await onChanged();
+        }}
+      />
     </div>
   );
 }
@@ -193,6 +127,11 @@ function Timeline(props: {
           summary = 'created this item';
         } else if (change.type === 'moved') {
           summary = `moved this item from “${String(change.oldValue)}” to “${String(change.newValue)}”`;
+        } else if (
+          change.oldValue === undefined &&
+          change.newValue === undefined
+        ) {
+          summary = `changed the ${change.field}`;
         } else {
           summary = `changed ${change.field}: ${JSON.stringify(change.oldValue) ?? '(empty)'} → ${JSON.stringify(change.newValue) ?? '(empty)'}`;
         }
@@ -315,6 +254,29 @@ export function ItemDrawer(props: {
                 This item is managed by “{item.externalManager}” and read-only.
               </Text>
             )}
+
+            <div>
+              <Text variant="body-small" color="secondary">
+                Description
+              </Text>
+              <EditableMarkdown
+                text={item.description ?? ''}
+                canEdit={!readonly}
+                versionCount={item.descriptionVersionCount}
+                allowEmpty
+                emptyText="No description yet."
+                editAriaLabel="Edit description"
+                loadVersions={() =>
+                  boardsApi.listDescriptionVersions(board.id, item.id)
+                }
+                onSave={async text => {
+                  await boardsApi.updateItem(board.id, item.id, {
+                    description: text,
+                  });
+                  await changed();
+                }}
+              />
+            </div>
 
             <Select
               label="Status"
