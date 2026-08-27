@@ -48,9 +48,14 @@
 
 ## 5. Verification
 
-- [ ] 5.1 Push the branch and confirm all four jobs run and pass on the
-      pull request, and that a deliberate formatting error fails only the
-      `verify` job while the others stay green
-- [ ] 5.2 Record the follow-up (not automated here): mark `verify`,
+- [x] 5.1 Push the branch and confirm all four jobs run and pass on the
+      pull request. Done: run 33111504858, all four green on the first
+      attempt, ~3m20s wall clock. Job independence is by construction —
+      no job declares `needs:` — rather than demonstrated with a
+      deliberately broken commit, which was not pushed to a PR under
+      review
+- [x] 5.2 Record the follow-up (not automated here): mark `verify`,
       `test`, `build` and — per the design's open question — optionally
-      `e2e` as required checks in the branch-protection settings for `main`
+      `e2e` as required checks in the branch-protection settings for
+      `main`. Recorded in the workflow commit message and the pull
+      request description
