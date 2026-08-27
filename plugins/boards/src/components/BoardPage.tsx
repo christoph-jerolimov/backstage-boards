@@ -4,7 +4,11 @@ import {
   useParams,
   useSearchParams,
 } from 'react-router-dom';
-import { useApi } from '@backstage/frontend-plugin-api';
+import {
+  BreadcrumbEntry,
+  useApi,
+  useRouteRef,
+} from '@backstage/frontend-plugin-api';
 import { useSignal } from '@backstage/plugin-signals-react';
 import { RiMore2Fill } from '@remixicon/react';
 import {
@@ -32,6 +36,7 @@ import {
   levelIncludes,
 } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
+import { rootRouteRef } from '../routes';
 import {
   invalidateBoard,
   useBoardQuery,
@@ -67,6 +72,7 @@ export function BoardPage() {
   const { boardId = '' } = useParams();
   const boardsApi = useApi(boardsApiRef);
   const navigate = useNavigate();
+  const rootLink = useRouteRef(rootRouteRef);
   const [searchParams, setSearchParams] = useSearchParams();
   const [view, setView] = useState<'board' | 'table'>('board');
   const [groupBy, setGroupBy] = useState(false);
@@ -254,13 +260,15 @@ export function BoardPage() {
     );
   }
 
+  const basePath = rootLink?.() ?? '/boards';
+
   return (
-    <Flex direction="column" gap="3" style={{ padding: 16 }}>
+    <BreadcrumbEntry
+      entry={{ href: `${basePath}/${board.id}`, label: board.name }}
+    >
+      <Flex direction="column" gap="3" style={{ padding: 16 }}>
       <Flex align="center" gap="2" justify="between" style={{ flexWrap: 'wrap' }}>
         <Flex align="center" gap="2">
-          <Button variant="tertiary" size="small" onPress={() => navigate('..')}>
-            ← Boards
-          </Button>
           <InlineEdit
             value={board.name}
             canEdit={isAdmin}
@@ -522,6 +530,7 @@ export function BoardPage() {
           </Flex>
         </DialogFooter>
       </Dialog>
-    </Flex>
+      </Flex>
+    </BreadcrumbEntry>
   );
 }
