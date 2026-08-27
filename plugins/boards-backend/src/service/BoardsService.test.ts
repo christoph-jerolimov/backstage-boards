@@ -259,6 +259,77 @@ describe('BoardsService', () => {
   });
 
   describe('duplicate board', () => {
+    it('copies items into the matching columns when requested', async () => {
+      const board = await service.createBoard(alice, { name: 'Source' });
+      const item = await service.createItem(alice, board.id, {
+        columnId: board.columns[1].id,
+        title: 'Copied task',
+        assignees: ['user:default/bob'],
+        labels: { priority: 'high' },
+        tags: ['bug'],
+      });
+      await service.updateItem(alice, board.id, item.id, {
+        dueDate: '2026-09-04',
+        description: 'details',
+      });
+      await service.addComment(alice, board.id, item.id, 'not copied');
+      const archived = await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Archived source item',
+      });
+      await service.deleteItem(alice, board.id, archived.id);
+
+      const copy = await service.duplicateBoard(alice, board.id, {
+        copyColumns: true,
+        copyItems: true,
+        copyPermissions: false,
+      });
+      const items = await service.listItems(alice, copy.id);
+      expect(items).toHaveLength(1);
+      expect(items[0].title).toBe('Copied task');
+      expect(items[0].columnId).toBe(copy.columns[1].id);
+      expect(items[0].assignees).toEqual(['user:default/bob']);
+      expect(items[0].labels).toEqual({ priority: 'high' });
+      expect(items[0].tags).toEqual(['bug']);
+      expect(items[0].dueDate).toBe('2026-09-04');
+      expect(items[0].description).toBe('details');
+      // creation is the only history; comments are not copied
+      const timeline = await service.getTimeline(alice, copy.id, items[0].id);
+      expect(timeline.filter(entry => entry.kind === 'comment')).toHaveLength(0);
+    });
+
+    it('rejects copying items without columns', async () => {
+      const board = await service.createBoard(alice, { name: 'Source' });
+      await expect(
+        service.duplicateBoard(alice, board.id, {
+          copyColumns: false,
+          copyItems: true,
+          copyPermissions: false,
+        }),
+      ).rejects.toThrow(/together with columns/);
+    });
+
+    it('copies entity references when requested', async () => {
+      const board = await service.createBoard(alice, {
+        name: 'Source',
+        entityRefs: ['component:default/svc', 'group:default/team-a'],
+      });
+      const withEntities = await service.duplicateBoard(alice, board.id, {
+        copyColumns: false,
+        copyEntities: true,
+        copyPermissions: false,
+      });
+      expect(withEntities.entityRefs).toEqual([
+        'component:default/svc',
+        'group:default/team-a',
+      ]);
+      const without = await service.duplicateBoard(alice, board.id, {
+        copyColumns: false,
+        copyPermissions: false,
+      });
+      expect(without.entityRefs).toEqual([]);
+    });
+
     it('copies columns with colors, never items', async () => {
       const board = await service.createBoard(alice, { name: 'Source' });
       await service.updateColumn(alice, board.id, board.columns[0].id, {

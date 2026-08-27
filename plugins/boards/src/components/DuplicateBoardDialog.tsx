@@ -15,7 +15,7 @@ import {
 import { BoardWithContext, levelIncludes } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
 
-/** Duplicates a board's structure; items are never copied. */
+/** Duplicates a board's structure and optionally its items. */
 export function DuplicateBoardDialog(props: {
   board: BoardWithContext;
   isOpen: boolean;
@@ -26,8 +26,18 @@ export function DuplicateBoardDialog(props: {
   const navigate = useNavigate();
   const isAdmin = levelIncludes(board.access, 'admin');
   const [name, setName] = useState(`${board.name} (copy)`);
-  const [copyColumns, setCopyColumns] = useState(true);
+  const [copyColumns, setCopyColumnsState] = useState(true);
+  const [copyItems, setCopyItems] = useState(false);
+  const [copyEntities, setCopyEntities] = useState(false);
   const [copyPermissions, setCopyPermissions] = useState(false);
+
+  const setCopyColumns = (value: boolean) => {
+    setCopyColumnsState(value);
+    if (!value) {
+      // items can only be copied together with their columns
+      setCopyItems(false);
+    }
+  };
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
@@ -38,6 +48,8 @@ export function DuplicateBoardDialog(props: {
       const copy = await boardsApi.duplicateBoard(board.id, {
         name: name.trim() || undefined,
         copyColumns,
+        copyItems: copyColumns && copyItems,
+        copyEntities,
         copyPermissions: isAdmin && copyPermissions,
       });
       onOpenChange(false);
@@ -62,6 +74,16 @@ export function DuplicateBoardDialog(props: {
           <Checkbox isSelected={copyColumns} onChange={setCopyColumns}>
             Copy columns (titles, order, colors)
           </Checkbox>
+          <Checkbox
+            isSelected={copyColumns && copyItems}
+            isDisabled={!copyColumns}
+            onChange={setCopyItems}
+          >
+            Copy items (titles, fields, assignees — no comments or history)
+          </Checkbox>
+          <Checkbox isSelected={copyEntities} onChange={setCopyEntities}>
+            Copy entity references
+          </Checkbox>
           {isAdmin && (
             <Checkbox
               isSelected={copyPermissions}
@@ -71,7 +93,7 @@ export function DuplicateBoardDialog(props: {
             </Checkbox>
           )}
           <Text variant="body-small" color="secondary">
-            Items are not copied. You become an admin of the copy.
+            You become an admin of the copy.
           </Text>
           {error && (
             <Text variant="body-small" style={{ color: '#cc3344' }}>
