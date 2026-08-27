@@ -52,7 +52,7 @@ function BoardRows(props: {
           align="center"
           gap="3"
           style={{
-            border: '1px solid var(--bui-border, #ddd)',
+            border: '1px solid var(--bui-border-1)',
             borderRadius: 8,
             padding: '8px 12px',
           }}
