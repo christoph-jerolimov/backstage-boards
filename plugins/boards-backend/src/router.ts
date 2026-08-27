@@ -199,6 +199,7 @@ export async function createRouter(
       await service.addColumn(principal, req.params.boardId, {
         title: req.body.title,
         position: req.body.position,
+        color: req.body.color,
       }),
     );
   });
@@ -210,7 +211,11 @@ export async function createRouter(
         principal,
         req.params.boardId,
         req.params.columnId,
-        { title: req.body.title, position: req.body.position },
+        {
+          title: req.body.title,
+          position: req.body.position,
+          color: req.body.color,
+        },
       ),
     );
   });

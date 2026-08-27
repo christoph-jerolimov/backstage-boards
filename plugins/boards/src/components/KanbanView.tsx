@@ -20,9 +20,12 @@ import {
   BoardColumn,
   BoardItem,
   BoardWithContext,
+  COLUMN_COLORS,
+  ColumnColor,
 } from '@internal/plugin-boards-common';
 import { groupByAssignee, positionBefore, UNASSIGNED } from './grouping';
 import { InlineEdit, RefChips, RefDisplay } from './common';
+import { ColumnDot } from './StatusBadge';
 
 const DRAG_TYPE = 'application/x-boards-item';
 
@@ -35,6 +38,7 @@ export interface BoardActions {
   renameColumn: (columnId: string, title: string) => Promise<void>;
   reorderColumn: (columnId: string, position: number) => Promise<void>;
   addColumn: (title: string) => Promise<void>;
+  setColumnColor: (columnId: string, color: string | null) => Promise<void>;
   deleteColumn: (columnId: string, moveItemsTo?: string) => Promise<void>;
   openItem: (itemId: string) => void;
   renameItem: (itemId: string, title: string) => Promise<void>;
@@ -286,17 +290,20 @@ function ColumnLane(props: {
       }}
     >
       <Flex align="center" justify="between" gap="2">
-        <InlineEdit
-          value={column.title}
-          canEdit={canWrite}
-          ariaLabel={`column ${column.title} title`}
-          onCommit={title => actions.renameColumn(column.id, title)}
-          display={
-            <Text variant="body-medium" weight="bold">
-              {column.title} ({items.length})
-            </Text>
-          }
-        />
+        <Flex align="center" gap="2">
+          <ColumnDot column={column} />
+          <InlineEdit
+            value={column.title}
+            canEdit={canWrite}
+            ariaLabel={`column ${column.title} title`}
+            onCommit={title => actions.renameColumn(column.id, title)}
+            display={
+              <Text variant="body-medium" weight="bold">
+                {column.title} ({items.length})
+              </Text>
+            }
+          />
+        </Flex>
         {canWrite && (
           <MenuTrigger>
             <ButtonIcon
@@ -330,6 +337,44 @@ function ColumnLane(props: {
                   Move right
                 </MenuItem>
               )}
+              <SubmenuTrigger>
+                <MenuItem>Color</MenuItem>
+                <Menu>
+                  {(Object.keys(COLUMN_COLORS) as ColumnColor[]).map(color => (
+                    <MenuItem
+                      key={color}
+                      textValue={color}
+                      onAction={() => actions.setColumnColor(column.id, color)}
+                    >
+                      <span
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}
+                      >
+                        <span
+                          aria-hidden
+                          style={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: '50%',
+                            background: COLUMN_COLORS[color],
+                            display: 'inline-block',
+                          }}
+                        />
+                        {color}
+                        {column.color === color ? ' ✓' : ''}
+                      </span>
+                    </MenuItem>
+                  ))}
+                  <MenuItem
+                    onAction={() => actions.setColumnColor(column.id, null)}
+                  >
+                    No color
+                  </MenuItem>
+                </Menu>
+              </SubmenuTrigger>
               <MenuItem
                 onAction={() =>
                   props.onRequestDelete(column, items.length > 0)

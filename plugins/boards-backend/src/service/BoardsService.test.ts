@@ -297,6 +297,27 @@ describe('BoardsService', () => {
       expect(moved.columnId).toBe(colB.id);
     });
 
+    it('sets and clears column colors from the palette only', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const column = board.columns[0];
+      const colored = await service.updateColumn(alice, board.id, column.id, {
+        color: 'green',
+      });
+      expect(colored.color).toBe('green');
+      await expect(
+        service.updateColumn(alice, board.id, column.id, { color: 'pink' }),
+      ).rejects.toThrow(/Invalid column color/);
+      const cleared = await service.updateColumn(alice, board.id, column.id, {
+        color: null,
+      });
+      expect(cleared.color).toBeUndefined();
+      const added = await service.addColumn(alice, board.id, {
+        title: 'Review',
+        color: 'purple',
+      });
+      expect(added.color).toBe('purple');
+    });
+
     it('read-only users cannot manage columns', async () => {
       const board = await service.createBoard(alice, {
         name: 'B',

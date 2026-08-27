@@ -135,6 +135,8 @@ export function BoardPage() {
       reorderColumn: (columnId, position) =>
         guarded(() => boardsApi.updateColumn(boardId, columnId, { position })),
       addColumn: title => guarded(() => boardsApi.addColumn(boardId, { title })),
+      setColumnColor: (columnId, color) =>
+        guarded(() => boardsApi.updateColumn(boardId, columnId, { color })),
       deleteColumn: (columnId, moveItemsTo) =>
         guarded(() =>
           boardsApi.deleteColumn(boardId, columnId, { moveItemsTo }),

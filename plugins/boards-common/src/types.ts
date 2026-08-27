@@ -19,7 +19,31 @@ export interface BoardColumn {
   boardId: string;
   title: string;
   position: number;
+  /** Named palette color (see COLUMN_COLORS); undefined = neutral. */
+  color?: ColumnColor;
 }
+
+export type ColumnColor =
+  | 'gray'
+  | 'blue'
+  | 'green'
+  | 'yellow'
+  | 'orange'
+  | 'red'
+  | 'purple'
+  | 'teal';
+
+/** Fixed palette for column colors (name -> hex). */
+export const COLUMN_COLORS: Record<ColumnColor, string> = {
+  gray: '#8a8f98',
+  blue: '#3b82f6',
+  green: '#22a06b',
+  yellow: '#eab308',
+  orange: '#f97316',
+  red: '#ef4444',
+  purple: '#a855f7',
+  teal: '#14b8a6',
+};
 
 export interface Board {
   id: string;
