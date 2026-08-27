@@ -13,9 +13,10 @@ describe('BoardsService', () => {
   let knex: Knex;
   let service: BoardsService;
   let notifications: { send: jest.Mock };
+  let signals: { publish: jest.Mock };
 
   beforeEach(async () => {
-    ({ knex, service, notifications } = await createTestService());
+    ({ knex, service, notifications, signals } = await createTestService());
   });
 
   afterEach(async () => {
@@ -412,6 +413,34 @@ describe('BoardsService', () => {
       await expect(
         service.getItem(alice, board.id, item.id),
       ).rejects.toThrow(/not found/);
+    });
+  });
+
+  describe('signals', () => {
+    it('broadcasts id-only signals on item and column mutations', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      signals.publish.mockClear();
+      const item = await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Item',
+      });
+      expect(signals.publish).toHaveBeenCalledWith({
+        recipients: { type: 'broadcast' },
+        channel: 'boards',
+        message: { boardId: board.id, itemId: item.id },
+      });
+      signals.publish.mockClear();
+      await service.moveItem(alice, board.id, item.id, {
+        columnId: board.columns[1].id,
+      });
+      expect(signals.publish).toHaveBeenCalledTimes(1);
+      signals.publish.mockClear();
+      await service.addColumn(alice, board.id, { title: 'New' });
+      expect(signals.publish).toHaveBeenCalledWith({
+        recipients: { type: 'broadcast' },
+        channel: 'boards',
+        message: { boardId: board.id },
+      });
     });
   });
 

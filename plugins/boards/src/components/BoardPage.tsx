@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   useNavigate,
   useParams,
   useSearchParams,
 } from 'react-router-dom';
 import { useApi } from '@backstage/frontend-plugin-api';
+import { useSignal } from '@backstage/plugin-signals-react';
 import { RiMore2Fill } from '@remixicon/react';
 import {
   Button,
@@ -82,6 +83,15 @@ export function BoardPage() {
     setError(undefined);
     await Promise.all([refreshBoard(), refreshItems()]);
   };
+
+  const { lastSignal } = useSignal<{ boardId: string }>('boards');
+  useEffect(() => {
+    if (lastSignal?.boardId === boardId) {
+      refreshBoard();
+      refreshItems();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastSignal]);
 
   const guarded = async (action: () => Promise<unknown>) => {
     try {

@@ -6,6 +6,7 @@ import {
   NotFoundError,
 } from '@backstage/errors';
 import { NotificationService } from '@backstage/plugin-notifications-node';
+import { SignalsService } from '@backstage/plugin-signals-node';
 import {
   Board,
   BoardColumn,
@@ -143,6 +144,7 @@ export interface BoardsServiceOptions {
   knex: Knex;
   logger: LoggerService;
   notifications?: NotificationService;
+  signals?: SignalsService;
   /** Base path used in notification links, e.g. `/boards`. */
   appLinkBase?: string;
 }
@@ -151,13 +153,37 @@ export class BoardsService {
   private readonly knex: Knex;
   private readonly logger: LoggerService;
   private readonly notifications?: NotificationService;
+  private readonly signals?: SignalsService;
   private readonly appLinkBase: string;
 
   constructor(options: BoardsServiceOptions) {
     this.knex = options.knex;
     this.logger = options.logger;
     this.notifications = options.notifications;
+    this.signals = options.signals;
     this.appLinkBase = options.appLinkBase ?? '/boards';
+  }
+
+  /**
+   * Broadcasts that a board changed. The message carries ids only; all
+   * data reads stay behind the permission-checked API.
+   */
+  private async emitBoardSignal(
+    boardId: string,
+    itemId?: string,
+  ): Promise<void> {
+    if (!this.signals) {
+      return;
+    }
+    try {
+      await this.signals.publish({
+        recipients: { type: 'broadcast' },
+        channel: 'boards',
+        message: itemId ? { boardId, itemId } : { boardId },
+      });
+    } catch (error) {
+      this.logger.warn(`Failed to publish board signal: ${error}`);
+    }
   }
 
   // ---------------------------------------------------------------- access
@@ -384,6 +410,7 @@ export class BoardsService {
       patch.visibility = update.visibility;
     }
     await this.knex<BoardRow>('boards').where('id', boardId).update(patch);
+    await this.emitBoardSignal(boardId);
     return this.getBoard(principal, boardId);
   }
 
@@ -408,6 +435,7 @@ export class BoardsService {
       }
       await trx('boards').where('id', boardId).delete();
     });
+    await this.emitBoardSignal(boardId);
   }
 
   async setFavorite(
@@ -554,6 +582,7 @@ export class BoardsService {
       position,
     };
     await this.knex('board_columns').insert(row);
+    await this.emitBoardSignal(boardId);
     return toColumn(row);
   }
 
@@ -583,6 +612,7 @@ export class BoardsService {
     }
     if (Object.keys(patch).length > 0) {
       await this.knex('board_columns').where('id', columnId).update(patch);
+      await this.emitBoardSignal(boardId);
     }
     return toColumn({ ...row, ...patch });
   }
@@ -630,9 +660,11 @@ export class BoardsService {
           .update({ column_id: target });
         await trx('board_columns').where('id', columnId).delete();
       });
+      await this.emitBoardSignal(boardId);
       return;
     }
     await this.knex('board_columns').where('id', columnId).delete();
+    await this.emitBoardSignal(boardId);
   }
 
   // ----------------------------------------------------------------- items
@@ -840,6 +872,7 @@ export class BoardsService {
       title: `New item on board`,
       description: `"${title}" was added`,
     });
+    await this.emitBoardSignal(boardId, itemId);
 
     return this.getItem(principal, boardId, itemId);
   }
@@ -1001,6 +1034,7 @@ export class BoardsService {
           });
         }
       });
+      await this.emitBoardSignal(boardId, itemId);
       await this.notifyWatchers({
         boardId,
         itemId,
@@ -1060,6 +1094,7 @@ export class BoardsService {
         });
       }
     });
+    await this.emitBoardSignal(boardId, itemId);
     if (movedColumns) {
       await this.notifyWatchers({
         boardId,
@@ -1087,6 +1122,7 @@ export class BoardsService {
         .delete();
       await trx('items').where('id', itemId).delete();
     });
+    await this.emitBoardSignal(boardId, itemId);
     await this.sendNotification(recipients, {
       title: 'Item deleted',
       description: `"${row.title}" was deleted`,
@@ -1130,6 +1166,7 @@ export class BoardsService {
         edited_at: timestamp,
       });
     });
+    await this.emitBoardSignal(boardId, itemId);
     await this.notifyWatchers({
       boardId,
       itemId,
@@ -1222,6 +1259,7 @@ export class BoardsService {
       edited_by: actor,
       edited_at: now(),
     });
+    await this.emitBoardSignal(boardId, itemId);
     await this.notifyWatchers({
       boardId,
       itemId,
@@ -1241,6 +1279,7 @@ export class BoardsService {
   ): Promise<void> {
     await this.requireCommentAccess(principal, boardId, itemId, commentId);
     await this.knex('comments').where('id', commentId).delete();
+    await this.emitBoardSignal(boardId, itemId);
   }
 
   async listCommentVersions(

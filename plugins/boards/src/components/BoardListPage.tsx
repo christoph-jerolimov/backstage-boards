@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApi } from '@backstage/frontend-plugin-api';
+import { useSignal } from '@backstage/plugin-signals-react';
 import {
   Button,
   ButtonIcon,
@@ -103,6 +104,14 @@ export function BoardListPage() {
     () => boardsApi.listBoards(),
     [boardsApi],
   );
+
+  const { lastSignal } = useSignal('boards');
+  useEffect(() => {
+    if (lastSignal) {
+      refresh();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastSignal]);
 
   const favorites = useMemo(
     () => (boards ?? []).filter(board => board.favorite),
