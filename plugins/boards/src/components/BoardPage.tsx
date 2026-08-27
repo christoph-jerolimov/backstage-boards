@@ -490,6 +490,8 @@ export function BoardPage() {
         <TableView
           board={board}
           items={filteredItems}
+          canWrite={canWrite}
+          actions={actions}
           groupBy={groupBy}
           openItem={actions.openItem}
         />
