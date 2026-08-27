@@ -225,6 +225,7 @@ function AddItemRow(props: {
 }) {
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState('');
+  const fieldRef = useRef<HTMLDivElement>(null);
   if (!adding) {
     return (
       <Button
@@ -237,33 +238,44 @@ function AddItemRow(props: {
       </Button>
     );
   }
-  const commit = async () => {
+  const commit = async (options?: { addAnother?: boolean }) => {
     const value = title.trim();
-    setAdding(false);
     setTitle('');
+    if (!value || !options?.addAnother) {
+      // empty submit or focus left the form: close it
+      setAdding(false);
+    }
     if (value) {
       await props.actions.createItem(props.columnId, value);
+      if (options?.addAnother) {
+        // stay open for the next item; refocus after the re-render
+        requestAnimationFrame(() =>
+          fieldRef.current?.querySelector('input')?.focus(),
+        );
+      }
     }
   };
   return (
-    <TextField
-      aria-label="New item title"
-      value={title}
-      onChange={setTitle}
-      placeholder="Item title"
-      // eslint-disable-next-line jsx-a11y/no-autofocus -- focus moves into a field the user just revealed
-      autoFocus
-      onBlur={commit}
-      onKeyDown={event => {
-        if (event.key === 'Enter') {
-          event.preventDefault();
-          commit();
-        } else if (event.key === 'Escape') {
-          setAdding(false);
-          setTitle('');
-        }
-      }}
-    />
+    <div ref={fieldRef}>
+      <TextField
+        aria-label="New item title"
+        value={title}
+        onChange={setTitle}
+        placeholder="Item title"
+        // eslint-disable-next-line jsx-a11y/no-autofocus -- focus moves into a field the user just revealed
+        autoFocus
+        onBlur={() => commit()}
+        onKeyDown={event => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            commit({ addAnother: true });
+          } else if (event.key === 'Escape') {
+            setAdding(false);
+            setTitle('');
+          }
+        }}
+      />
+    </div>
   );
 }
 
