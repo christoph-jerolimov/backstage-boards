@@ -22,6 +22,7 @@ import { WatchButton } from './WatchButton';
 import { DueDateBadge } from './DueDate';
 import { EditableMarkdown } from './EditableMarkdown';
 import { PrincipalPicker } from './PrincipalPicker';
+import { TagsEditor } from './TagsEditor';
 import {
   changeSummary,
   formatDate,
@@ -55,13 +56,6 @@ function parseLabels(text: string): Record<string, string> {
     }
   }
   return labels;
-}
-
-function parseList(text: string): string[] {
-  return text
-    .split(',')
-    .map(entry => entry.trim())
-    .filter(Boolean);
 }
 
 function CommentBlock(props: {
@@ -142,6 +136,8 @@ export function ItemDrawer(props: {
   board: BoardWithContext;
   item: BoardItem;
   canWrite: boolean;
+  /** Tags used on the board, offered as suggestions when adding. */
+  tagSuggestions?: string[];
   onClose: () => void;
   onChanged: () => Promise<void>;
 }) {
@@ -150,7 +146,6 @@ export function ItemDrawer(props: {
   const readonly = !canWrite || !!item.externalManager;
   const [newComment, setNewComment] = useState('');
   const [editLabels, setEditLabels] = useState(false);
-  const [editTags, setEditTags] = useState(false);
 
   const {
     data: timeline,
@@ -485,36 +480,15 @@ export function ItemDrawer(props: {
               <Text variant="body-small" color="secondary">
                 Tags
               </Text>
-              {editTags ? (
-                <TextField
-                  aria-label="Tags (comma separated)"
-                  defaultValue={item.tags.join(', ')}
-                  // eslint-disable-next-line jsx-a11y/no-autofocus -- focus moves into a field the user just revealed
-                  autoFocus
-                  onBlur={async event => {
-                    setEditTags(false);
-                    await boardsApi.updateItem(board.id, item.id, {
-                      tags: parseList(event.target.value),
-                    });
-                    await changed();
-                  }}
-                />
-              ) : (
-                <Flex align="center" gap="2">
-                  <Text variant="body-small">
-                    {item.tags.join(', ') || '—'}
-                  </Text>
-                  {!readonly && (
-                    <Button
-                      variant="tertiary"
-                      size="small"
-                      onPress={() => setEditTags(true)}
-                    >
-                      Edit
-                    </Button>
-                  )}
-                </Flex>
-              )}
+              <TagsEditor
+                tags={item.tags}
+                canEdit={!readonly}
+                suggestions={props.tagSuggestions ?? []}
+                onChange={async tags => {
+                  await boardsApi.updateItem(board.id, item.id, { tags });
+                  await changed();
+                }}
+              />
             </div>
 
             <Flex direction="column" gap="1">
