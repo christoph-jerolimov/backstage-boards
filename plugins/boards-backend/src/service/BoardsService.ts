@@ -19,6 +19,7 @@ import {
   ChangeRecord,
   CommentVersion,
   ItemComment,
+  ItemFilter,
   ItemUpdate,
   NewItem,
   TimelineEntry,
@@ -698,11 +699,43 @@ export class BoardsService {
   async listItems(
     principal: BoardsPrincipal,
     boardId: string,
+    filter?: ItemFilter,
   ): Promise<BoardItem[]> {
     await this.requireBoard(principal, boardId, 'read');
-    const rows = await this.knex<ItemRow>('items')
-      .where('board_id', boardId)
+    const query = this.knex<ItemRow>('items')
+      .where('items.board_id', boardId)
       .orderBy('position');
+    const text = filter?.text?.trim().toLocaleLowerCase('en-US');
+    if (text) {
+      const pattern = `%${text}%`;
+      query.where(builder =>
+        builder
+          .whereRaw('lower(items.title) like ?', [pattern])
+          .orWhereRaw("lower(coalesce(items.description, '')) like ?", [
+            pattern,
+          ]),
+      );
+    }
+    for (const tag of filter?.tags ?? []) {
+      query.whereExists(builder =>
+        builder
+          .select('*')
+          .from('item_tags')
+          .whereRaw('item_tags.item_id = items.id')
+          .where('item_tags.tag', tag),
+      );
+    }
+    for (const [key, value] of Object.entries(filter?.labels ?? {})) {
+      query.whereExists(builder =>
+        builder
+          .select('*')
+          .from('item_labels')
+          .whereRaw('item_labels.item_id = items.id')
+          .where('item_labels.key', key)
+          .where('item_labels.value', value),
+      );
+    }
+    const rows = await query;
     return this.hydrateItems(
       rows,
       principal.type === 'user' ? principal.userRef : undefined,
