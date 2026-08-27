@@ -21,6 +21,7 @@ import { EntityRefLink } from '@backstage/plugin-catalog-react';
 import { BoardListEntry } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
 import { useBoardsQuery, boardsQueryClient, queryKeys } from '../queries';
+import { MyItemsList } from './MyItemsPage';
 
 function StarIcon(props: { filled: boolean }) {
   return (
@@ -168,6 +169,7 @@ export function BoardListPage() {
           <TabList>
             <Tab id="favorites">Favorites ({favorites.length})</Tab>
             <Tab id="all">All ({(boards ?? []).length})</Tab>
+            <Tab id="my-items">My items</Tab>
           </TabList>
           <TabPanel id="favorites">
             <BoardRows
@@ -182,6 +184,9 @@ export function BoardListPage() {
               onToggleFavorite={toggleFavorite}
               emptyText="No boards are accessible to you yet. Create one!"
             />
+          </TabPanel>
+          <TabPanel id="my-items">
+            <MyItemsList />
           </TabPanel>
         </Tabs>
       )}

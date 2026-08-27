@@ -166,7 +166,10 @@ auth:
   # see https://backstage.io/docs/auth/ to learn about auth providers
   providers:
     # See https://backstage.io/docs/auth/guest/provider
-    guest: {}
+    guest:
+      # resolve to the catalog user so assignments made through the
+      # catalog pickers match the signed-in identity (e.g. My items)
+      userEntityRef: user:default/guest
   # see https://backstage.io/docs/ai/mcp-actions#client-id-metadata-documents
   # to learn more about client id metadata documents
   clientIdMetadataDocuments:

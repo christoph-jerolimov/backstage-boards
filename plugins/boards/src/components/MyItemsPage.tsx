@@ -32,7 +32,8 @@ function groupByBoard(entries: MyBoardItem[]): BoardGroup[] {
   return [...groups.values()];
 }
 
-export function MyItemsPage() {
+/** The current user's items grouped by board; reused by the Boards tab. */
+export function MyItemsList() {
   const boardsApi = useApi(boardsApiRef);
   const navigate = useNavigate();
   const rootLink = useRouteRef(rootRouteRef);
@@ -58,13 +59,7 @@ export function MyItemsPage() {
   const groups = useMemo(() => groupByBoard(entries ?? []), [entries]);
 
   return (
-    <BreadcrumbEntry
-      entry={{ href: `${basePath}/my-items`, label: 'My items' }}
-    >
-      <Flex direction="column" gap="4" style={{ padding: 16 }}>
-        <Text variant="title-medium" as="h1">
-          My items
-        </Text>
+      <Flex direction="column" gap="4">
         {error && (
           <Text style={{ color: 'var(--bui-fg-negative)' }}>
             My items could not be loaded: {(error as Error).message}
@@ -80,7 +75,7 @@ export function MyItemsPage() {
           <div key={group.boardId}>
             <Button
               variant="tertiary"
-              onPress={() => navigate(`../${group.boardId}`)}
+              onPress={() => navigate(`${basePath}/${group.boardId}`)}
               aria-label={`Open board ${group.boardName}`}
             >
               <Text variant="body-large" weight="bold">
@@ -103,7 +98,7 @@ export function MyItemsPage() {
                     <Button
                       variant="tertiary"
                       onPress={() =>
-                        navigate(`../${group.boardId}?item=${item.id}`)
+                        navigate(`${basePath}/${group.boardId}?item=${item.id}`)
                       }
                       aria-label={`Open item ${item.title}`}
                     >
@@ -122,6 +117,22 @@ export function MyItemsPage() {
             </Flex>
           </div>
         ))}
+      </Flex>
+  );
+}
+
+export function MyItemsPage() {
+  const rootLink = useRouteRef(rootRouteRef);
+  const basePath = rootLink?.() ?? '/boards';
+  return (
+    <BreadcrumbEntry
+      entry={{ href: `${basePath}/my-items`, label: 'My items' }}
+    >
+      <Flex direction="column" gap="4" style={{ padding: 16 }}>
+        <Text variant="title-medium" as="h1">
+          My items
+        </Text>
+        <MyItemsList />
       </Flex>
     </BreadcrumbEntry>
   );

@@ -117,6 +117,54 @@ describe('createRouter', () => {
     expect(fetched.body.columns.length).toBeGreaterThan(0);
   });
 
+  it('lists exactly the current user’s items on GET /my-items', async () => {
+    const board = (
+      await request(app)
+        .post('/boards')
+        .set('x-test-user', 'alice')
+        .send({ name: 'B', visibility: 'logged-in-write' })
+        .expect(201)
+    ).body;
+    const columnId = board.columns[0].id;
+    // direct assignment to alice
+    await request(app)
+      .post(`/boards/${board.id}/items`)
+      .set('x-test-user', 'alice')
+      .send({ columnId, title: 'Direct', assignees: ['user:default/alice'] })
+      .expect(201);
+    // via alice's group
+    await request(app)
+      .post(`/boards/${board.id}/items`)
+      .set('x-test-user', 'alice')
+      .send({ columnId, title: 'Via group', assignees: ['group:default/team-a'] })
+      .expect(201);
+    // someone else's item must not appear
+    await request(app)
+      .post(`/boards/${board.id}/items`)
+      .set('x-test-user', 'alice')
+      .send({ columnId, title: 'Bobs', assignees: ['user:default/bob'] })
+      .expect(201);
+
+    const mine = await request(app)
+      .get('/my-items')
+      .set('x-test-user', 'alice')
+      .expect(200);
+    expect(mine.body.items.map((e: any) => e.item.title).sort()).toEqual([
+      'Direct',
+      'Via group',
+    ]);
+    expect(mine.body.items[0].boardName).toBe('B');
+
+    const bobs = await request(app)
+      .get('/my-items')
+      .set('x-test-user', 'bob')
+      .expect(200);
+    expect(bobs.body.items.map((e: any) => e.item.title)).toEqual(['Bobs']);
+
+    // anonymous callers are rejected
+    await request(app).get('/my-items').expect(403);
+  });
+
   it('rejects board creation without a name', async () => {
     await request(app)
       .post('/boards')
