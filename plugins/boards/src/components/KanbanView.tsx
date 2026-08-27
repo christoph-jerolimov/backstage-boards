@@ -476,6 +476,7 @@ export function KanbanView(props: {
         />
       ))}
       {canWrite &&
+        board.columns.length === 0 &&
         (addingColumn ? (
           <div style={{ minWidth: 200 }}>
             <TextField
