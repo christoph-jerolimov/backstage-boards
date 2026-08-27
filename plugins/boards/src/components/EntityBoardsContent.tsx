@@ -1,18 +1,17 @@
-import { useMemo } from 'react';
-import { useRouteRef } from '@backstage/frontend-plugin-api';
-import { Flex, Link, Text } from '@backstage/ui';
+import { useMemo, useState } from 'react';
+import { Tab, TabList, TabPanel, Tabs, Text } from '@backstage/ui';
 import { useEntity } from '@backstage/plugin-catalog-react';
 import { stringifyEntityRef } from '@backstage/catalog-model';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { rootRouteRef } from '../routes';
 import { boardsQueryClient, useBoardsByEntityQuery } from '../queries';
+import { BoardPageContent } from './BoardPage';
 
 function EntityBoardsList() {
   const { entity } = useEntity();
-  const boardsLink = useRouteRef(rootRouteRef);
   const entityRef = useMemo(() => stringifyEntityRef(entity), [entity]);
 
   const { data: boards, isLoading: loading } = useBoardsByEntityQuery(entityRef);
+  const [tab, setTab] = useState<string | undefined>(undefined);
 
   if (loading) {
     return <Text>Loading boards…</Text>;
@@ -21,19 +20,31 @@ function EntityBoardsList() {
   if (assigned.length === 0) {
     return <Text>No boards are assigned to this entity.</Text>;
   }
-  const base = boardsLink?.() ?? '/boards';
+  if (assigned.length === 1) {
+    return <BoardPageContent boardId={assigned[0].id} embedded />;
+  }
   return (
-    <Flex direction="column" gap="2">
+    <Tabs
+      selectedKey={tab ?? assigned[0].id}
+      onSelectionChange={key => setTab(String(key))}
+    >
+      <TabList>
+        {assigned.map(board => (
+          <Tab key={board.id} id={board.id}>
+            {board.name}
+          </Tab>
+        ))}
+      </TabList>
       {assigned.map(board => (
-        <Link key={board.id} href={`${base}/${board.id}`}>
-          {board.name}
-        </Link>
+        <TabPanel key={board.id} id={board.id}>
+          <BoardPageContent boardId={board.id} embedded />
+        </TabPanel>
       ))}
-    </Flex>
+    </Tabs>
   );
 }
 
-/** Lists the boards assigned to the entity currently shown in the catalog. */
+/** Shows the boards assigned to the current catalog entity, in full. */
 export function EntityBoardsContent() {
   return (
     <QueryClientProvider client={boardsQueryClient}>
