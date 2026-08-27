@@ -138,8 +138,9 @@ export function BoardPageContent(props: {
       await action();
       await refreshAll();
     } catch (err) {
+      // refresh directly: refreshAll() would clear the error again
+      await invalidateBoard(queryClient, boardId);
       setError((err as Error).message);
-      await refreshAll();
     }
   };
 

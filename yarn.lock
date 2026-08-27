@@ -2166,7 +2166,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@backstage/frontend-test-utils@npm:^0.6.3":
+"@backstage/frontend-test-utils@npm:^0.6.0, @backstage/frontend-test-utils@npm:^0.6.3":
   version: 0.6.3
   resolution: "@backstage/frontend-test-utils@npm:0.6.3"
   dependencies:
@@ -5202,6 +5202,7 @@ __metadata:
     "@backstage/catalog-model": "npm:^1.10.0"
     "@backstage/cli": "npm:^0.36.5"
     "@backstage/frontend-plugin-api": "npm:^0.18.0"
+    "@backstage/frontend-test-utils": "npm:^0.6.0"
     "@backstage/plugin-catalog-react": "npm:^3.2.1"
     "@backstage/plugin-signals-react": "npm:^0.0.25"
     "@backstage/ui": "npm:^0.17.1"
@@ -5212,6 +5213,7 @@ __metadata:
     "@testing-library/dom": "npm:^10.0.0"
     "@testing-library/jest-dom": "npm:^6.0.0"
     "@testing-library/react": "npm:^16.0.0"
+    "@testing-library/user-event": "npm:^14.0.0"
     react: "npm:^18.0.2"
     react-aria: "npm:^3.48.0"
     react-aria-components: "npm:^1.17.0"
