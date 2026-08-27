@@ -1,7 +1,8 @@
+import type { ReactNode } from 'react';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { identityApiRef } from '@backstage/frontend-plugin-api';
-import { Button, MenuTrigger } from '@backstage/ui';
+import { Button, MenuItem, MenuTrigger } from '@backstage/ui';
 import { BoardItem } from '@internal/plugin-boards-common';
 import { ItemContextMenu, ItemMenu } from './ItemMenu';
 import {
@@ -28,6 +29,7 @@ async function openMenu(options: {
   item?: BoardItem;
   readonly?: boolean;
   assigneePool?: string[];
+  extraItems?: ReactNode;
 }) {
   const actions = testActions();
   const item = options.item ?? testItem();
@@ -40,6 +42,7 @@ async function openMenu(options: {
         readonly={options.readonly ?? false}
         actions={actions}
         assigneePool={options.assigneePool ?? []}
+        extraItems={options.extraItems}
       />
     </MenuTrigger>,
     { apis: [[identityApiRef, identityApi]] },
@@ -68,6 +71,19 @@ describe('ItemMenu', () => {
     expect(
       screen.getAllByRole('menuitem').map(entry => entry.textContent),
     ).toEqual(['Open details']);
+  });
+
+  it('renders a surface\u2019s extra entries after Open details', async () => {
+    const onAction = jest.fn();
+    await openMenu({
+      readonly: true,
+      extraItems: <MenuItem onAction={onAction}>Open board</MenuItem>,
+    });
+    expect(
+      screen.getAllByRole('menuitem').map(entry => entry.textContent),
+    ).toEqual(['Open details', 'Open board']);
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Open board' }));
+    expect(onAction).toHaveBeenCalled();
   });
 
   it('opens the item details', async () => {

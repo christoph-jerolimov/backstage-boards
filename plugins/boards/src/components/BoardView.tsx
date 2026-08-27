@@ -25,7 +25,7 @@ import {
 } from '@internal/plugin-boards-common';
 import { GroupByMode, groupItems, positionBefore } from './grouping';
 import { GroupLabel } from './GroupLabel';
-import { ItemContextMenu, ItemMenu } from './ItemMenu';
+import { ItemActions, ItemContextMenu, ItemMenu } from './ItemMenu';
 import { useRowContextMenu } from './RowMenu';
 import { InlineEdit } from './common';
 import { AssigneeAvatars } from './AssigneeAvatars';
@@ -34,22 +34,14 @@ import { ColumnDot } from './StatusBadge';
 
 const DRAG_TYPE = 'application/x-boards-item';
 
-export interface BoardActions {
-  moveItem: (
-    itemId: string,
-    target: { columnId: string; position?: number },
-  ) => Promise<void>;
+export interface BoardActions extends ItemActions {
   createItem: (columnId: string, title: string) => Promise<void>;
   renameColumn: (columnId: string, title: string) => Promise<void>;
   reorderColumn: (columnId: string, position: number) => Promise<void>;
   addColumn: (title: string) => Promise<void>;
   setColumnColor: (columnId: string, color: string | null) => Promise<void>;
   deleteColumn: (columnId: string, moveItemsTo?: string) => Promise<void>;
-  openItem: (itemId: string) => void;
   renameItem: (itemId: string, title: string) => Promise<void>;
-  setItemDueDate: (itemId: string, dueDate: string | null) => Promise<void>;
-  setAssignees: (itemId: string, assignees: string[]) => Promise<void>;
-  deleteItem: (itemId: string) => Promise<void>;
 }
 
 function MoreIcon() {

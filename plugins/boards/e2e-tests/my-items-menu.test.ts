@@ -1,0 +1,100 @@
+import { expect, request, test, type Page } from '@playwright/test';
+
+const BACKEND_URL =
+  process.env.PLAYWRIGHT_BACKEND_URL ?? 'http://localhost:7007';
+
+/** A board whose items are assigned to the signed-in guest user. */
+async function seedAssignedBoard(name: string, titles: string[]) {
+  const api = await request.newContext({ baseURL: BACKEND_URL });
+  const auth = await api.get('/api/auth/guest/refresh', {
+    headers: { accept: 'application/json' },
+  });
+  const session = await auth.json();
+  const token = session.backstageIdentity.token as string;
+  const userRef = session.backstageIdentity.identity.userEntityRef as string;
+  const headers = {
+    authorization: `Bearer ${token}`,
+    'content-type': 'application/json',
+  };
+  const boardResponse = await api.post('/api/boards/boards', {
+    headers,
+    data: { name },
+  });
+  const board = await boardResponse.json();
+  const [todo] = board.columns;
+  for (const title of titles) {
+    await api.post(`/api/boards/boards/${board.id}/items`, {
+      headers,
+      data: { columnId: todo.id, title, assignees: [userRef] },
+    });
+  }
+  await api.dispose();
+  return { board };
+}
+
+async function openMyItems(page: Page, boardName: string) {
+  await page.goto('/boards');
+  // guest sign-in page appears on the first navigation of a session
+  await page
+    .getByRole('button', { name: 'Enter' })
+    .click({ timeout: 10_000 })
+    .catch(() => undefined);
+  await page.getByRole('tab', { name: 'My items' }).click();
+  await expect(
+    page.getByRole('button', { name: `Open board ${boardName}` }),
+  ).toBeVisible();
+}
+
+const row = (page: Page, title: string) =>
+  page.getByRole('row', { name: new RegExp(title) });
+
+test.describe('my-items row menu', () => {
+  test('changes an item status from the my-items table', async ({ page }) => {
+    const name = `My items E2E status ${Date.now()}`;
+    await seedAssignedBoard(name, ['Status card']);
+    await openMyItems(page, name);
+
+    await expect(row(page, 'Status card').getByText('To do')).toBeVisible();
+    await page.getByRole('button', { name: 'Actions for Status card' }).click();
+    await page.getByRole('menuitem', { name: 'Move to column' }).hover();
+    await page.getByRole('menuitem', { name: 'In progress' }).click();
+
+    await expect(
+      row(page, 'Status card').getByText('In progress'),
+    ).toBeVisible();
+    // the move must have reached the server
+    await page.reload();
+    await page.getByRole('tab', { name: 'My items' }).click();
+    await expect(
+      row(page, 'Status card').getByText('In progress'),
+    ).toBeVisible();
+  });
+
+  test('sets a due date from the my-items table', async ({ page }) => {
+    const name = `My items E2E due ${Date.now()}`;
+    await seedAssignedBoard(name, ['Due card']);
+    await openMyItems(page, name);
+
+    await page.getByRole('button', { name: 'Actions for Due card' }).click();
+    await page.getByRole('menuitem', { name: 'Due date' }).hover();
+    await page.getByRole('menuitem', { name: 'Today' }).click();
+
+    await expect(row(page, 'Due card').getByText('Due today')).toBeVisible();
+    await page.reload();
+    await page.getByRole('tab', { name: 'My items' }).click();
+    await expect(row(page, 'Due card').getByText('Due today')).toBeVisible();
+  });
+
+  test('unassigning the user removes the row', async ({ page }) => {
+    const name = `My items E2E assignee ${Date.now()}`;
+    await seedAssignedBoard(name, ['Mine card', 'Other card']);
+    await openMyItems(page, name);
+
+    await page.getByRole('button', { name: 'Actions for Mine card' }).click();
+    await page.getByRole('menuitem', { name: 'Assignee' }).hover();
+    await page.getByRole('menuitem', { name: '✓ Me' }).click();
+
+    await expect(row(page, 'Mine card')).toHaveCount(0);
+    await expect(row(page, 'Other card')).toBeVisible();
+  });
+});

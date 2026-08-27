@@ -26,6 +26,7 @@ export const queryKeys = {
   boards: ['boards'] as const,
   board: (boardId: string) => ['boards', boardId] as const,
   items: (boardId: string) => ['items', boardId] as const,
+  myItems: ['boards', 'my-items'] as const,
 };
 
 export function useBoardsQuery() {
@@ -70,6 +71,14 @@ export async function invalidateBoard(
     client.invalidateQueries({ queryKey: queryKeys.items(boardId) }),
     client.invalidateQueries({ queryKey: queryKeys.boards, exact: true }),
   ]);
+}
+
+/**
+ * Invalidates the my-items listing. `invalidateBoard` does not reach it:
+ * it invalidates the board list key exactly, and my-items is a sibling.
+ */
+export async function invalidateMyItems(client: QueryClient): Promise<void> {
+  await client.invalidateQueries({ queryKey: queryKeys.myItems });
 }
 
 /**

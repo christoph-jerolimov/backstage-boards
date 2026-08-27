@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Menu, MenuItem, SubmenuTrigger } from '@backstage/ui';
 import { useApi, identityApiRef } from '@backstage/frontend-plugin-api';
 import { parseEntityRef } from '@backstage/catalog-model';
@@ -12,7 +13,22 @@ import {
 } from '@internal/plugin-boards-common';
 import { useAsyncData } from './common';
 import { RowContextMenu, RowContextMenuState } from './RowMenu';
-import type { BoardActions } from './BoardView';
+
+/**
+ * The item mutations the item menu needs. Kept separate from the board
+ * view's `BoardActions` (which extends it) so surfaces that can only act
+ * on items — the my-items table — supply exactly what they can honor.
+ */
+export interface ItemActions {
+  openItem: (itemId: string) => void;
+  moveItem: (
+    itemId: string,
+    target: { columnId: string; position?: number },
+  ) => Promise<void>;
+  setItemDueDate: (itemId: string, dueDate: string | null) => Promise<void>;
+  setAssignees: (itemId: string, assignees: string[]) => Promise<void>;
+  deleteItem: (itemId: string) => Promise<void>;
+}
 
 function assigneeLabel(ref: string): string {
   if (isTextRef(ref)) {
@@ -33,11 +49,13 @@ export function ItemMenu(props: {
   item: BoardItem;
   columns: BoardColumn[];
   readonly: boolean;
-  actions: BoardActions;
+  actions: ItemActions;
   /** Assignees seen on the board's items, offered for quick assign. */
   assigneePool: string[];
+  /** Extra entries for one surface only, rendered after "Open details". */
+  extraItems?: ReactNode;
 }) {
-  const { item, columns, readonly, actions, assigneePool } = props;
+  const { item, columns, readonly, actions, assigneePool, extraItems } = props;
   const identityApi = useApi(identityApiRef);
   const { data: identity } = useAsyncData(
     () => identityApi.getBackstageIdentity(),
@@ -60,6 +78,7 @@ export function ItemMenu(props: {
       <MenuItem onAction={() => actions.openItem(item.id)}>
         Open details
       </MenuItem>
+      {extraItems}
       {!readonly && (
         <SubmenuTrigger>
           <MenuItem>Move to column</MenuItem>
@@ -141,10 +160,19 @@ export function ItemContextMenu(props: {
   onClose: () => void;
   columns: BoardColumn[];
   readonly: boolean;
-  actions: BoardActions;
+  actions: ItemActions;
   assigneePool: string[];
+  extraItems?: ReactNode;
 }) {
-  const { state, onClose, columns, readonly, actions, assigneePool } = props;
+  const {
+    state,
+    onClose,
+    columns,
+    readonly,
+    actions,
+    assigneePool,
+    extraItems,
+  } = props;
   return (
     <RowContextMenu
       state={state}
@@ -158,6 +186,7 @@ export function ItemContextMenu(props: {
           readonly={readonly}
           actions={actions}
           assigneePool={assigneePool}
+          extraItems={extraItems}
         />
       )}
     </RowContextMenu>
