@@ -11,6 +11,8 @@ import {
   Board,
   BoardChangeEntry,
   BoardColumn,
+  COLUMN_COLORS,
+  ColumnColor,
   BoardItem,
   BoardListEntry,
   BoardPermissionEntry,
@@ -58,6 +60,7 @@ type ColumnRow = {
   board_id: string;
   title: string;
   position: number;
+  color: string | null;
 };
 
 type PermissionRow = {
@@ -118,7 +121,14 @@ function toColumn(row: ColumnRow): BoardColumn {
     boardId: row.board_id,
     title: row.title,
     position: row.position,
+    color: (row.color as ColumnColor) ?? undefined,
   };
+}
+
+function assertColumnColor(color: string): asserts color is ColumnColor {
+  if (!Object.keys(COLUMN_COLORS).includes(color)) {
+    throw new InputError(`Invalid column color '${color}'`);
+  }
 }
 
 function toPermission(row: PermissionRow): BoardPermissionEntry {
@@ -296,6 +306,7 @@ export class BoardsService {
           board_id: boardId,
           title,
           position: (index + 1) * POSITION_STEP,
+          color: null,
         })),
       );
       const adminRefs = new Set<string>(options.admins ?? []);
@@ -568,12 +579,15 @@ export class BoardsService {
   async addColumn(
     principal: BoardsPrincipal,
     boardId: string,
-    options: { title: string; position?: number },
+    options: { title: string; position?: number; color?: string },
   ): Promise<BoardColumn> {
     await this.requireBoard(principal, boardId, 'write');
     const title = options.title?.trim();
     if (!title) {
       throw new InputError('Column title must not be empty');
+    }
+    if (options.color) {
+      assertColumnColor(options.color);
     }
     let position = options.position;
     if (position === undefined) {
@@ -588,6 +602,7 @@ export class BoardsService {
       board_id: boardId,
       title,
       position,
+      color: options.color ?? null,
     };
     await this.knex('board_columns').insert(row);
     await this.emitBoardSignal(boardId);
@@ -598,7 +613,7 @@ export class BoardsService {
     principal: BoardsPrincipal,
     boardId: string,
     columnId: string,
-    update: { title?: string; position?: number },
+    update: { title?: string; position?: number; color?: string | null },
   ): Promise<BoardColumn> {
     await this.requireBoard(principal, boardId, 'write');
     const row = await this.knex<ColumnRow>('board_columns')
@@ -617,6 +632,12 @@ export class BoardsService {
     }
     if (update.position !== undefined) {
       patch.position = update.position;
+    }
+    if (update.color !== undefined) {
+      if (update.color) {
+        assertColumnColor(update.color);
+      }
+      patch.color = update.color;
     }
     if (Object.keys(patch).length > 0) {
       await this.knex('board_columns').where('id', columnId).update(patch);

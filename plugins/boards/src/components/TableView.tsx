@@ -14,6 +14,7 @@ import {
 } from '@internal/plugin-boards-common';
 import { groupByAssignee, UNASSIGNED } from './grouping';
 import { formatDate, RefChips, RefDisplay } from './common';
+import { StatusBadge } from './StatusBadge';
 
 function ItemsTable(props: {
   board: BoardWithContext;
@@ -21,8 +22,8 @@ function ItemsTable(props: {
   openItem: (itemId: string) => void;
 }) {
   const { board, items, openItem } = props;
-  const columnTitle = (columnId: string) =>
-    board.columns.find(column => column.id === columnId)?.title ?? '?';
+  const columnOf = (columnId: string) =>
+    board.columns.find(column => column.id === columnId);
   return (
     <TableRoot
       aria-label="Board items"
@@ -44,7 +45,9 @@ function ItemsTable(props: {
               {item.title}
               {item.externalManager ? ` (via ${item.externalManager})` : ''}
             </Cell>
-            <Cell>{columnTitle(item.columnId)}</Cell>
+            <Cell>
+              <StatusBadge column={columnOf(item.columnId)} />
+            </Cell>
             <Cell>
               <RefChips refs={item.assignees} />
             </Cell>

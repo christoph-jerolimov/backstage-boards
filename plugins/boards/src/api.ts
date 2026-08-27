@@ -50,12 +50,12 @@ export interface BoardsApi {
 
   addColumn(
     boardId: string,
-    options: { title: string; position?: number },
+    options: { title: string; position?: number; color?: string },
   ): Promise<BoardColumn>;
   updateColumn(
     boardId: string,
     columnId: string,
-    update: { title?: string; position?: number },
+    update: { title?: string; position?: number; color?: string | null },
   ): Promise<BoardColumn>;
   deleteColumn(
     boardId: string,
@@ -247,7 +247,7 @@ export class BoardsClient implements BoardsApi {
 
   addColumn(
     boardId: string,
-    options: { title: string; position?: number },
+    options: { title: string; position?: number; color?: string },
   ): Promise<BoardColumn> {
     return this.request('POST', `/boards/${boardId}/columns`, options);
   }
@@ -255,7 +255,7 @@ export class BoardsClient implements BoardsApi {
   updateColumn(
     boardId: string,
     columnId: string,
-    update: { title?: string; position?: number },
+    update: { title?: string; position?: number; color?: string | null },
   ): Promise<BoardColumn> {
     return this.request(
       'PATCH',

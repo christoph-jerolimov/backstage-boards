@@ -26,6 +26,7 @@ import {
   RefDisplay,
   useAsyncData,
 } from './common';
+import { StatusBadge } from './StatusBadge';
 
 function CloseIcon() {
   return (
@@ -266,6 +267,13 @@ export function ItemDrawer(props: {
               />
             </div>
 
+            <Flex align="center" gap="2">
+              <StatusBadge
+                column={board.columns.find(
+                  column => column.id === item.columnId,
+                )}
+              />
+            </Flex>
             <Select
               label="Status"
               isDisabled={readonly}
