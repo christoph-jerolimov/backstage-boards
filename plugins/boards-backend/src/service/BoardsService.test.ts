@@ -954,6 +954,45 @@ describe('BoardsService', () => {
       ).rejects.toThrow(/not found/);
     });
 
+    it('notifies mentioned non-watchers in comments', async () => {
+      const { board, item } = await setupWatchedItem();
+      await service.addComment(
+        alice,
+        board.id,
+        item.id,
+        'please look @user:default/carol',
+      );
+      expect(notifications.send).toHaveBeenCalledTimes(1);
+      const call = notifications.send.mock.calls[0][0];
+      expect(call.recipients.entityRef).toEqual(['user:default/carol']);
+      expect(call.payload.title).toMatch(/mentioned/i);
+      expect(call.payload.link).toContain(`item=${item.id}`);
+    });
+
+    it('mentioned watchers get exactly one notification, actors none', async () => {
+      const { board, item } = await setupWatchedItem();
+      await service.setWatchItem(carol, board.id, item.id, true);
+      await service.addComment(alice, board.id, item.id, 'fyi @carol and me @user:default/alice');
+      // carol: only the mention; alice: nothing despite self-mention
+      expect(notifications.send).toHaveBeenCalledTimes(1);
+      const call = notifications.send.mock.calls[0][0];
+      expect(call.recipients.entityRef).toEqual(['user:default/carol']);
+      expect(call.payload.title).toMatch(/mentioned/i);
+    });
+
+    it('notifies mentions in description edits', async () => {
+      const { board, item } = await setupWatchedItem();
+      await service.updateItem(alice, board.id, item.id, {
+        description: 'owned by @group:default/guests',
+      });
+      const mentionCall = notifications.send.mock.calls.find(
+        (call: any[]) => call[0].payload.title === 'You were mentioned',
+      );
+      expect(mentionCall?.[0].recipients.entityRef).toEqual([
+        'group:default/guests',
+      ]);
+    });
+
     it('notifies watchers when an item is archived', async () => {
       const { board, item } = await setupWatchedItem();
       await service.setWatchItem(carol, board.id, item.id, true);

@@ -16,6 +16,8 @@ export type InlineToken =
   | { type: 'link'; href: string; children: InlineToken[] }
   | { type: 'entity'; entityRef: string };
 
+import { findMentions } from '@internal/plugin-boards-common';
+
 export type BlockToken =
   | { type: 'paragraph'; children: InlineToken[] }
   | { type: 'codeBlock'; value: string }
@@ -28,8 +30,7 @@ const ENTITY_REF_PATTERN =
 
 const NON_ENTITY_PREFIXES = new Set(['text', 'http', 'https', 'mailto']);
 
-/** Splits plain text into text tokens and auto-linked entity refs. */
-export function autolinkEntities(text: string): InlineToken[] {
+function autolinkBareRefs(text: string): InlineToken[] {
   const tokens: InlineToken[] = [];
   let last = 0;
   for (const match of text.matchAll(ENTITY_REF_PATTERN)) {
@@ -45,6 +46,30 @@ export function autolinkEntities(text: string): InlineToken[] {
   }
   if (last < text.length) {
     tokens.push({ type: 'text', value: text.slice(last) });
+  }
+  return tokens;
+}
+
+/**
+ * Splits plain text into text tokens, @-mention links, and auto-linked
+ * bare entity refs.
+ */
+export function autolinkEntities(text: string): InlineToken[] {
+  const mentions = findMentions(text);
+  if (mentions.length === 0) {
+    return autolinkBareRefs(text);
+  }
+  const tokens: InlineToken[] = [];
+  let last = 0;
+  for (const mention of mentions) {
+    if (mention.start > last) {
+      tokens.push(...autolinkBareRefs(text.slice(last, mention.start)));
+    }
+    tokens.push({ type: 'entity', entityRef: mention.entityRef });
+    last = mention.end;
+  }
+  if (last < text.length) {
+    tokens.push(...autolinkBareRefs(text.slice(last)));
   }
   return tokens;
 }
