@@ -415,6 +415,87 @@ describe('BoardsService', () => {
     });
   });
 
+  describe('item filtering', () => {
+    async function seedFilterBoard() {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const columnId = board.columns[0].id;
+      await service.createItem(alice, board.id, {
+        columnId,
+        title: 'Fix login bug',
+        tags: ['bug', 'urgent'],
+        labels: { priority: 'high', env: 'prod' },
+      });
+      const withDescription = await service.createItem(alice, board.id, {
+        columnId,
+        title: 'Improve docs',
+        tags: ['docs'],
+        labels: { priority: 'low' },
+      });
+      await service.updateItem(alice, board.id, withDescription.id, {
+        description: 'covers the LOGIN flow',
+      });
+      await service.createItem(alice, board.id, { columnId, title: 'Chore' });
+      return board;
+    }
+
+    it('filters by text over title and description', async () => {
+      const board = await seedFilterBoard();
+      const byText = await service.listItems(alice, board.id, {
+        text: 'login',
+      });
+      expect(byText.map(i => i.title).sort()).toEqual([
+        'Fix login bug',
+        'Improve docs',
+      ]);
+    });
+
+    it('requires all tags and all label pairs', async () => {
+      const board = await seedFilterBoard();
+      expect(
+        (await service.listItems(alice, board.id, { tags: ['bug'] })).map(
+          i => i.title,
+        ),
+      ).toEqual(['Fix login bug']);
+      expect(
+        await service.listItems(alice, board.id, {
+          tags: ['bug', 'missing'],
+        }),
+      ).toHaveLength(0);
+      expect(
+        (
+          await service.listItems(alice, board.id, {
+            labels: { priority: 'high', env: 'prod' },
+          })
+        ).map(i => i.title),
+      ).toEqual(['Fix login bug']);
+      expect(
+        await service.listItems(alice, board.id, {
+          labels: { priority: 'nope' },
+        }),
+      ).toHaveLength(0);
+    });
+
+    it('combines filters with AND', async () => {
+      const board = await seedFilterBoard();
+      expect(
+        (
+          await service.listItems(alice, board.id, {
+            text: 'login',
+            tags: ['bug'],
+            labels: { env: 'prod' },
+          })
+        ).map(i => i.title),
+      ).toEqual(['Fix login bug']);
+      expect(
+        await service.listItems(alice, board.id, {
+          text: 'login',
+          tags: ['docs'],
+          labels: { env: 'prod' },
+        }),
+      ).toHaveLength(0);
+    });
+  });
+
   describe('item description', () => {
     it('keeps versions and records a change on each edit', async () => {
       const board = await service.createBoard(alice, { name: 'B' });

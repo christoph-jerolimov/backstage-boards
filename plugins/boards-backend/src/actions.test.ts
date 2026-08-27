@@ -88,10 +88,44 @@ describe('actions', () => {
     await knex.destroy();
   });
 
+  it('list-items honors filters and permissions', async () => {
+    const { output: board } = await registry.invoke(
+      'create-board',
+      { name: 'B' },
+      aliceCredentials,
+    );
+    const columns = await knex('board_columns').where('board_id', board.id);
+    await registry.invoke(
+      'add-item',
+      {
+        boardId: board.id,
+        columnId: columns[0].id,
+        title: 'Tagged',
+        tags: ['bug'],
+      },
+      aliceCredentials,
+    );
+    await registry.invoke(
+      'add-item',
+      { boardId: board.id, columnId: columns[0].id, title: 'Untagged' },
+      aliceCredentials,
+    );
+    const { output } = await registry.invoke(
+      'list-items',
+      { boardId: board.id, tags: ['bug'] },
+      aliceCredentials,
+    );
+    expect(output.items.map((i: any) => i.title)).toEqual(['Tagged']);
+    await expect(
+      registry.invoke('list-items', { boardId: board.id }, bobCredentials),
+    ).rejects.toThrow(/not found/);
+  });
+
   it('registers the full action set', () => {
     expect([...registry.actions.keys()].sort()).toEqual(
       [
         'create-board',
+        'list-items',
         'update-board',
         'delete-board',
         'add-board-permission',

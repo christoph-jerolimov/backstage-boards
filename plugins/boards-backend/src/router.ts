@@ -219,7 +219,26 @@ export async function createRouter(
 
   router.get('/boards/:boardId/items', async (req, res) => {
     const principal = await principalOf(req);
-    res.json({ items: await service.listItems(principal, req.params.boardId) });
+    const asArray = (value: unknown): string[] => {
+      if (typeof value === 'string') {
+        return [value];
+      }
+      return Array.isArray(value) ? (value as string[]) : [];
+    };
+    const labels: Record<string, string> = {};
+    for (const pair of asArray(req.query.label)) {
+      const eq = pair.indexOf('=');
+      if (eq > 0) {
+        labels[pair.slice(0, eq)] = pair.slice(eq + 1);
+      }
+    }
+    res.json({
+      items: await service.listItems(principal, req.params.boardId, {
+        text: typeof req.query.text === 'string' ? req.query.text : undefined,
+        tags: asArray(req.query.tag),
+        labels,
+      }),
+    });
   });
 
   router.post('/boards/:boardId/items', async (req, res) => {

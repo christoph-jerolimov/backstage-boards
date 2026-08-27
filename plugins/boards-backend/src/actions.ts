@@ -202,6 +202,55 @@ export function registerActions(options: ActionsOptions): void {
   });
 
   actionsRegistry.register({
+    name: 'list-items',
+    title: 'List Board Items',
+    description:
+      'Lists the items of a board, optionally filtered by text, tags (all must match), and labels (all key=value pairs must match).',
+    attributes: { readOnly: true },
+    schema: {
+      input: z =>
+        z.object({
+          boardId: z.string(),
+          text: z.string().optional(),
+          tags: z.array(z.string()).optional(),
+          labels: z.record(z.string(), z.string()).optional(),
+        }),
+      output: z =>
+        z.object({
+          items: z.array(
+            z.object({
+              id: z.string(),
+              title: z.string(),
+              columnId: z.string(),
+              tags: z.array(z.string()),
+              labels: z.record(z.string(), z.string()),
+              assignees: z.array(z.string()),
+            }),
+          ),
+        }),
+    },
+    action: async ({ input, credentials }) => {
+      const items = await service.listItems(
+        await toPrincipal(credentials),
+        input.boardId,
+        { text: input.text, tags: input.tags, labels: input.labels },
+      );
+      return {
+        output: {
+          items: items.map(item => ({
+            id: item.id,
+            title: item.title,
+            columnId: item.columnId,
+            tags: item.tags,
+            labels: item.labels,
+            assignees: item.assignees,
+          })),
+        },
+      };
+    },
+  });
+
+  actionsRegistry.register({
     name: 'add-item',
     title: 'Add Board Item',
     description:

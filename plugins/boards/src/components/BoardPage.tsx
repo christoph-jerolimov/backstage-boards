@@ -17,13 +17,19 @@ import {
   Menu,
   MenuItem,
   MenuTrigger,
+  SearchField,
   Switch,
   Text,
   ToggleButton,
   ToggleButtonGroup,
 } from '@backstage/ui';
 import { EntityRefLink } from '@backstage/plugin-catalog-react';
-import { levelIncludes } from '@internal/plugin-boards-common';
+import {
+  ItemFilter,
+  isEmptyFilter,
+  itemMatchesFilter,
+  levelIncludes,
+} from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
 import { InlineEdit, useAsyncData } from './common';
 import { BoardActions, KanbanView } from './KanbanView';
@@ -52,6 +58,9 @@ export function BoardPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [view, setView] = useState<'board' | 'table'>('board');
   const [groupBy, setGroupBy] = useState(false);
+  const [filterText, setFilterText] = useState('');
+  const [filterTags, setFilterTags] = useState<string[]>([]);
+  const [filterLabels, setFilterLabels] = useState<string[]>([]);
   const [shareOpen, setShareOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editEntity, setEditEntity] = useState(false);
@@ -125,6 +134,29 @@ export function BoardPage() {
   const isAdmin = levelIncludes(board.access, 'admin');
   const openItemId = searchParams.get('item') ?? undefined;
   const openItem = (items ?? []).find(item => item.id === openItemId);
+
+  const allTags = [...new Set((items ?? []).flatMap(item => item.tags))].sort();
+  const allLabelPairs = [
+    ...new Set(
+      (items ?? []).flatMap(item =>
+        Object.entries(item.labels).map(([key, value]) => `${key}=${value}`),
+      ),
+    ),
+  ].sort();
+  const filter: ItemFilter = {
+    text: filterText,
+    tags: filterTags,
+    labels: Object.fromEntries(
+      filterLabels.map(pair => {
+        const eq = pair.indexOf('=');
+        return [pair.slice(0, eq), pair.slice(eq + 1)];
+      }),
+    ),
+  };
+  const filteredItems = (items ?? []).filter(item =>
+    itemMatchesFilter(item, filter),
+  );
+  const filterActive = !isEmptyFilter(filter);
 
   let entitySection: React.ReactNode;
   if (editEntity) {
@@ -277,6 +309,80 @@ export function BoardPage() {
         </Text>
       </Flex>
 
+      <Flex align="center" gap="2" style={{ flexWrap: 'wrap' }}>
+        <SearchField
+          aria-label="Search items"
+          placeholder="Search items…"
+          value={filterText}
+          onChange={setFilterText}
+          size="small"
+        />
+        {allTags.length > 0 && (
+          <MenuTrigger>
+            <Button variant="tertiary" size="small">
+              Tags{filterTags.length > 0 ? ` (${filterTags.length})` : ''}
+            </Button>
+            <Menu aria-label="Filter by tags">
+              {allTags.map(tag => (
+                <MenuItem
+                  key={tag}
+                  onAction={() =>
+                    setFilterTags(current =>
+                      current.includes(tag)
+                        ? current.filter(entry => entry !== tag)
+                        : [...current, tag],
+                    )
+                  }
+                >
+                  {filterTags.includes(tag) ? `✓ ${tag}` : tag}
+                </MenuItem>
+              ))}
+            </Menu>
+          </MenuTrigger>
+        )}
+        {allLabelPairs.length > 0 && (
+          <MenuTrigger>
+            <Button variant="tertiary" size="small">
+              Labels{filterLabels.length > 0 ? ` (${filterLabels.length})` : ''}
+            </Button>
+            <Menu aria-label="Filter by labels">
+              {allLabelPairs.map(pair => (
+                <MenuItem
+                  key={pair}
+                  onAction={() =>
+                    setFilterLabels(current =>
+                      current.includes(pair)
+                        ? current.filter(entry => entry !== pair)
+                        : [...current, pair],
+                    )
+                  }
+                >
+                  {filterLabels.includes(pair) ? `✓ ${pair}` : pair}
+                </MenuItem>
+              ))}
+            </Menu>
+          </MenuTrigger>
+        )}
+        {filterActive && (
+          <>
+            <Text variant="body-small" color="secondary">
+              {filteredItems.length} of {(items ?? []).length} items
+            </Text>
+            <Button
+              variant="tertiary"
+              size="small"
+              onPress={() => {
+                setFilterText('');
+                setFilterTags([]);
+                setFilterLabels([]);
+              }}
+            >
+              Clear filters
+            </Button>
+          </>
+        )}
+      </Flex>
+
       {error && (
         <Text
           variant="body-small"
@@ -289,7 +395,7 @@ export function BoardPage() {
       {view === 'board' ? (
         <KanbanView
           board={board}
-          items={items ?? []}
+          items={filteredItems}
           canWrite={canWrite}
           actions={actions}
           groupBy={groupBy}
@@ -297,7 +403,7 @@ export function BoardPage() {
       ) : (
         <TableView
           board={board}
-          items={items ?? []}
+          items={filteredItems}
           groupBy={groupBy}
           openItem={actions.openItem}
         />
