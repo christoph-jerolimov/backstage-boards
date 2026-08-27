@@ -233,7 +233,9 @@ mcpActions:
 # boards:
 #   reminders:
 #     - id: overdue-weekday-mornings
-#       cron: '0 8 * * 1-5'
+#       schedule: # standard Backstage scheduler configuration
+#         frequency: { cron: '0 8 * * 1-5' } # or e.g. { minutes: 10 }
+#         timeout: { minutes: 5 }
 #       scope: overdue # all | with-due-date | due-today | overdue
 #       grouping: per-board # combined | per-board
 #       excludeUsers:

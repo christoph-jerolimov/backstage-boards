@@ -46,7 +46,7 @@ const auth = {
 function reminder(overrides: Partial<ReminderConfig>): ReminderConfig {
   return {
     id: 'test',
-    cron: '0 8 * * *',
+    schedule: { frequency: { cron: '0 8 * * *' }, timeout: { minutes: 5 } },
     scope: 'all',
     grouping: 'combined',
     userFilter: {},
@@ -59,17 +59,26 @@ describe('readRemindersConfig', () => {
   it('parses entries with defaults and both schedule kinds', () => {
     const config = new ConfigReader({
       boards: {
-          reminders: [
-            { id: 'a', cron: '0 8 * * 1-5' },
-            {
-              id: 'b',
-              frequencyHours: 24,
-              scope: 'overdue',
-              grouping: 'per-board',
-              excludeUsers: {
-                'metadata.labels.boards/notifications': 'false',
-              },
+        reminders: [
+          {
+            id: 'a',
+            schedule: {
+              frequency: { cron: '0 8 * * 1-5' },
+              timeout: { minutes: 5 },
             },
+          },
+          {
+            id: 'b',
+            schedule: {
+              frequency: { minutes: 10 },
+              timeout: { minutes: 5 },
+            },
+            scope: 'overdue',
+            grouping: 'per-board',
+            excludeUsers: {
+              'metadata.labels.boards/notifications': 'false',
+            },
+          },
         ],
       },
     });
@@ -77,13 +86,16 @@ describe('readRemindersConfig', () => {
     expect(parsed).toHaveLength(2);
     expect(parsed[0]).toMatchObject({
       id: 'a',
-      cron: '0 8 * * 1-5',
+      schedule: { frequency: { cron: '0 8 * * 1-5' } },
       scope: 'all',
       grouping: 'combined',
     });
     expect(parsed[1]).toMatchObject({
       id: 'b',
-      frequencyHours: 24,
+      schedule: {
+        frequency: expect.anything(),
+        timeout: expect.anything(),
+      },
       scope: 'overdue',
       grouping: 'per-board',
       excludeUsers: { 'metadata.labels.boards/notifications': 'false' },
@@ -95,12 +107,30 @@ describe('readRemindersConfig', () => {
       readRemindersConfig(
         new ConfigReader({ boards: { reminders: [{ id: 'x' }] } }),
       ),
-    ).toThrow(/exactly one of 'cron' or 'frequencyHours'/);
+    ).toThrow(/missing 'schedule'/);
     expect(() =>
       readRemindersConfig(
         new ConfigReader({
           boards: {
-            reminders: [{ id: 'x', cron: '* * * * *', scope: 'nope' }],
+            reminders: [{ id: 'x', schedule: { frequency: 'nope' } }],
+          },
+        }),
+      ),
+    ).toThrow(/invalid 'schedule'/);
+    expect(() =>
+      readRemindersConfig(
+        new ConfigReader({
+          boards: {
+            reminders: [
+              {
+                id: 'x',
+                schedule: {
+                  frequency: { cron: '* * * * *' },
+                  timeout: { minutes: 5 },
+                },
+                scope: 'nope',
+              },
+            ],
           },
         }),
       ),

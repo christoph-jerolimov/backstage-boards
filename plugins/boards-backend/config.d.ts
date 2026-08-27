@@ -11,16 +11,42 @@ export interface Config {
        */
       id: string;
       /**
-       * Cron expression for the schedule. Set either this or
-       * `frequencyHours`, not both.
+       * Standard Backstage scheduler configuration, e.g.
+       * `{ frequency: { minutes: 10 }, timeout: { minutes: 5 } }` or
+       * `{ frequency: { cron: '0 8 * * 1-5' } }`.
        * @visibility backend
        */
-      cron?: string;
-      /**
-       * Fixed frequency in hours. Set either this or `cron`, not both.
-       * @visibility backend
-       */
-      frequencyHours?: number;
+      schedule: {
+        frequency:
+          | string
+          | { cron?: string }
+          | {
+              milliseconds?: number;
+              seconds?: number;
+              minutes?: number;
+              hours?: number;
+              days?: number;
+            };
+        timeout:
+          | string
+          | {
+              milliseconds?: number;
+              seconds?: number;
+              minutes?: number;
+              hours?: number;
+              days?: number;
+            };
+        initialDelay?:
+          | string
+          | {
+              milliseconds?: number;
+              seconds?: number;
+              minutes?: number;
+              hours?: number;
+              days?: number;
+            };
+        scope?: 'global' | 'local';
+      };
       /**
        * Which of a user's assigned items to include:
        * `all` (default), `with-due-date`, `due-today`, or `overdue`.

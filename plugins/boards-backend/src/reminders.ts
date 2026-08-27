@@ -1,8 +1,10 @@
 import {
   AuthService,
   LoggerService,
+  readSchedulerServiceTaskScheduleDefinitionFromConfig,
   RootConfigService,
   SchedulerService,
+  SchedulerServiceTaskScheduleDefinition,
 } from '@backstage/backend-plugin-api';
 import {
   Entity,
@@ -27,8 +29,8 @@ export type ReminderGrouping = (typeof REMINDER_GROUPINGS)[number];
 
 export interface ReminderConfig {
   id: string;
-  cron?: string;
-  frequencyHours?: number;
+  /** Standard Backstage scheduler configuration. */
+  schedule: SchedulerServiceTaskScheduleDefinition;
   scope: ReminderScope;
   grouping: ReminderGrouping;
   userFilter: Record<string, string>;
@@ -48,11 +50,19 @@ export function readRemindersConfig(
       throw new Error(`Duplicate boards.reminders id '${id}'`);
     }
     seen.add(id);
-    const cron = entry.getOptionalString('cron');
-    const frequencyHours = entry.getOptionalNumber('frequencyHours');
-    if (!cron === !frequencyHours) {
+    const scheduleConfig = entry.getOptionalConfig('schedule');
+    if (!scheduleConfig) {
       throw new Error(
-        `boards.reminders '${id}' must set exactly one of 'cron' or 'frequencyHours'`,
+        `boards.reminders '${id}' is missing 'schedule' (standard Backstage scheduler configuration)`,
+      );
+    }
+    let schedule: SchedulerServiceTaskScheduleDefinition;
+    try {
+      schedule =
+        readSchedulerServiceTaskScheduleDefinitionFromConfig(scheduleConfig);
+    } catch (error) {
+      throw new Error(
+        `boards.reminders '${id}' has an invalid 'schedule': ${error}`,
       );
     }
     const scope = (entry.getOptionalString('scope') ??
@@ -87,8 +97,7 @@ export function readRemindersConfig(
     };
     result.push({
       id,
-      cron,
-      frequencyHours,
+      schedule,
       scope,
       grouping,
       userFilter: readRecord('userFilter'),
@@ -289,12 +298,8 @@ export async function scheduleReminders(
   const reminders = readRemindersConfig(options.config);
   for (const reminder of reminders) {
     await options.scheduler.scheduleTask({
+      ...reminder.schedule,
       id: `boards-reminder-${reminder.id}`,
-      frequency: reminder.cron
-        ? { cron: reminder.cron }
-        : { hours: reminder.frequencyHours ?? 24 },
-      timeout: { minutes: 10 },
-      initialDelay: { minutes: 1 },
       fn: () => runReminder({ ...options, reminder }),
     });
   }
