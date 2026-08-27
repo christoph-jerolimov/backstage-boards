@@ -1,5 +1,10 @@
 import { BoardItem } from '@internal/plugin-boards-common';
-import { groupByAssignee, positionBefore, UNASSIGNED } from './grouping';
+import {
+  groupByAssignee,
+  positionBefore,
+  sortItems,
+  UNASSIGNED,
+} from './grouping';
 
 function item(id: string, assignees: string[]): BoardItem {
   return {
@@ -45,6 +50,54 @@ describe('groupByAssignee', () => {
   it('omits the unassigned group when empty', () => {
     const groups = groupByAssignee([item('1', ['user:default/alice'])]);
     expect(groups.map(g => g.key)).toEqual(['user:default/alice']);
+  });
+});
+
+describe('sortItems', () => {
+  const columns = [
+    { id: 'c1', boardId: 'b', title: 'To do', position: 1 },
+    { id: 'c2', boardId: 'b', title: 'Done', position: 2 },
+  ];
+  const items = [
+    { ...item('Beta', []), columnId: 'c2', updatedAt: '2026-01-02T00:00:00Z' },
+    { ...item('alpha', []), columnId: 'c1', updatedAt: '2026-01-03T00:00:00Z' },
+    { ...item('Gamma', []), columnId: 'c1', updatedAt: '2026-01-01T00:00:00Z' },
+  ].map(entry => ({ ...entry, title: entry.id }));
+
+  it('keeps board order without a descriptor', () => {
+    expect(sortItems(items, undefined, columns)).toBe(items);
+  });
+
+  it('sorts by title case-insensitively in both directions', () => {
+    expect(
+      sortItems(items, { column: 'title', direction: 'ascending' }, columns).map(
+        entry => entry.title,
+      ),
+    ).toEqual(['alpha', 'Beta', 'Gamma']);
+    expect(
+      sortItems(items, { column: 'title', direction: 'descending' }, columns).map(
+        entry => entry.title,
+      ),
+    ).toEqual(['Gamma', 'Beta', 'alpha']);
+  });
+
+  it('sorts by status title and updated timestamp', () => {
+    expect(
+      sortItems(items, { column: 'status', direction: 'ascending' }, columns).map(
+        entry => entry.columnId,
+      ),
+    ).toEqual(['c2', 'c1', 'c1']);
+    expect(
+      sortItems(
+        items,
+        { column: 'updatedAt', direction: 'descending' },
+        columns,
+      ).map(entry => entry.updatedAt),
+    ).toEqual([
+      '2026-01-03T00:00:00Z',
+      '2026-01-02T00:00:00Z',
+      '2026-01-01T00:00:00Z',
+    ]);
   });
 });
 
