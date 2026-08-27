@@ -125,6 +125,12 @@ export async function createRouter(
     res.status(204).end();
   });
 
+  router.post('/boards/:boardId/delete-now', async (req, res) => {
+    const principal = await principalOf(req);
+    await service.hardDeleteBoard(principal, req.params.boardId);
+    res.status(204).end();
+  });
+
   router.post('/boards/:boardId/duplicate', async (req, res) => {
     const principal = await principalOf(req);
     res.status(201).json(

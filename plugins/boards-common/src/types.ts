@@ -53,6 +53,9 @@ export interface Board {
   createdBy: string;
   createdAt: string;
   updatedAt: string;
+  /** Set while the board is archived (read-only, purged after 30 days). */
+  archivedAt?: string;
+  archivedBy?: string;
 }
 
 /** A board as returned to a specific user, with per-user context. */

@@ -119,7 +119,8 @@ export function registerActions(options: ActionsOptions): void {
   actionsRegistry.register({
     name: 'delete-board',
     title: 'Delete Board',
-    description: 'Deletes a board and all of its items, comments, and history.',
+    description:
+      'Archives a board; it becomes read-only for admins and is permanently deleted after 30 days.',
     attributes: { destructive: true },
     schema: {
       input: z => z.object({ boardId: z.string() }),

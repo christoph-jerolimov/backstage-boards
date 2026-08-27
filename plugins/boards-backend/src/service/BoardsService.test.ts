@@ -122,7 +122,55 @@ describe('BoardsService', () => {
       expect(renamed.name).toBe('New');
     });
 
-    it('deletes a board with all data', async () => {
+    it('archives a board, keeping admin read access via the direct link', async () => {
+      const board = await service.createBoard(alice, {
+        name: 'B',
+        visibility: 'logged-in-write',
+      });
+      const item = await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Item',
+      });
+      await service.addComment(alice, board.id, item.id, 'hello');
+      await service.deleteBoard(alice, board.id);
+
+      // hidden from every listing, but the admin can still open it read-only
+      expect(await service.listBoards(alice)).toHaveLength(0);
+      const archived = await service.getBoard(alice, board.id);
+      expect(archived.archivedAt).toBeDefined();
+      expect(archived.archivedBy).toBe('user:default/alice');
+      expect(await service.listItems(alice, board.id)).toHaveLength(1);
+
+      // non-admins lose access entirely, even with logged-in-write visibility
+      await expect(service.getBoard(bob, board.id)).rejects.toThrow(
+        /not found/,
+      );
+      await expect(service.listItems(bob, board.id)).rejects.toThrow(
+        /not found/,
+      );
+
+      // all writes fail, including for the admin
+      await expect(
+        service.createItem(alice, board.id, {
+          columnId: board.columns[0].id,
+          title: 'Nope',
+        }),
+      ).rejects.toThrow(/archived and read-only/);
+      await expect(
+        service.updateBoard(alice, board.id, { name: 'New' }),
+      ).rejects.toThrow(/archived and read-only/);
+      await expect(
+        service.addPermission(alice, board.id, {
+          principalRef: 'user:default/bob',
+          level: 'read',
+        }),
+      ).rejects.toThrow(/archived and read-only/);
+      await expect(service.deleteBoard(alice, board.id)).rejects.toThrow(
+        /archived and read-only/,
+      );
+    });
+
+    it('hard-deletes only archived boards, cascading all data', async () => {
       const board = await service.createBoard(alice, { name: 'B' });
       const item = await service.createItem(alice, board.id, {
         columnId: board.columns[0].id,
@@ -130,7 +178,14 @@ describe('BoardsService', () => {
       });
       await service.addComment(alice, board.id, item.id, 'hello');
       await service.setWatchItem(alice, board.id, item.id, true);
+      await service.setWatchBoard(alice, board.id, true);
+
+      await expect(service.hardDeleteBoard(alice, board.id)).rejects.toThrow(
+        /Only archived boards/,
+      );
       await service.deleteBoard(alice, board.id);
+      await service.hardDeleteBoard(alice, board.id);
+
       await expect(service.getBoard(alice, board.id)).rejects.toThrow(
         /not found/,
       );
@@ -139,6 +194,24 @@ describe('BoardsService', () => {
       expect(await knex('comment_versions')).toHaveLength(0);
       expect(await knex('changes')).toHaveLength(0);
       expect(await knex('watches')).toHaveLength(0);
+    });
+
+    it('purges only boards archived before the cutoff', async () => {
+      const oldBoard = await service.createBoard(alice, { name: 'Old' });
+      const newBoard = await service.createBoard(alice, { name: 'New' });
+      await service.deleteBoard(alice, oldBoard.id);
+      await service.deleteBoard(alice, newBoard.id);
+      // backdate the first archival beyond the retention window
+      const past = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000);
+      await knex('boards')
+        .where('id', oldBoard.id)
+        .update({ archived_at: past.toISOString() });
+      const purged = await service.purgeArchivedBoards(
+        new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+      );
+      expect(purged).toBe(1);
+      expect(await knex('boards').where('id', oldBoard.id)).toHaveLength(0);
+      expect(await knex('boards').where('id', newBoard.id)).toHaveLength(1);
     });
 
     it('manages entity assignment', async () => {

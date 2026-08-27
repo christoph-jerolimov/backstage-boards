@@ -253,11 +253,28 @@ const columnColors: Migration = {
   },
 };
 
+const boardArchival: Migration = {
+  name: '20260827_05_board_archival',
+  async up(knex) {
+    await knex.schema.alterTable('boards', table => {
+      table.string('archived_at').nullable();
+      table.string('archived_by').nullable();
+    });
+  },
+  async down(knex) {
+    await knex.schema.alterTable('boards', table => {
+      table.dropColumn('archived_at');
+      table.dropColumn('archived_by');
+    });
+  },
+};
+
 const migrations: Migration[] = [
   initial,
   itemDescriptions,
   itemArchival,
   columnColors,
+  boardArchival,
 ];
 
 class BoardsMigrationSource implements Knex.MigrationSource<Migration> {
