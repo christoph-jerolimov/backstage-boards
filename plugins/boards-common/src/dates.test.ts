@@ -2,6 +2,7 @@ import {
   dueState,
   fridayISO,
   isValidDueDate,
+  relativeDueLabel,
   todayISO,
   tomorrowISO,
 } from './dates';
@@ -51,5 +52,16 @@ describe('dueState', () => {
     expect(dueState('2026-08-25', now)).toBe('overdue');
     expect(dueState('2026-08-26', now)).toBe('today');
     expect(dueState('2026-08-27', now)).toBe('upcoming');
+  });
+});
+
+describe('relativeDueLabel', () => {
+  const now = new Date(2026, 7, 26);
+  it('labels the three days around today', () => {
+    expect(relativeDueLabel('2026-08-25', now)).toBe('yesterday');
+    expect(relativeDueLabel('2026-08-26', now)).toBe('today');
+    expect(relativeDueLabel('2026-08-27', now)).toBe('tomorrow');
+    expect(relativeDueLabel('2026-08-28', now)).toBeUndefined();
+    expect(relativeDueLabel('2026-08-24', now)).toBeUndefined();
   });
 });

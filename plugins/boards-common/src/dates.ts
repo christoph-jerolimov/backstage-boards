@@ -65,3 +65,25 @@ export function dueState(dueDate: string, now: Date = new Date()): DueState {
   }
   return 'upcoming';
 }
+
+/**
+ * A relative label for dates one day around today: `yesterday`,
+ * `today`, or `tomorrow`; undefined for anything further out.
+ */
+export function relativeDueLabel(
+  dueDate: string,
+  now: Date = new Date(),
+): 'yesterday' | 'today' | 'tomorrow' | undefined {
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  if (dueDate === todayISO(yesterday)) {
+    return 'yesterday';
+  }
+  if (dueDate === todayISO(now)) {
+    return 'today';
+  }
+  if (dueDate === tomorrowISO(now)) {
+    return 'tomorrow';
+  }
+  return undefined;
+}
