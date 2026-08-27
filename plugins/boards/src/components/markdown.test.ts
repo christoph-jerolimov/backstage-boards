@@ -22,6 +22,24 @@ describe('autolinkEntities', () => {
     ]);
   });
 
+  it('links @-mentions as entities', () => {
+    expect(autolinkEntities('ping @carol about this')).toEqual([
+      { type: 'text', value: 'ping ' },
+      { type: 'entity', entityRef: 'user:default/carol' },
+      { type: 'text', value: ' about this' },
+    ]);
+    expect(autolinkEntities('@group:default/team-a fyi')).toEqual([
+      { type: 'entity', entityRef: 'group:default/team-a' },
+      { type: 'text', value: ' fyi' },
+    ]);
+  });
+
+  it('does not treat emails as mentions', () => {
+    expect(autolinkEntities('mail jane@example.com')).toEqual([
+      { type: 'text', value: 'mail jane@example.com' },
+    ]);
+  });
+
   it('never links urls', () => {
     expect(autolinkEntities('see https://example.com/a')).toEqual([
       { type: 'text', value: 'see https://example.com/a' },

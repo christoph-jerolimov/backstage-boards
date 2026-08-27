@@ -26,6 +26,7 @@ import {
   NewItem,
   TimelineEntry,
   ALL_VISIBILITIES,
+  extractMentions,
   isTextRef,
   isValidActorRef,
   isValidPrincipalRef,
@@ -1049,11 +1050,21 @@ export class BoardsService {
         }
       });
       await this.emitBoardSignal(boardId, itemId);
+      const mentioned = descriptionChanged
+        ? await this.notifyMentions({
+            boardId,
+            itemId,
+            actor,
+            text: update.description ?? '',
+            context: `You were mentioned in the description of "${patch.title ?? row.title}"`,
+          })
+        : [];
       await this.notifyWatchers({
         boardId,
         itemId,
         actor,
         title: 'Item updated',
+        exclude: mentioned,
         description: `"${patch.title ?? row.title}": ${changes
           .map(change => change.field)
           .join(', ')} changed`,
@@ -1269,12 +1280,20 @@ export class BoardsService {
       });
     });
     await this.emitBoardSignal(boardId, itemId);
+    const mentioned = await this.notifyMentions({
+      boardId,
+      itemId,
+      actor,
+      text,
+      context: `You were mentioned in a comment on "${item.title}"`,
+    });
     await this.notifyWatchers({
       boardId,
       itemId,
       actor,
       title: 'New comment',
       description: `New comment on "${item.title}"`,
+      exclude: mentioned,
     });
     const [comment] = await this.hydrateComments([commentId]);
     return comment;
@@ -1362,12 +1381,20 @@ export class BoardsService {
       edited_at: now(),
     });
     await this.emitBoardSignal(boardId, itemId);
+    const mentioned = await this.notifyMentions({
+      boardId,
+      itemId,
+      actor,
+      text,
+      context: `You were mentioned in a comment on "${itemTitle}"`,
+    });
     await this.notifyWatchers({
       boardId,
       itemId,
       actor,
       title: 'Comment edited',
       description: `A comment on "${itemTitle}" was edited`,
+      exclude: mentioned,
     });
     const [comment] = await this.hydrateComments([commentId]);
     return comment;
@@ -1592,18 +1619,45 @@ export class BoardsService {
     actor: string;
     title: string;
     description: string;
+    /** Principals already notified for this event (e.g. mentions). */
+    exclude?: string[];
   }): Promise<void> {
-    const recipients = await this.watcherRefs(
-      options.boardId,
-      options.itemId,
-      options.actor,
-    );
+    const excluded = new Set(options.exclude ?? []);
+    const recipients = (
+      await this.watcherRefs(options.boardId, options.itemId, options.actor)
+    ).filter(ref => !excluded.has(ref));
     await this.sendNotification(recipients, {
       title: options.title,
       description: options.description,
       boardId: options.boardId,
       itemId: options.itemId,
     });
+  }
+
+  /**
+   * Notifies @-mentioned principals directly, regardless of watch state.
+   * Returns the notified refs so the caller can exclude them from the
+   * watcher notification of the same event.
+   */
+  private async notifyMentions(options: {
+    boardId: string;
+    itemId: string;
+    actor: string;
+    text: string;
+    context: string;
+  }): Promise<string[]> {
+    const mentioned = extractMentions(options.text).filter(
+      ref => ref !== options.actor,
+    );
+    if (mentioned.length > 0) {
+      await this.sendNotification(mentioned, {
+        title: 'You were mentioned',
+        description: options.context,
+        boardId: options.boardId,
+        itemId: options.itemId,
+      });
+    }
+    return mentioned;
   }
 
   private async sendNotification(
