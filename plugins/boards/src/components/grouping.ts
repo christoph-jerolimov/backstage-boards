@@ -1,4 +1,41 @@
-import { BoardItem } from '@internal/plugin-boards-common';
+import { BoardColumn, BoardItem } from '@internal/plugin-boards-common';
+
+export interface ItemSortDescriptor {
+  column: 'title' | 'status' | 'createdBy' | 'updatedAt';
+  direction: 'ascending' | 'descending';
+}
+
+/**
+ * Client-side sort for the table view. Without a descriptor, board order
+ * (position) is kept.
+ */
+export function sortItems(
+  items: BoardItem[],
+  descriptor: ItemSortDescriptor | undefined,
+  columns: BoardColumn[],
+): BoardItem[] {
+  if (!descriptor) {
+    return items;
+  }
+  const columnTitle = (columnId: string) =>
+    columns.find(column => column.id === columnId)?.title ?? '';
+  const key = (item: BoardItem): string => {
+    switch (descriptor.column) {
+      case 'title':
+        return item.title.toLocaleLowerCase('en-US');
+      case 'status':
+        return columnTitle(item.columnId).toLocaleLowerCase('en-US');
+      case 'createdBy':
+        return item.createdBy.toLocaleLowerCase('en-US');
+      case 'updatedAt':
+        return item.updatedAt;
+      default:
+        return '';
+    }
+  };
+  const factor = descriptor.direction === 'descending' ? -1 : 1;
+  return [...items].sort((a, b) => factor * key(a).localeCompare(key(b)));
+}
 
 export const UNASSIGNED = 'unassigned';
 

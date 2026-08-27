@@ -1,4 +1,4 @@
-import { Fragment } from 'react';
+import { Fragment, useState } from 'react';
 import {
   Cell,
   Column,
@@ -12,7 +12,12 @@ import {
   BoardItem,
   BoardWithContext,
 } from '@internal/plugin-boards-common';
-import { groupByAssignee, UNASSIGNED } from './grouping';
+import {
+  groupByAssignee,
+  ItemSortDescriptor,
+  sortItems,
+  UNASSIGNED,
+} from './grouping';
 import { formatDate, RefChips, RefDisplay } from './common';
 import { StatusBadge } from './StatusBadge';
 
@@ -20,26 +25,41 @@ function ItemsTable(props: {
   board: BoardWithContext;
   items: BoardItem[];
   openItem: (itemId: string) => void;
+  sort: ItemSortDescriptor | undefined;
+  onSortChange: (descriptor: ItemSortDescriptor) => void;
 }) {
-  const { board, items, openItem } = props;
+  const { board, items, openItem, sort, onSortChange } = props;
   const columnOf = (columnId: string) =>
     board.columns.find(column => column.id === columnId);
+  const sorted = sortItems(items, sort, board.columns);
   return (
     <TableRoot
       aria-label="Board items"
       onRowAction={key => openItem(String(key))}
+      sortDescriptor={sort}
+      onSortChange={descriptor =>
+        onSortChange(descriptor as ItemSortDescriptor)
+      }
     >
       <TableHeader>
-        <Column isRowHeader>Title</Column>
-        <Column>Status</Column>
+        <Column id="title" isRowHeader allowsSorting>
+          Title
+        </Column>
+        <Column id="status" allowsSorting>
+          Status
+        </Column>
         <Column>Assignees</Column>
         <Column>Labels</Column>
         <Column>Tags</Column>
-        <Column>Created by</Column>
-        <Column>Updated</Column>
+        <Column id="createdBy" allowsSorting>
+          Created by
+        </Column>
+        <Column id="updatedAt" allowsSorting>
+          Updated
+        </Column>
       </TableHeader>
       <TableBody>
-        {items.map(item => (
+        {sorted.map(item => (
           <Row key={item.id} id={item.id}>
             <Cell>
               {item.title}
@@ -75,8 +95,17 @@ export function TableView(props: {
   openItem: (itemId: string) => void;
 }) {
   const { board, items, groupBy, openItem } = props;
+  const [sort, setSort] = useState<ItemSortDescriptor | undefined>(undefined);
   if (!groupBy) {
-    return <ItemsTable board={board} items={items} openItem={openItem} />;
+    return (
+      <ItemsTable
+        board={board}
+        items={items}
+        openItem={openItem}
+        sort={sort}
+        onSortChange={setSort}
+      />
+    );
   }
   return (
     <>
@@ -89,7 +118,13 @@ export function TableView(props: {
               <RefDisplay refString={group.key} />
             )}
           </Text>
-          <ItemsTable board={board} items={group.items} openItem={openItem} />
+          <ItemsTable
+            board={board}
+            items={group.items}
+            openItem={openItem}
+            sort={sort}
+            onSortChange={setSort}
+          />
         </Fragment>
       ))}
     </>
