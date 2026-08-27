@@ -74,7 +74,7 @@ function CommentBlock(props: {
   return (
     <div
       style={{
-        border: '1px solid var(--bui-border, #ddd)',
+        border: '1px solid var(--bui-border-1)',
         borderRadius: 8,
         padding: 8,
       }}
@@ -207,7 +207,7 @@ export function ItemDrawer(props: {
           bottom: 0,
           zIndex: 901,
           width: 'min(560px, 90vw)',
-          background: 'var(--bui-bg-surface-1, #fff)',
+          background: 'var(--bui-bg-neutral-1)',
           boxShadow: '-4px 0 16px rgba(0,0,0,0.2)',
           overflowY: 'auto',
           outline: 'none',
@@ -306,7 +306,7 @@ export function ItemDrawer(props: {
                           display: 'inline-flex',
                           alignItems: 'center',
                           gap: 4,
-                          border: '1px solid var(--bui-border, #ddd)',
+                          border: '1px solid var(--bui-border-1)',
                           borderRadius: 12,
                           padding: '2px 4px 2px 8px',
                         }}

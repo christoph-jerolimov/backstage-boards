@@ -98,13 +98,13 @@ function ItemCard(props: {
         }
       }}
       style={{
-        border: '1px solid var(--bui-border, #ddd)',
+        border: '1px solid var(--bui-border-1)',
         borderTop: isDropTarget
-          ? '3px solid var(--bui-fg-link, #36f)'
-          : '1px solid var(--bui-border, #ddd)',
+          ? '3px solid var(--bui-fg-link)'
+          : '1px solid var(--bui-border-1)',
         borderRadius: 8,
         padding: 8,
-        background: 'var(--bui-bg-surface-1, #fff)',
+        background: 'var(--bui-bg-neutral-1)',
         opacity: isDragging ? 0.5 : 1,
         cursor: 'pointer',
       }}
@@ -280,8 +280,8 @@ function ColumnLane(props: {
         width: 280,
         flexShrink: 0,
         background: isDropTarget
-          ? 'var(--bui-bg-surface-2, #eef)'
-          : 'var(--bui-bg-surface-0, #f6f6f6)',
+          ? 'var(--bui-bg-neutral-3)'
+          : 'var(--bui-bg-neutral-2)',
         borderRadius: 8,
         padding: 8,
         display: 'flex',

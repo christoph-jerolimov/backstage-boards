@@ -111,7 +111,7 @@ export function EditableMarkdown(props: {
           style={{
             marginTop: 8,
             paddingLeft: 8,
-            borderLeft: '2px solid var(--bui-border, #ddd)',
+            borderLeft: '2px solid var(--bui-border-1)',
           }}
         >
           {versions.map(version => (
