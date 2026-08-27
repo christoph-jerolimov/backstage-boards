@@ -4,7 +4,7 @@ import { renderInTestApp } from '@backstage/frontend-test-utils';
 import { entityRouteRef } from '@backstage/plugin-catalog-react';
 import { BoardColumn, BoardItem } from '@internal/plugin-boards-common';
 import { BoardsApi } from '../../api';
-import { BoardActions } from '../KanbanView';
+import { BoardActions } from '../BoardView';
 
 /**
  * Renders a component inside a test app (routing and app context, which

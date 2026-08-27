@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { identityApiRef } from '@backstage/frontend-plugin-api';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
 import { BoardWithContext } from '@internal/plugin-boards-common';
-import { KanbanView } from './KanbanView';
+import { BoardView } from './BoardView';
 import {
   renderWithProviders,
   testActions,
@@ -66,7 +66,7 @@ function renderBoard(
     columns: over.columns ?? columns,
   } as unknown as BoardWithContext;
   renderWithProviders(
-    <KanbanView
+    <BoardView
       board={board}
       items={over.items ?? items}
       canWrite={over.canWrite ?? true}
@@ -83,7 +83,7 @@ function renderBoard(
   return { actions };
 }
 
-describe('KanbanView lanes', () => {
+describe('BoardView lanes', () => {
   it('renders one lane per column with its item count', () => {
     renderBoard();
     expect(screen.getByText('Todo (2)')).toBeInTheDocument();
@@ -163,7 +163,7 @@ describe('KanbanView lanes', () => {
   });
 });
 
-describe('KanbanView add item', () => {
+describe('BoardView add item', () => {
   it('creates an item and stays open for the next one', async () => {
     const { actions } = renderBoard();
     await userEvent.click(
@@ -198,7 +198,7 @@ describe('KanbanView add item', () => {
   });
 });
 
-describe('KanbanView column menu', () => {
+describe('BoardView column menu', () => {
   async function openColumnMenu(title: string) {
     await userEvent.click(
       screen.getByRole('button', { name: `Actions for column ${title}` }),
@@ -278,7 +278,7 @@ describe('KanbanView column menu', () => {
   });
 });
 
-describe('KanbanView add column', () => {
+describe('BoardView add column', () => {
   it('is offered only while the board has no column', () => {
     renderBoard();
     expect(

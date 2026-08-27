@@ -419,7 +419,7 @@ function ColumnLane(props: {
   );
 }
 
-export function KanbanView(props: {
+export function BoardView(props: {
   board: BoardWithContext;
   items: BoardItem[];
   canWrite: boolean;

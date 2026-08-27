@@ -18,7 +18,7 @@ import {
 import { GroupLabel } from './GroupLabel';
 import { ItemContextMenu, ItemMenu } from './ItemMenu';
 import { RowActionsMenu, useRowContextMenu } from './RowMenu';
-import type { BoardActions } from './KanbanView';
+import type { BoardActions } from './BoardView';
 import { formatDate, RefDisplay } from './common';
 import { AssigneeAvatars } from './AssigneeAvatars';
 import { DueDateBadge } from './DueDate';

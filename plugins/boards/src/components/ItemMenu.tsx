@@ -12,7 +12,7 @@ import {
 } from '@internal/plugin-boards-common';
 import { useAsyncData } from './common';
 import { RowContextMenu, RowContextMenuState } from './RowMenu';
-import type { BoardActions } from './KanbanView';
+import type { BoardActions } from './BoardView';
 
 function assigneeLabel(ref: string): string {
   if (isTextRef(ref)) {
