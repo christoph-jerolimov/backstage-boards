@@ -10,7 +10,16 @@ import {
   useRouteRef,
 } from '@backstage/frontend-plugin-api';
 import { useSignal } from '@backstage/plugin-signals-react';
-import { RiGridLine, RiKanbanView, RiMore2Fill } from '@remixicon/react';
+import {
+  RiArchiveLine,
+  RiDeleteBinLine,
+  RiFileCopyLine,
+  RiGridLine,
+  RiHistoryLine,
+  RiKanbanView,
+  RiLockUnlockLine,
+  RiMore2Fill,
+} from '@remixicon/react';
 import {
   Button,
   ButtonIcon,
@@ -333,22 +342,40 @@ export function BoardPage() {
               icon={<RiMore2Fill size={16} />}
             />
             <Menu aria-label="Board actions">
-              <MenuItem onAction={() => setChangesOpen(true)}>
+              <MenuItem
+                iconStart={<RiHistoryLine size={16} />}
+                onAction={() => setChangesOpen(true)}
+              >
                 Recent changes…
               </MenuItem>
               {canWrite && (
-                <MenuItem onAction={() => setArchivedOpen(true)}>
+                <MenuItem
+                  iconStart={<RiArchiveLine size={16} />}
+                  onAction={() => setArchivedOpen(true)}
+                >
                   Archived items…
                 </MenuItem>
               )}
-              <MenuItem onAction={() => setDuplicateOpen(true)}>
+              <MenuItem
+                iconStart={<RiFileCopyLine size={16} />}
+                onAction={() => setDuplicateOpen(true)}
+              >
                 Duplicate board…
               </MenuItem>
               {isAdmin && (
-                <MenuItem onAction={() => setShareOpen(true)}>Share…</MenuItem>
+                <MenuItem
+                  iconStart={<RiLockUnlockLine size={16} />}
+                  onAction={() => setShareOpen(true)}
+                >
+                  Share…
+                </MenuItem>
               )}
               {isAdmin && (
-                <MenuItem onAction={() => setDeleteOpen(true)}>
+                <MenuItem
+                  iconStart={<RiDeleteBinLine size={16} />}
+                  color="danger"
+                  onAction={() => setDeleteOpen(true)}
+                >
                   Delete board…
                 </MenuItem>
               )}
