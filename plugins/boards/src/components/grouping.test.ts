@@ -1,9 +1,12 @@
 import { BoardItem } from '@internal/plugin-boards-common';
 import {
   groupByAssignee,
+  groupItems,
+  NO_DUE_DATE,
   positionBefore,
   sortItems,
   UNASSIGNED,
+  UNTAGGED,
 } from './grouping';
 
 function item(id: string, assignees: string[]): BoardItem {
@@ -108,5 +111,60 @@ describe('positionBefore', () => {
     expect(positionBefore(sorted, 1)).toBe(1500);
     expect(positionBefore(sorted, 2)).toBe(3000);
     expect(positionBefore([], 0)).toBe(1000);
+  });
+});
+
+describe('groupItems', () => {
+  const mk = (over: Partial<BoardItem>): BoardItem =>
+    ({
+      id: over.id ?? 'x',
+      boardId: 'b',
+      columnId: 'c',
+      position: 1,
+      title: over.title ?? 'T',
+      createdBy: 'user:default/alice',
+      createdAt: '',
+      updatedBy: 'user:default/alice',
+      updatedAt: '',
+      descriptionVersionCount: 0,
+      assignees: over.assignees ?? [],
+      labels: {},
+      tags: over.tags ?? [],
+      dueDate: over.dueDate,
+    }) as BoardItem;
+
+  it('groups by due date with the undated group last', () => {
+    const groups = groupItems(
+      [
+        mk({ id: '1', dueDate: '2026-09-01' }),
+        mk({ id: '2' }),
+        mk({ id: '3', dueDate: '2026-08-01' }),
+        mk({ id: '4', dueDate: '2026-09-01' }),
+      ],
+      'dueDate',
+    );
+    expect(groups.map(group => group.key)).toEqual([
+      '2026-08-01',
+      '2026-09-01',
+      NO_DUE_DATE,
+    ]);
+    expect(groups[1].items.map(item => item.id)).toEqual(['1', '4']);
+  });
+
+  it('groups by tags with multi-membership and untagged last', () => {
+    const groups = groupItems(
+      [
+        mk({ id: '1', tags: ['ui', 'bug'] }),
+        mk({ id: '2', tags: ['bug'] }),
+        mk({ id: '3' }),
+      ],
+      'tags',
+    );
+    expect(groups.map(group => group.key)).toEqual(['bug', 'ui', UNTAGGED]);
+    expect(groups[0].items.map(item => item.id)).toEqual(['1', '2']);
+  });
+
+  it('none returns a single group', () => {
+    expect(groupItems([mk({ id: '1' })], 'none')).toHaveLength(1);
   });
 });

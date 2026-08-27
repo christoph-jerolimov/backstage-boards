@@ -34,7 +34,7 @@ import {
   MenuItem,
   MenuTrigger,
   SearchField,
-  Switch,
+  Select,
   Text,
   ToggleButton,
   ToggleButtonGroup,
@@ -47,6 +47,7 @@ import {
   levelIncludes,
 } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
+import { GroupByMode } from './grouping';
 import { rootRouteRef } from '../routes';
 import {
   invalidateBoard,
@@ -87,7 +88,7 @@ export function BoardPage() {
   const rootLink = useRouteRef(rootRouteRef);
   const [searchParams, setSearchParams] = useSearchParams();
   const [view, setView] = useState<'board' | 'table'>('board');
-  const [groupBy, setGroupBy] = useState(false);
+  const [groupBy, setGroupBy] = useState<GroupByMode>('none');
   const [filterText, setFilterText] = useState('');
   const [filterTags, setFilterTags] = useState<string[]>([]);
   const [filterLabels, setFilterLabels] = useState<string[]>([]);
@@ -297,10 +298,17 @@ export function BoardPage() {
             }
             loadWatchers={() => boardsApi.listBoardWatchers(board.id)}
           />
-          <Switch
-            label="Group by assignee"
-            isSelected={groupBy}
-            onChange={setGroupBy}
+          <Select
+            aria-label="Group by"
+            size="small"
+            options={[
+              { value: 'none', label: 'Not grouped' },
+              { value: 'assignee', label: 'By assignee' },
+              { value: 'dueDate', label: 'By due date' },
+              { value: 'tags', label: 'By tags' },
+            ]}
+            selectedKey={groupBy}
+            onSelectionChange={key => setGroupBy((key as GroupByMode) ?? 'none')}
           />
           <ToggleButtonGroup
             aria-label="View"

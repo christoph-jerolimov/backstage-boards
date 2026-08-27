@@ -41,6 +41,58 @@ export function sortItems(
 }
 
 export const UNASSIGNED = 'unassigned';
+export const NO_DUE_DATE = 'no-due-date';
+export const UNTAGGED = 'untagged';
+
+/** How board/table items are grouped. */
+export type GroupByMode = 'none' | 'assignee' | 'dueDate' | 'tags';
+
+export interface ItemGroup {
+  key: string;
+  items: BoardItem[];
+}
+
+/**
+ * Groups items by the selected mode. Multi-valued modes (assignee,
+ * tags) put an item into each of its groups; the "none of them" group
+ * (unassigned / no due date / untagged) always comes last.
+ */
+export function groupItems(
+  items: BoardItem[],
+  mode: GroupByMode,
+): ItemGroup[] {
+  if (mode === 'none') {
+    return [{ key: 'all', items }];
+  }
+  if (mode === 'assignee') {
+    return groupByAssignee(items);
+  }
+  const groups = new Map<string, BoardItem[]>();
+  const rest: BoardItem[] = [];
+  for (const item of items) {
+    const keys =
+      mode === 'dueDate' ? (item.dueDate ? [item.dueDate] : []) : item.tags;
+    if (keys.length === 0) {
+      rest.push(item);
+      continue;
+    }
+    for (const key of keys) {
+      const group = groups.get(key) ?? [];
+      group.push(item);
+      groups.set(key, group);
+    }
+  }
+  const result = [...groups.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, groupItems_]) => ({ key, items: groupItems_ }));
+  if (rest.length > 0) {
+    result.push({
+      key: mode === 'dueDate' ? NO_DUE_DATE : UNTAGGED,
+      items: rest,
+    });
+  }
+  return result;
+}
 
 /**
  * Groups items by assignee. An item with multiple assignees appears in
