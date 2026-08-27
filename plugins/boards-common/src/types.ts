@@ -48,7 +48,8 @@ export const COLUMN_COLORS: Record<ColumnColor, string> = {
 export interface Board {
   id: string;
   name: string;
-  entityRef?: string;
+  /** Catalog entities this board references (e.g. a component and a team). */
+  entityRefs: string[];
   visibility: BoardVisibility;
   createdBy: string;
   createdAt: string;
@@ -189,6 +190,7 @@ export interface ItemUpdate {
 
 export interface BoardUpdate {
   name?: string;
-  entityRef?: string | null;
+  /** Replaces the full list of referenced catalog entities. */
+  entityRefs?: string[];
   visibility?: BoardVisibility;
 }

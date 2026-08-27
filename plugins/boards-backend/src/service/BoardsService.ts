@@ -33,6 +33,7 @@ import {
   isTextRef,
   isValidActorRef,
   isValidDueDate,
+  isValidEntityRef,
   normalizeTags,
   isValidPrincipalRef,
   levelIncludes,
@@ -51,7 +52,6 @@ const POSITION_STEP = 1000;
 type BoardRow = {
   id: string;
   name: string;
-  entity_ref: string | null;
   visibility: BoardVisibility;
   created_by: string;
   created_at: string;
@@ -109,11 +109,22 @@ function now(): string {
   return new Date().toISOString();
 }
 
-function toBoard(row: BoardRow): Board {
+/** Validates and dedupes a list of catalog entity refs. */
+function normalizeEntityRefs(refs: string[]): string[] {
+  const result = [...new Set(refs.map(ref => ref.trim()).filter(Boolean))];
+  for (const ref of result) {
+    if (!isValidEntityRef(ref)) {
+      throw new InputError(`Invalid entity ref '${ref}'`);
+    }
+  }
+  return result;
+}
+
+function toBoard(row: BoardRow, entityRefs: string[]): Board {
   return {
     id: row.id,
     name: row.name,
-    entityRef: row.entity_ref ?? undefined,
+    entityRefs,
     visibility: row.visibility,
     createdBy: row.created_by,
     createdAt: row.created_at,
@@ -285,7 +296,7 @@ export class BoardsService {
     options: {
       name: string;
       columns?: string[];
-      entityRef?: string;
+      entityRefs?: string[];
       visibility?: BoardVisibility;
       /** Additional admin grants, mainly for service callers. */
       admins?: string[];
@@ -301,6 +312,7 @@ export class BoardsService {
     if (options.visibility && !ALL_VISIBILITIES.includes(options.visibility)) {
       throw new InputError(`Invalid visibility '${options.visibility}'`);
     }
+    const entityRefs = normalizeEntityRefs(options.entityRefs ?? []);
 
     const boardId = uuid();
     const timestamp = now();
@@ -314,12 +326,16 @@ export class BoardsService {
       await trx<BoardRow>('boards').insert({
         id: boardId,
         name,
-        entity_ref: options.entityRef ?? null,
         visibility: options.visibility ?? 'private',
         created_by: creator,
         created_at: timestamp,
         updated_at: timestamp,
       });
+      if (entityRefs.length > 0) {
+        await trx('board_entities').insert(
+          entityRefs.map(ref => ({ board_id: boardId, entity_ref: ref })),
+        );
+      }
       await trx<ColumnRow>('board_columns').insert(
         columnTitles.map((title, index) => ({
           id: uuid(),
@@ -378,13 +394,34 @@ export class BoardsService {
           })
           .first())
       : false;
+    const entityRefs = (await this.entityRefsByBoard([boardId])).get(
+      boardId,
+    ) ?? [];
     return {
-      ...toBoard(board),
+      ...toBoard(board, entityRefs),
       columns: columns.map(toColumn),
       access: level,
       favorite,
       watching,
     };
+  }
+
+  /** Batch-loads the referenced entity refs for a set of boards. */
+  private async entityRefsByBoard(
+    boardIds: string[],
+  ): Promise<Map<string, string[]>> {
+    const map = new Map<string, string[]>();
+    if (boardIds.length === 0) {
+      return map;
+    }
+    const rows = await this.knex('board_entities')
+      .whereIn('board_id', boardIds)
+      .orderBy('entity_ref')
+      .select('board_id', 'entity_ref');
+    for (const row of rows) {
+      map.set(row.board_id, [...(map.get(row.board_id) ?? []), row.entity_ref]);
+    }
+    return map;
   }
 
   async listBoards(
@@ -395,9 +432,16 @@ export class BoardsService {
       .whereNull('archived_at')
       .orderBy('name');
     if (options?.entityRef) {
-      query.where('entity_ref', options.entityRef);
+      const entityRef = options.entityRef;
+      query.whereExists(function entityMatch() {
+        this.select('*')
+          .from('board_entities')
+          .whereRaw('board_entities.board_id = boards.id')
+          .where('board_entities.entity_ref', entityRef);
+      });
     }
     const rows = await query;
+    const refsByBoard = await this.entityRefsByBoard(rows.map(row => row.id));
     const userRef = principal.type === 'user' ? principal.userRef : undefined;
     const favoriteIds = new Set<string>(
       userRef
@@ -419,7 +463,7 @@ export class BoardsService {
         continue;
       }
       result.push({
-        ...toBoard(row),
+        ...toBoard(row, refsByBoard.get(row.id) ?? []),
         access: level,
         favorite: favoriteIds.has(row.id),
       });
@@ -441,8 +485,16 @@ export class BoardsService {
       }
       patch.name = name;
     }
-    if (update.entityRef !== undefined) {
-      patch.entity_ref = update.entityRef;
+    if (update.entityRefs !== undefined) {
+      const refs = normalizeEntityRefs(update.entityRefs);
+      await this.knex.transaction(async trx => {
+        await trx('board_entities').where('board_id', boardId).delete();
+        if (refs.length > 0) {
+          await trx('board_entities').insert(
+            refs.map(ref => ({ board_id: boardId, entity_ref: ref })),
+          );
+        }
+      });
     }
     if (update.visibility !== undefined) {
       if (!ALL_VISIBILITIES.includes(update.visibility)) {

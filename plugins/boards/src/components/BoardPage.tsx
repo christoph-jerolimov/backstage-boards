@@ -18,6 +18,7 @@ import {
   RiHistoryLine,
   RiKanbanView,
   RiLockUnlockLine,
+  RiSettings3Line,
   RiMore2Fill,
 } from '@remixicon/react';
 import {
@@ -59,6 +60,7 @@ import { InlineEdit } from './common';
 import { BoardActions, KanbanView } from './KanbanView';
 import { TableView } from './TableView';
 import { ItemDrawer } from './ItemDrawer';
+import { BoardSettingsDialog } from './BoardSettingsDialog';
 import { ShareDialog } from './ShareDialog';
 import { RecentChangesDialog } from './RecentChangesDialog';
 import { ArchivedItemsDialog } from './ArchivedItemsDialog';
@@ -94,7 +96,7 @@ export function BoardPage() {
   const [archivedOpen, setArchivedOpen] = useState(false);
   const [duplicateOpen, setDuplicateOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [editEntity, setEditEntity] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
   const queryClient = useQueryClient();
@@ -217,68 +219,21 @@ export function BoardPage() {
   );
   const filterActive = !isEmptyFilter(filter);
 
-  let entitySection: React.ReactNode;
-  if (editEntity) {
-    entitySection = (
-      <InlineEdit
-        value={board.entityRef ?? ''}
-        canEdit
-        ariaLabel="assigned entity ref"
-        placeholder="e.g. system:default/payments"
-        onCommit={async entityRef => {
-          setEditEntity(false);
-          await guarded(() => boardsApi.updateBoard(board.id, { entityRef }));
-        }}
-      />
+  const entitySection: React.ReactNode =
+    board.entityRefs.length > 0 ? (
+      <Text variant="body-small">
+        {board.entityRefs.map((ref, index) => (
+          <span key={ref}>
+            {index > 0 && ', '}
+            <EntityRefLink entityRef={ref} />
+          </span>
+        ))}
+      </Text>
+    ) : (
+      <Text variant="body-small" color="secondary">
+        none
+      </Text>
     );
-  } else if (board.entityRef) {
-    entitySection = (
-      <Flex align="center" gap="1">
-        <Text variant="body-small">
-          <EntityRefLink entityRef={board.entityRef} />
-        </Text>
-        {isAdmin && (
-          <>
-            <Button
-              variant="tertiary"
-              size="small"
-              onPress={() => setEditEntity(true)}
-            >
-              Change
-            </Button>
-            <Button
-              variant="tertiary"
-              size="small"
-              onPress={() =>
-                guarded(() =>
-                  boardsApi.updateBoard(board.id, { entityRef: null }),
-                )
-              }
-            >
-              Clear
-            </Button>
-          </>
-        )}
-      </Flex>
-    );
-  } else {
-    entitySection = (
-      <Flex align="center" gap="1">
-        <Text variant="body-small" color="secondary">
-          none
-        </Text>
-        {isAdmin && (
-          <Button
-            variant="tertiary"
-            size="small"
-            onPress={() => setEditEntity(true)}
-          >
-            Assign
-          </Button>
-        )}
-      </Flex>
-    );
-  }
 
   const basePath = rootLink?.() ?? '/boards';
 
@@ -394,6 +349,14 @@ export function BoardPage() {
               </MenuItem>
               {isAdmin && (
                 <MenuItem
+                  iconStart={<RiSettings3Line size={16} />}
+                  onAction={() => setSettingsOpen(true)}
+                >
+                  Board settings…
+                </MenuItem>
+              )}
+              {isAdmin && (
+                <MenuItem
                   iconStart={<RiLockUnlockLine size={16} />}
                   onAction={() => setShareOpen(true)}
                 >
@@ -416,7 +379,7 @@ export function BoardPage() {
 
       <Flex align="center" gap="2">
         <Text variant="body-small" color="secondary">
-          Entity:
+          Entities:
         </Text>
         {entitySection}
         <Text variant="body-small" color="secondary">
@@ -536,6 +499,13 @@ export function BoardPage() {
           onChanged={refreshAll}
         />
       )}
+
+      <BoardSettingsDialog
+        board={board}
+        isOpen={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        onChanged={refreshAll}
+      />
 
       <ShareDialog
         board={board}
