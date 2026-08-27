@@ -11,18 +11,18 @@ export interface ItemFilter {
 }
 
 export function isEmptyFilter(filter: ItemFilter): boolean {
-  return (
-    !filter.text?.trim() &&
-    !(filter.tags && filter.tags.length > 0)
-  );
+  return !filter.text?.trim() && !(filter.tags && filter.tags.length > 0);
 }
 
-export function itemMatchesFilter(item: BoardItem, filter: ItemFilter): boolean {
+export function itemMatchesFilter(
+  item: BoardItem,
+  filter: ItemFilter,
+): boolean {
   const text = filter.text?.trim().toLocaleLowerCase('en-US');
   if (text) {
-    const haystack = `${item.title}\n${item.description ?? ''}`.toLocaleLowerCase(
-      'en-US',
-    );
+    const haystack = `${item.title}\n${
+      item.description ?? ''
+    }`.toLocaleLowerCase('en-US');
     if (!haystack.includes(text)) {
       return false;
     }

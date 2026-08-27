@@ -76,7 +76,10 @@ export async function invalidateBoard(
  * Optimistic item move: the card lands in the target column immediately;
  * a server rejection rolls the cache back.
  */
-export function useMoveItem(boardId: string, onError: (message: string) => void) {
+export function useMoveItem(
+  boardId: string,
+  onError: (message: string) => void,
+) {
   const boardsApi = useApi(boardsApiRef);
   const client = useQueryClient();
   return useMutation({

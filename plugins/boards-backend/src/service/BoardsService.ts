@@ -40,11 +40,7 @@ import {
 } from '@internal/plugin-boards-common';
 import { Knex } from 'knex';
 import { randomUUID as uuid } from 'crypto';
-import {
-  BoardsPrincipal,
-  actorRef,
-  computeEffectiveLevel,
-} from './access';
+import { BoardsPrincipal, actorRef, computeEffectiveLevel } from './access';
 
 const DEFAULT_COLUMNS = ['To do', 'In progress', 'Done'];
 const POSITION_STEP = 1000;
@@ -375,7 +371,11 @@ export class BoardsService {
     principal: BoardsPrincipal,
     boardId: string,
   ): Promise<BoardWithContext> {
-    const { board, level } = await this.requireBoard(principal, boardId, 'read');
+    const { board, level } = await this.requireBoard(
+      principal,
+      boardId,
+      'read',
+    );
     const columns = await this.knex<ColumnRow>('board_columns')
       .where('board_id', boardId)
       .orderBy('position');
@@ -394,9 +394,8 @@ export class BoardsService {
           })
           .first())
       : false;
-    const entityRefs = (await this.entityRefsByBoard([boardId])).get(
-      boardId,
-    ) ?? [];
+    const entityRefs =
+      (await this.entityRefsByBoard([boardId])).get(boardId) ?? [];
     return {
       ...toBoard(board, entityRefs),
       columns: columns.map(toColumn),
@@ -513,11 +512,13 @@ export class BoardsService {
     boardId: string,
   ): Promise<void> {
     await this.requireBoard(principal, boardId, 'admin');
-    await this.knex('boards').where('id', boardId).update({
-      archived_at: now(),
-      archived_by: actorRef(principal),
-      updated_at: now(),
-    });
+    await this.knex('boards')
+      .where('id', boardId)
+      .update({
+        archived_at: now(),
+        archived_by: actorRef(principal),
+        updated_at: now(),
+      });
     await this.emitBoardSignal(boardId);
   }
 
@@ -629,7 +630,11 @@ export class BoardsService {
       copyPermissions: boolean;
     },
   ): Promise<BoardWithContext> {
-    const { board, level } = await this.requireBoard(principal, boardId, 'read');
+    const { board, level } = await this.requireBoard(
+      principal,
+      boardId,
+      'read',
+    );
     if (options.copyPermissions && !levelIncludes(level, 'admin')) {
       throw new NotAllowedError(
         'Copying share settings requires admin access to the source board',
@@ -1099,13 +1104,9 @@ export class BoardsService {
    */
   async listMyItems(principal: BoardsPrincipal): Promise<MyBoardItem[]> {
     if (principal.type !== 'user') {
-      throw new NotAllowedError(
-        'Listing your items requires a logged-in user',
-      );
+      throw new NotAllowedError('Listing your items requires a logged-in user');
     }
-    const refs = [
-      ...new Set([principal.userRef, ...principal.ownershipRefs]),
-    ];
+    const refs = [...new Set([principal.userRef, ...principal.ownershipRefs])];
     const itemIds = (
       await this.knex('item_assignees')
         .whereIn('assignee_ref', refs)
@@ -1363,7 +1364,11 @@ export class BoardsService {
       if (next !== prev) {
         descriptionChanged = true;
         patch.description = next === '' ? null : next;
-        changes.push({ field: 'description', oldValue: undefined, newValue: undefined });
+        changes.push({
+          field: 'description',
+          oldValue: undefined,
+          newValue: undefined,
+        });
       }
     }
     if (update.assignees !== undefined) {
@@ -1384,9 +1389,7 @@ export class BoardsService {
     if (update.dueDate !== undefined) {
       const next = update.dueDate;
       if (next !== null && !isValidDueDate(next)) {
-        throw new InputError(
-          `Invalid due date '${next}', expected YYYY-MM-DD`,
-        );
+        throw new InputError(`Invalid due date '${next}', expected YYYY-MM-DD`);
       }
       if ((next ?? null) !== row.due_date) {
         patch.due_date = next ?? null;
@@ -1430,7 +1433,9 @@ export class BoardsService {
             itemId,
             actor,
             text: update.description ?? '',
-            context: `You were mentioned in the description of "${patch.title ?? row.title}"`,
+            context: `You were mentioned in the description of "${
+              patch.title ?? row.title
+            }"`,
           })
         : [];
       await this.notifyWatchers({
@@ -1849,9 +1854,7 @@ export class BoardsService {
       throw new NotFoundError(`Item ${itemId} not found`);
     }
     const commentRows = await this.knex('comments').where('item_id', itemId);
-    const comments = await this.hydrateComments(
-      commentRows.map(row => row.id),
-    );
+    const comments = await this.hydrateComments(commentRows.map(row => row.id));
     const changeRows = await this.knex<ChangeRow>('changes').where(
       'item_id',
       itemId,
@@ -1927,7 +1930,11 @@ export class BoardsService {
     watching: boolean,
   ): Promise<void> {
     await this.knex('watches')
-      .where({ user_ref: userRef, target_type: targetType, target_id: targetId })
+      .where({
+        user_ref: userRef,
+        target_type: targetType,
+        target_id: targetId,
+      })
       .delete();
     if (watching) {
       await this.knex('watches').insert({
@@ -1982,9 +1989,9 @@ export class BoardsService {
           .orWhere({ target_type: 'board', target_id: boardId }),
       )
       .select('user_ref');
-    return [
-      ...new Set(rows.map(row => row.user_ref as string)),
-    ].filter(ref => ref !== actor && !isTextRef(ref));
+    return [...new Set(rows.map(row => row.user_ref as string))].filter(
+      ref => ref !== actor && !isTextRef(ref),
+    );
   }
 
   private async notifyWatchers(options: {

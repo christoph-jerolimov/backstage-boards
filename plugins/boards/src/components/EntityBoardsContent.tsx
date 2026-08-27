@@ -10,7 +10,8 @@ function EntityBoardsList() {
   const { entity } = useEntity();
   const entityRef = useMemo(() => stringifyEntityRef(entity), [entity]);
 
-  const { data: boards, isLoading: loading } = useBoardsByEntityQuery(entityRef);
+  const { data: boards, isLoading: loading } =
+    useBoardsByEntityQuery(entityRef);
   const [tab, setTab] = useState<string | undefined>(undefined);
 
   if (loading) {

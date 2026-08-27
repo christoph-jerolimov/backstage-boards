@@ -171,11 +171,7 @@ export function AssigneeAvatars(props: { refs: string[] }) {
         // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
         <span onClick={event => event.stopPropagation()}>
           <Text variant="body-x-small">
-            <EntityRefLink
-              entityRef={entityRefs[0]}
-              hideIcon
-              disableTooltip
-            >
+            <EntityRefLink entityRef={entityRefs[0]} hideIcon disableTooltip>
               {profiles.get(entityRefs[0])?.displayName ??
                 refFallbackName(entityRefs[0])}
             </EntityRefLink>

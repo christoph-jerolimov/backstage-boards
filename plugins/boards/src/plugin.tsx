@@ -26,8 +26,7 @@ const boardsPage = PageBlueprint.make({
     title: 'Boards',
     icon: <RiKanbanView size={20} />,
     routeRef: rootRouteRef,
-    loader: () =>
-      import('./components/BoardsPage').then(m => <m.BoardsPage />),
+    loader: () => import('./components/BoardsPage').then(m => <m.BoardsPage />),
   },
 });
 

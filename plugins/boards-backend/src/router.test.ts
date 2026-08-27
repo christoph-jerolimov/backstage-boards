@@ -10,7 +10,10 @@ import { createRouter } from './router';
 import { BoardsService } from './service/BoardsService';
 import { createTestService, alice } from './service/testUtils';
 
-const USERS: Record<string, { userEntityRef: string; ownershipEntityRefs: string[] }> = {
+const USERS: Record<
+  string,
+  { userEntityRef: string; ownershipEntityRefs: string[] }
+> = {
   alice: {
     userEntityRef: 'user:default/alice',
     ownershipEntityRefs: ['user:default/alice', 'group:default/team-a'],
@@ -27,13 +30,22 @@ const httpAuth = {
   credentials: async (req: express.Request) => {
     const user = req.header('x-test-user');
     if (user) {
-      return { $$type: '@backstage/BackstageCredentials', principal: { type: 'user', userEntityRef: USERS[user].userEntityRef } };
+      return {
+        $$type: '@backstage/BackstageCredentials',
+        principal: { type: 'user', userEntityRef: USERS[user].userEntityRef },
+      };
     }
     const svc = req.header('x-test-service');
     if (svc) {
-      return { $$type: '@backstage/BackstageCredentials', principal: { type: 'service', subject: svc } };
+      return {
+        $$type: '@backstage/BackstageCredentials',
+        principal: { type: 'service', subject: svc },
+      };
     }
-    return { $$type: '@backstage/BackstageCredentials', principal: { type: 'none' } };
+    return {
+      $$type: '@backstage/BackstageCredentials',
+      principal: { type: 'none' },
+    };
   },
 } as unknown as HttpAuthService;
 
@@ -68,7 +80,9 @@ function errorMiddleware(): express.ErrorRequestHandler {
         InputError: 400,
         ConflictError: 409,
       }[err.name as string] ?? 500;
-    res.status(status).json({ error: { name: err.name, message: err.message } });
+    res
+      .status(status)
+      .json({ error: { name: err.name, message: err.message } });
   };
 }
 
@@ -91,9 +105,7 @@ describe('createRouter', () => {
       },
     } as any;
     app = express();
-    app.use(
-      await createRouter({ service, httpAuth, auth, userInfo, logger }),
-    );
+    app.use(await createRouter({ service, httpAuth, auth, userInfo, logger }));
     app.use(errorMiddleware());
   });
 
@@ -136,7 +148,11 @@ describe('createRouter', () => {
     await request(app)
       .post(`/boards/${board.id}/items`)
       .set('x-test-user', 'alice')
-      .send({ columnId, title: 'Via group', assignees: ['group:default/team-a'] })
+      .send({
+        columnId,
+        title: 'Via group',
+        assignees: ['group:default/team-a'],
+      })
       .expect(201);
     // someone else's item must not appear
     await request(app)
@@ -191,9 +207,7 @@ describe('createRouter', () => {
       name: 'B',
       visibility: 'logged-in-read',
     });
-    const columnId = (
-      await service.getBoard(alice, board.id)
-    ).columns[0].id;
+    const columnId = (await service.getBoard(alice, board.id)).columns[0].id;
     await request(app)
       .post(`/boards/${board.id}/items`)
       .set('x-test-user', 'bob')

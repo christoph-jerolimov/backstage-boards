@@ -2,11 +2,13 @@ import { autolinkEntities, parseMarkdown } from './markdown';
 
 describe('autolinkEntities', () => {
   it('links catalog entity refs with namespace', () => {
-    expect(autolinkEntities('please check system:default/example now')).toEqual([
-      { type: 'text', value: 'please check ' },
-      { type: 'entity', entityRef: 'system:default/example' },
-      { type: 'text', value: ' now' },
-    ]);
+    expect(autolinkEntities('please check system:default/example now')).toEqual(
+      [
+        { type: 'text', value: 'please check ' },
+        { type: 'entity', entityRef: 'system:default/example' },
+        { type: 'text', value: ' now' },
+      ],
+    );
   });
 
   it('links short-form refs', () => {
@@ -77,9 +79,9 @@ describe('parseMarkdown', () => {
     });
     const [nonLink] = parseMarkdown('[x](javascript:alert(1))');
     expect(nonLink.type).toBe('paragraph');
-    expect(
-      (nonLink as any).children.some((t: any) => t.type === 'link'),
-    ).toBe(false);
+    expect((nonLink as any).children.some((t: any) => t.type === 'link')).toBe(
+      false,
+    );
   });
 
   it('parses code blocks verbatim without linking', () => {

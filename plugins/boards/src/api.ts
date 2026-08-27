@@ -156,8 +156,7 @@ export class BoardsClient implements BoardsApi {
     const baseUrl = await this.options.discoveryApi.getBaseUrl('boards');
     const response = await this.options.fetchApi.fetch(`${baseUrl}${path}`, {
       method,
-      headers:
-        body === undefined ? {} : { 'Content-Type': 'application/json' },
+      headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
     if (!response.ok) {
@@ -370,10 +369,7 @@ export class BoardsClient implements BoardsApi {
   }
 
   restoreItem(boardId: string, itemId: string): Promise<BoardItem> {
-    return this.request(
-      'POST',
-      `/boards/${boardId}/items/${itemId}/restore`,
-    );
+    return this.request('POST', `/boards/${boardId}/items/${itemId}/restore`);
   }
 
   setWatchItem(
@@ -472,10 +468,7 @@ export class BoardsClient implements BoardsApi {
     return result.versions;
   }
 
-  async getTimeline(
-    boardId: string,
-    itemId: string,
-  ): Promise<TimelineEntry[]> {
+  async getTimeline(boardId: string, itemId: string): Promise<TimelineEntry[]> {
     const result = await this.request<{ timeline: TimelineEntry[] }>(
       'GET',
       `/boards/${boardId}/items/${itemId}/timeline`,

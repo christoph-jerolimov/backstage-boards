@@ -12,7 +12,10 @@ import {
   Text,
   TextField,
 } from '@backstage/ui';
-import { BoardWithContext, levelIncludes } from '@internal/plugin-boards-common';
+import {
+  BoardWithContext,
+  levelIncludes,
+} from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
 import { rootRouteRef } from '../routes';
 
@@ -68,11 +71,7 @@ export function DuplicateBoardDialog(props: {
       <DialogHeader>Duplicate “{board.name}”</DialogHeader>
       <DialogBody>
         <Flex direction="column" gap="3">
-          <TextField
-            label="Name of the copy"
-            value={name}
-            onChange={setName}
-          />
+          <TextField label="Name of the copy" value={name} onChange={setName} />
           <Checkbox isSelected={copyColumns} onChange={setCopyColumns}>
             Copy columns (titles, order, colors)
           </Checkbox>

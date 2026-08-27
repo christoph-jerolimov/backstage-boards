@@ -44,9 +44,9 @@ describe('itemMatchesFilter', () => {
         tags: ['bug'],
       }),
     ).toBe(true);
-    expect(
-      itemMatchesFilter(item, { text: 'login', tags: ['missing'] }),
-    ).toBe(false);
+    expect(itemMatchesFilter(item, { text: 'login', tags: ['missing'] })).toBe(
+      false,
+    );
   });
 });
 

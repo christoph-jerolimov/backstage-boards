@@ -1,7 +1,12 @@
 import { useState } from 'react';
 import { Button, Flex, Text, TextAreaField } from '@backstage/ui';
 import { CommentVersion } from '@internal/plugin-boards-common';
-import { formatDate, MarkdownContent, RefDisplay, useAsyncData } from './common';
+import {
+  formatDate,
+  MarkdownContent,
+  RefDisplay,
+  useAsyncData,
+} from './common';
 
 /**
  * Shared markdown display/edit block with retained version history.

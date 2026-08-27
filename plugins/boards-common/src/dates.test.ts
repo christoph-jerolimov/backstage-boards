@@ -65,3 +65,17 @@ describe('relativeDueLabel', () => {
     expect(relativeDueLabel('2026-08-24', now)).toBeUndefined();
   });
 });
+
+describe('defaults to the current date', () => {
+  it('resolves today/tomorrow/friday and states without an explicit now', () => {
+    const today = todayISO();
+    expect(isValidDueDate(today)).toBe(true);
+    expect(isValidDueDate(tomorrowISO())).toBe(true);
+    expect(isValidDueDate(fridayISO())).toBe(true);
+    // the Friday of the current work week is never in the past
+    expect(fridayISO() >= today).toBe(true);
+    expect(dueState(today)).toBe('today');
+    expect(relativeDueLabel(today)).toBe('today');
+    expect(relativeDueLabel(tomorrowISO())).toBe('tomorrow');
+  });
+});

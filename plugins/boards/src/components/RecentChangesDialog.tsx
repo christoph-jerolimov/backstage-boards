@@ -12,12 +12,7 @@ import {
   Text,
 } from '@backstage/ui';
 import { boardsApiRef } from '../api';
-import {
-  changeSummary,
-  formatDate,
-  RefDisplay,
-  useAsyncData,
-} from './common';
+import { changeSummary, formatDate, RefDisplay, useAsyncData } from './common';
 
 /** Board-wide feed of the most recent change records, newest first. */
 export function RecentChangesDialog(props: {

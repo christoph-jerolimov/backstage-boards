@@ -45,9 +45,9 @@ export function PrincipalPicker(props: {
       .filter(
         option =>
           !input ||
-          option.label.toLocaleLowerCase('en-US').includes(
-            input.toLocaleLowerCase('en-US'),
-          ),
+          option.label
+            .toLocaleLowerCase('en-US')
+            .includes(input.toLocaleLowerCase('en-US')),
       )
       .sort((a, b) => a.label.localeCompare(b.label));
     const trimmed = input.trim();

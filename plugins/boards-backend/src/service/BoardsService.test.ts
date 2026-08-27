@@ -34,9 +34,9 @@ describe('BoardsService', () => {
     });
 
     it('rejects empty names', async () => {
-      await expect(
-        service.createBoard(alice, { name: '   ' }),
-      ).rejects.toThrow('name must not be empty');
+      await expect(service.createBoard(alice, { name: '   ' })).rejects.toThrow(
+        'name must not be empty',
+      );
     });
 
     it('rejects anonymous creation', async () => {
@@ -317,7 +317,9 @@ describe('BoardsService', () => {
       expect(items[0].description).toBe('details');
       // creation is the only history; comments are not copied
       const timeline = await service.getTimeline(alice, copy.id, items[0].id);
-      expect(timeline.filter(entry => entry.kind === 'comment')).toHaveLength(0);
+      expect(timeline.filter(entry => entry.kind === 'comment')).toHaveLength(
+        0,
+      );
     });
 
     it('rejects copying items without columns', async () => {
@@ -683,8 +685,7 @@ describe('BoardsService', () => {
       expect(cleared.dueDate).toBeUndefined();
       const timeline = await service.getTimeline(alice, board.id, item.id);
       const dueChanges = timeline.filter(
-        entry =>
-          entry.kind === 'change' && entry.change.field === 'dueDate',
+        entry => entry.kind === 'change' && entry.change.field === 'dueDate',
       );
       expect(dueChanges).toHaveLength(2);
     });
@@ -747,9 +748,9 @@ describe('BoardsService', () => {
       await expect(
         service.updateItem(bob, board.id, item.id, { title: 'Nope' }),
       ).rejects.toThrow(/requires 'write'/);
-      await expect(
-        service.deleteItem(bob, board.id, item.id),
-      ).rejects.toThrow(/requires 'write'/);
+      await expect(service.deleteItem(bob, board.id, item.id)).rejects.toThrow(
+        /requires 'write'/,
+      );
     });
 
     it('records change entries for field updates', async () => {
@@ -841,9 +842,9 @@ describe('BoardsService', () => {
         title: 'Item',
       });
       await service.deleteItem(alice, board.id, item.id);
-      await expect(
-        service.restoreItem(bob, board.id, item.id),
-      ).rejects.toThrow(/requires 'write'/);
+      await expect(service.restoreItem(bob, board.id, item.id)).rejects.toThrow(
+        /requires 'write'/,
+      );
       await expect(service.listArchivedItems(bob, board.id)).rejects.toThrow(
         /requires 'write'/,
       );
@@ -872,7 +873,9 @@ describe('BoardsService', () => {
       expect(purged).toBe(1);
       const remaining = await service.listArchivedItems(alice, board.id);
       expect(remaining.map(entry => entry.title)).toEqual(['New']);
-      expect(await knex('changes').where('item_id', oldItem.id)).toHaveLength(0);
+      expect(await knex('changes').where('item_id', oldItem.id)).toHaveLength(
+        0,
+      );
     });
   });
 
@@ -1032,7 +1035,10 @@ describe('BoardsService', () => {
         board.id,
         item.id,
       );
-      expect(versions.map(v => v.text)).toEqual(['First **draft**', 'Final text']);
+      expect(versions.map(v => v.text)).toEqual([
+        'First **draft**',
+        'Final text',
+      ]);
       expect(versions[0].editedBy).toBe('user:default/alice');
 
       const timeline = await service.getTimeline(alice, board.id, item.id);
@@ -1335,7 +1341,12 @@ describe('BoardsService', () => {
     it('mentioned watchers get exactly one notification, actors none', async () => {
       const { board, item } = await setupWatchedItem();
       await service.setWatchItem(carol, board.id, item.id, true);
-      await service.addComment(alice, board.id, item.id, 'fyi @carol and me @user:default/alice');
+      await service.addComment(
+        alice,
+        board.id,
+        item.id,
+        'fyi @carol and me @user:default/alice',
+      );
       // carol: only the mention; alice: nothing despite self-mention
       expect(notifications.send).toHaveBeenCalledTimes(1);
       const call = notifications.send.mock.calls[0][0];

@@ -2,3 +2,12 @@ dist
 dist-types
 coverage
 .vscode
+
+# Test and coverage output
+e2e-test-report
+test-results
+
+# Tool-managed documents: OpenSpec writes these itself, and reformatting
+# them fights the generator.
+openspec
+.claude
