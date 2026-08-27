@@ -506,6 +506,7 @@ export function BoardPage() {
           board={board}
           item={openItem}
           canWrite={canWrite}
+          tagSuggestions={allTags}
           onClose={() => {
             searchParams.delete('item');
             setSearchParams(searchParams);
