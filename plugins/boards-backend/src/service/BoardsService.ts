@@ -538,6 +538,27 @@ export class BoardsService {
     await this.emitBoardSignal(boardId);
   }
 
+  /** Restores an archived board to its normal listed, writable state. */
+  async unarchiveBoard(
+    principal: BoardsPrincipal,
+    boardId: string,
+  ): Promise<void> {
+    const { board } = await this.requireBoard(principal, boardId, 'read');
+    const level = await this.effectiveLevel(principal, board);
+    if (!levelIncludes(level, 'admin')) {
+      throw new NotAllowedError('Unarchiving a board requires admin access');
+    }
+    if (!board.archived_at) {
+      throw new ConflictError('Board is not archived');
+    }
+    await this.knex('boards').where('id', boardId).update({
+      archived_at: null,
+      archived_by: null,
+      updated_at: now(),
+    });
+    await this.emitBoardSignal(boardId);
+  }
+
   private async cascadeDeleteBoards(boardIds: string[]): Promise<void> {
     if (boardIds.length === 0) {
       return;

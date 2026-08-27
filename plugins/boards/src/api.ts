@@ -39,6 +39,8 @@ export interface BoardsApi {
   deleteBoard(boardId: string): Promise<void>;
   /** Permanently deletes an archived board immediately. */
   hardDeleteBoard(boardId: string): Promise<void>;
+  /** Restores an archived board to its normal state. */
+  unarchiveBoard(boardId: string): Promise<void>;
   duplicateBoard(
     boardId: string,
     options: {
@@ -223,6 +225,10 @@ export class BoardsClient implements BoardsApi {
 
   hardDeleteBoard(boardId: string): Promise<void> {
     return this.request('POST', `/boards/${boardId}/delete-now`);
+  }
+
+  unarchiveBoard(boardId: string): Promise<void> {
+    return this.request('POST', `/boards/${boardId}/unarchive`);
   }
 
   duplicateBoard(

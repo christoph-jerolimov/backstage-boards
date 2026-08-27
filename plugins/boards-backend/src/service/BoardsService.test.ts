@@ -170,6 +170,30 @@ describe('BoardsService', () => {
       );
     });
 
+    it('unarchives a board back to its normal state', async () => {
+      const board = await service.createBoard(alice, {
+        name: 'B',
+        visibility: 'logged-in-write',
+      });
+      await expect(service.unarchiveBoard(alice, board.id)).rejects.toThrow(
+        /not archived/,
+      );
+      await service.deleteBoard(alice, board.id);
+      // non-admins cannot even see the archived board
+      await expect(service.unarchiveBoard(bob, board.id)).rejects.toThrow(
+        /not found/,
+      );
+      await service.unarchiveBoard(alice, board.id);
+      const restored = await service.getBoard(alice, board.id);
+      expect(restored.archivedAt).toBeUndefined();
+      expect(await service.listBoards(alice)).toHaveLength(1);
+      // writable again
+      await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Back in business',
+      });
+    });
+
     it('hard-deletes only archived boards, cascading all data', async () => {
       const board = await service.createBoard(alice, { name: 'B' });
       const item = await service.createItem(alice, board.id, {

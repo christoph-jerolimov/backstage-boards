@@ -250,14 +250,25 @@ export function BoardPageContent(props: {
             description={`It is no longer listed and will be permanently deleted on ${purgeDate}. Until then only admins can view it via this link.`}
             customActions={
               isArchivedAdmin ? (
-                <Button
-                  variant="secondary"
-                  size="small"
-                  destructive
-                  onPress={() => setDeleteOpen(true)}
-                >
-                  Delete now
-                </Button>
+                <Flex gap="2">
+                  <Button
+                    variant="secondary"
+                    size="small"
+                    onPress={() =>
+                      guarded(() => boardsApi.unarchiveBoard(board.id))
+                    }
+                  >
+                    Unarchive
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="small"
+                    destructive
+                    onPress={() => setDeleteOpen(true)}
+                  >
+                    Delete now
+                  </Button>
+                </Flex>
               ) : undefined
             }
           />
