@@ -223,7 +223,23 @@ const itemDescriptions: Migration = {
   },
 };
 
-const migrations: Migration[] = [initial, itemDescriptions];
+const itemArchival: Migration = {
+  name: '20260827_03_item_archival',
+  async up(knex) {
+    await knex.schema.alterTable('items', table => {
+      table.string('archived_at').nullable();
+      table.string('archived_by').nullable();
+    });
+  },
+  async down(knex) {
+    await knex.schema.alterTable('items', table => {
+      table.dropColumn('archived_at');
+      table.dropColumn('archived_by');
+    });
+  },
+};
+
+const migrations: Migration[] = [initial, itemDescriptions, itemArchival];
 
 class BoardsMigrationSource implements Knex.MigrationSource<Migration> {
   async getMigrations(): Promise<Migration[]> {

@@ -73,6 +73,8 @@ export interface BoardsApi {
     target: { columnId: string; position?: number },
   ): Promise<BoardItem>;
   deleteItem(boardId: string, itemId: string): Promise<void>;
+  listArchivedItems(boardId: string): Promise<BoardItem[]>;
+  restoreItem(boardId: string, itemId: string): Promise<BoardItem>;
   setWatchItem(
     boardId: string,
     itemId: string,
@@ -299,6 +301,21 @@ export class BoardsClient implements BoardsApi {
 
   deleteItem(boardId: string, itemId: string): Promise<void> {
     return this.request('DELETE', `/boards/${boardId}/items/${itemId}`);
+  }
+
+  async listArchivedItems(boardId: string): Promise<BoardItem[]> {
+    const result = await this.request<{ items: BoardItem[] }>(
+      'GET',
+      `/boards/${boardId}/items/archived`,
+    );
+    return result.items;
+  }
+
+  restoreItem(boardId: string, itemId: string): Promise<BoardItem> {
+    return this.request(
+      'POST',
+      `/boards/${boardId}/items/${itemId}/restore`,
+    );
   }
 
   setWatchItem(

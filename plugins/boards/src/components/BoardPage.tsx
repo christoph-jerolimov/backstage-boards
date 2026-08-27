@@ -38,6 +38,7 @@ import { TableView } from './TableView';
 import { ItemDrawer } from './ItemDrawer';
 import { ShareDialog } from './ShareDialog';
 import { RecentChangesDialog } from './RecentChangesDialog';
+import { ArchivedItemsDialog } from './ArchivedItemsDialog';
 import { WatchButton } from './WatchButton';
 
 function StarIcon(props: { filled: boolean }) {
@@ -65,6 +66,7 @@ export function BoardPage() {
   const [filterLabels, setFilterLabels] = useState<string[]>([]);
   const [shareOpen, setShareOpen] = useState(false);
   const [changesOpen, setChangesOpen] = useState(false);
+  const [archivedOpen, setArchivedOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editEntity, setEditEntity] = useState(false);
   const [error, setError] = useState<string | undefined>();
@@ -303,6 +305,11 @@ export function BoardPage() {
               <MenuItem onAction={() => setChangesOpen(true)}>
                 Recent changes…
               </MenuItem>
+              {canWrite && (
+                <MenuItem onAction={() => setArchivedOpen(true)}>
+                  Archived items…
+                </MenuItem>
+              )}
               {isAdmin && (
                 <MenuItem onAction={() => setShareOpen(true)}>Share…</MenuItem>
               )}
@@ -451,6 +458,14 @@ export function BoardPage() {
         isOpen={changesOpen}
         onOpenChange={setChangesOpen}
         onOpenItem={actions.openItem}
+      />
+
+      <ArchivedItemsDialog
+        boardId={board.id}
+        canWrite={canWrite}
+        isOpen={archivedOpen}
+        onOpenChange={setArchivedOpen}
+        onChanged={refreshAll}
       />
 
       <Dialog isOpen={deleteOpen} onOpenChange={setDeleteOpen}>

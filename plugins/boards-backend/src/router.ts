@@ -253,6 +253,24 @@ export async function createRouter(
     });
   });
 
+  router.get('/boards/:boardId/items/archived', async (req, res) => {
+    const principal = await principalOf(req);
+    res.json({
+      items: await service.listArchivedItems(principal, req.params.boardId),
+    });
+  });
+
+  router.post('/boards/:boardId/items/:itemId/restore', async (req, res) => {
+    const principal = await principalOf(req);
+    res.json(
+      await service.restoreItem(
+        principal,
+        req.params.boardId,
+        req.params.itemId,
+      ),
+    );
+  });
+
   router.post('/boards/:boardId/items', async (req, res) => {
     const principal = await principalOf(req);
     if (!req.body.columnId) {

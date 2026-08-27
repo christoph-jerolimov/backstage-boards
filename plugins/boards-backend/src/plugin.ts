@@ -24,6 +24,7 @@ export const boardsPlugin = createBackendPlugin({
       deps: {
         logger: coreServices.logger,
         database: coreServices.database,
+        scheduler: coreServices.scheduler,
         httpRouter: coreServices.httpRouter,
         httpAuth: coreServices.httpAuth,
         auth: coreServices.auth,
@@ -35,6 +36,7 @@ export const boardsPlugin = createBackendPlugin({
       async init({
         logger,
         database,
+        scheduler,
         httpRouter,
         httpAuth,
         auth,
@@ -63,6 +65,19 @@ export const boardsPlugin = createBackendPlugin({
         httpRouter.addAuthPolicy({ path: '/', allow: 'unauthenticated' });
 
         registerActions({ actionsRegistry, service, auth, userInfo });
+
+        const RETENTION_DAYS = 30;
+        await scheduler.scheduleTask({
+          id: 'boards-purge-archived-items',
+          frequency: { hours: 6 },
+          timeout: { minutes: 5 },
+          initialDelay: { minutes: 1 },
+          fn: async () => {
+            await service.purgeArchivedItems(
+              new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000),
+            );
+          },
+        });
       },
     });
   },
