@@ -415,6 +415,79 @@ describe('BoardsService', () => {
     });
   });
 
+  describe('item description', () => {
+    it('keeps versions and records a change on each edit', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const item = await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Item',
+      });
+      expect(item.description).toBeUndefined();
+      expect(item.descriptionVersionCount).toBe(0);
+
+      const withDescription = await service.updateItem(
+        alice,
+        board.id,
+        item.id,
+        { description: 'First **draft**' },
+      );
+      expect(withDescription.description).toBe('First **draft**');
+      expect(withDescription.descriptionVersionCount).toBe(1);
+
+      const edited = await service.updateItem(alice, board.id, item.id, {
+        description: 'Final text',
+      });
+      expect(edited.description).toBe('Final text');
+      expect(edited.descriptionVersionCount).toBe(2);
+
+      const versions = await service.listDescriptionVersions(
+        alice,
+        board.id,
+        item.id,
+      );
+      expect(versions.map(v => v.text)).toEqual(['First **draft**', 'Final text']);
+      expect(versions[0].editedBy).toBe('user:default/alice');
+
+      const timeline = await service.getTimeline(alice, board.id, item.id);
+      const descriptionChanges = timeline.filter(
+        e => e.kind === 'change' && e.change.field === 'description',
+      );
+      expect(descriptionChanges).toHaveLength(2);
+    });
+
+    it('skips unchanged descriptions and supports clearing', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const item = await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Item',
+      });
+      await service.updateItem(alice, board.id, item.id, {
+        description: 'Text',
+      });
+      const same = await service.updateItem(alice, board.id, item.id, {
+        description: 'Text',
+      });
+      expect(same.descriptionVersionCount).toBe(1);
+      const cleared = await service.updateItem(alice, board.id, item.id, {
+        description: '',
+      });
+      expect(cleared.description).toBeUndefined();
+      expect(cleared.descriptionVersionCount).toBe(2);
+    });
+
+    it('rejects description edits on external items by users', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const item = await service.createItem(syncService, board.id, {
+        columnId: board.columns[0].id,
+        title: 'PR #1',
+        externalManager: 'github',
+      });
+      await expect(
+        service.updateItem(alice, board.id, item.id, { description: 'x' }),
+      ).rejects.toThrow(/read-only/);
+    });
+  });
+
   describe('externally managed items', () => {
     it('only service callers may create external items', async () => {
       const board = await service.createBoard(alice, {

@@ -75,6 +75,7 @@ type ItemRow = {
   updated_at: string;
   creator_ref: string | null;
   external_manager: string | null;
+  description: string | null;
 };
 
 type ChangeRow = {
@@ -659,6 +660,15 @@ export class BoardsService {
           .select('target_id')
       : [];
     const watchedIds = new Set(watches.map(row => row.target_id));
+    const versionCounts: Array<{ item_id: string; count: number | string }> =
+      await this.knex('item_description_versions')
+        .whereIn('item_id', ids)
+        .groupBy('item_id')
+        .select('item_id')
+        .count({ count: '*' });
+    const versionCountById = new Map(
+      versionCounts.map(row => [row.item_id, Number(row.count)]),
+    );
 
     return rows.map(row => ({
       id: row.id,
@@ -672,6 +682,8 @@ export class BoardsService {
       updatedAt: row.updated_at,
       creatorRef: row.creator_ref ?? undefined,
       externalManager: row.external_manager ?? undefined,
+      description: row.description ?? undefined,
+      descriptionVersionCount: versionCountById.get(row.id) ?? 0,
       assignees: assignees
         .filter(a => a.item_id === row.id)
         .map(a => a.assignee_ref),
@@ -896,6 +908,16 @@ export class BoardsService {
         });
       }
     }
+    let descriptionChanged = false;
+    if (update.description !== undefined) {
+      const next = update.description;
+      const prev = row.description ?? '';
+      if (next !== prev) {
+        descriptionChanged = true;
+        patch.description = next === '' ? null : next;
+        changes.push({ field: 'description', oldValue: undefined, newValue: undefined });
+      }
+    }
     if (update.assignees !== undefined) {
       this.validateActorRefs(update.assignees);
       const next = [...new Set(update.assignees)].sort();
@@ -924,6 +946,15 @@ export class BoardsService {
     if (changes.length > 0) {
       await this.knex.transaction(async trx => {
         await trx('items').where('id', itemId).update(patch);
+        if (descriptionChanged) {
+          await trx('item_description_versions').insert({
+            id: uuid(),
+            item_id: itemId,
+            text: update.description ?? '',
+            edited_by: actor,
+            edited_at: timestamp,
+          });
+        }
         await this.writeAssociations(trx, itemId, update as NewItem);
         for (const change of changes) {
           await this.recordChange(trx, {
@@ -1198,6 +1229,30 @@ export class BoardsService {
     return versions.map(version => ({
       id: version.id,
       commentId: version.comment_id,
+      text: version.text,
+      editedBy: version.edited_by,
+      editedAt: version.edited_at,
+    }));
+  }
+
+  async listDescriptionVersions(
+    principal: BoardsPrincipal,
+    boardId: string,
+    itemId: string,
+  ): Promise<CommentVersion[]> {
+    await this.requireBoard(principal, boardId, 'read');
+    const item = await this.knex('items')
+      .where({ id: itemId, board_id: boardId })
+      .first();
+    if (!item) {
+      throw new NotFoundError(`Item ${itemId} not found`);
+    }
+    const versions = await this.knex('item_description_versions')
+      .where('item_id', itemId)
+      .orderBy('edited_at');
+    return versions.map(version => ({
+      id: version.id,
+      commentId: itemId,
       text: version.text,
       editedBy: version.edited_by,
       editedAt: version.edited_at,

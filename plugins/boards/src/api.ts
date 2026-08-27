@@ -101,6 +101,10 @@ export interface BoardsApi {
     itemId: string,
     commentId: string,
   ): Promise<CommentVersion[]>;
+  listDescriptionVersions(
+    boardId: string,
+    itemId: string,
+  ): Promise<CommentVersion[]>;
   getTimeline(boardId: string, itemId: string): Promise<TimelineEntry[]>;
 }
 
@@ -361,6 +365,17 @@ export class BoardsClient implements BoardsApi {
     const result = await this.request<{ versions: CommentVersion[] }>(
       'GET',
       `/boards/${boardId}/items/${itemId}/comments/${commentId}/versions`,
+    );
+    return result.versions;
+  }
+
+  async listDescriptionVersions(
+    boardId: string,
+    itemId: string,
+  ): Promise<CommentVersion[]> {
+    const result = await this.request<{ versions: CommentVersion[] }>(
+      'GET',
+      `/boards/${boardId}/items/${itemId}/description/versions`,
     );
     return result.versions;
   }

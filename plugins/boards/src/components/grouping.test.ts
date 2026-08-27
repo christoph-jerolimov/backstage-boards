@@ -13,6 +13,7 @@ function item(id: string, assignees: string[]): BoardItem {
     updatedBy: 'user:default/alice',
     updatedAt: '2026-01-01T00:00:00Z',
     assignees,
+    descriptionVersionCount: 0,
     labels: {},
     tags: [],
   };
