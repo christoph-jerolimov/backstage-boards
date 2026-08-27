@@ -62,5 +62,19 @@ export default defineConfig({
 
   outputDir: 'node_modules/.cache/e2e-test-results',
 
-  projects: generateProjects(), // Find all packages with e2e-test folders
+  // Find all packages with e2e-test folders. Environments without a Chrome
+  // channel install (e.g. containers with a preinstalled Chromium) can point
+  // PLAYWRIGHT_CHROMIUM_PATH at a browser binary instead.
+  projects: generateProjects().map(project =>
+    process.env.PLAYWRIGHT_CHROMIUM_PATH
+      ? {
+          ...project,
+          use: {
+            launchOptions: {
+              executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH,
+            },
+          },
+        }
+      : project,
+  ),
 });
