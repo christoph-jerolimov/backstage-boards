@@ -1,0 +1,64 @@
+## Purpose
+
+Defines the work items on a board — their fields, lifecycle, read-only externally-managed items, and how items are displayed in board (kanban) and table views with grouping.
+
+## ADDED Requirements
+
+### Requirement: Item fields
+An item SHALL belong to exactly one board and one of its columns (the item's status). An item SHALL have: a required title; audit fields (created by, created at, updated by, updated at); labels as key-value pairs; tags as a flat list of strings; an optional creator; and one or more assignees. Creator and assignees SHALL be entity refs (e.g. `user:default/christoph`, `group:default/team-a`) or free-text identities using the `text:` prefix (e.g. `text:External Contractor`).
+
+#### Scenario: Create an item
+- **WHEN** a user with write access adds an item with title "Fix login bug" to the "Todo" column
+- **THEN** the item is persisted with status "Todo", created by/created at set from the caller identity and current time, and appears in the board immediately
+
+#### Scenario: Title is required
+- **WHEN** a user attempts to create an item with an empty title
+- **THEN** the request is rejected with a validation error
+
+#### Scenario: Text-prefixed assignee
+- **WHEN** a user assigns an item to `text:Jane (agency)`
+- **THEN** the assignee is stored and displayed as plain text without a catalog link, while catalog-ref assignees on the same item render as entity links
+
+### Requirement: Update, move, and delete items
+Users with write access SHALL be able to update item fields inline, move items between columns and reorder them within a column (in the board view via drag and drop or an equivalent accessible control), and delete items. Moving an item to another column SHALL update its status.
+
+#### Scenario: Move an item between columns
+- **WHEN** a user with write access moves an item from "Todo" to "In Progress"
+- **THEN** the item's status becomes "In Progress", its position in the target column is persisted, and the change is recorded in the item's history
+
+#### Scenario: Inline title edit
+- **WHEN** a user with write access edits an item's title inline and confirms
+- **THEN** the new title is saved without leaving the current view
+
+#### Scenario: Delete an item
+- **WHEN** a user with write access deletes an item
+- **THEN** the item no longer appears in any view of the board
+
+### Requirement: Externally managed read-only items
+An item SHALL support an external-management marker identifying the managing system (e.g. a GitHub or Jira sync module). Items marked as externally managed SHALL be read-only in the UI for all users: their fields cannot be edited, moved, or deleted through the normal user flows, and the UI SHALL visibly mark them as externally managed. Mutations to such items SHALL only be accepted from the managing integration (via the REST API or actions using a service identity).
+
+#### Scenario: External item is read-only in the UI
+- **WHEN** a user with write access views an item marked as managed by an external system
+- **THEN** edit, move, and delete controls are disabled or hidden and the item shows an "externally managed" indicator
+
+#### Scenario: User mutation of an external item is rejected
+- **WHEN** a user attempts to update an externally managed item through the item update endpoint
+- **THEN** the backend rejects the request
+
+### Requirement: Board view and table view
+All items of a board SHALL be viewable as a kanban board (one lane per column, items as cards) and as a table (items as rows with their fields as columns). The user SHALL be able to switch between the two views, and the chosen view SHALL not change the underlying data.
+
+#### Scenario: Switch views
+- **WHEN** a user switches from board view to table view
+- **THEN** the same set of items is shown as table rows including title, status, assignees, labels, and tags
+
+### Requirement: Group items by assignee
+Both the board view and the table view SHALL offer an option to group items by assignee. An item with multiple assignees SHALL appear in each of its assignees' groups; an item with no assignee SHALL appear in an "Unassigned" group.
+
+#### Scenario: Group board view by assignee
+- **WHEN** a user enables group-by-assignee in the board view
+- **THEN** items are grouped into per-assignee sections (swimlanes) within each column, including an "Unassigned" section
+
+#### Scenario: Multi-assignee item appears in each group
+- **WHEN** an item has two assignees and grouping by assignee is enabled
+- **THEN** the item is visible under both assignees' groups

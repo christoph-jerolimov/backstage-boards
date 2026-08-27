@@ -1,0 +1,65 @@
+import {
+  coreServices,
+  createBackendPlugin,
+} from '@backstage/backend-plugin-api';
+import { Knex } from 'knex';
+import { actionsRegistryServiceRef } from '@backstage/backend-plugin-api/alpha';
+import { notificationService } from '@backstage/plugin-notifications-node';
+import { applyDatabaseMigrations } from './database/migrations';
+import { BoardsService } from './service/BoardsService';
+import { createRouter } from './router';
+import { registerActions } from './actions';
+
+/**
+ * The boards backend plugin: shareable kanban boards with items, comments,
+ * change history, watching, and actions-registry actions.
+ *
+ * @public
+ */
+export const boardsPlugin = createBackendPlugin({
+  pluginId: 'boards',
+  register(env) {
+    env.registerInit({
+      deps: {
+        logger: coreServices.logger,
+        database: coreServices.database,
+        httpRouter: coreServices.httpRouter,
+        httpAuth: coreServices.httpAuth,
+        auth: coreServices.auth,
+        userInfo: coreServices.userInfo,
+        notifications: notificationService,
+        actionsRegistry: actionsRegistryServiceRef,
+      },
+      async init({
+        logger,
+        database,
+        httpRouter,
+        httpAuth,
+        auth,
+        userInfo,
+        notifications,
+        actionsRegistry,
+      }) {
+        // the framework bundles its own copy of the knex types
+        const knex = (await database.getClient()) as unknown as Knex;
+        await applyDatabaseMigrations(knex);
+
+        const service = new BoardsService({
+          knex,
+          logger,
+          notifications,
+        });
+
+        httpRouter.use(
+          await createRouter({ service, httpAuth, auth, userInfo, logger }),
+        );
+        // Unauthenticated requests must reach the router so that boards with
+        // `public-read`/`public-write` visibility work without a login; the
+        // access resolver enforces visibility on every request.
+        httpRouter.addAuthPolicy({ path: '/', allow: 'unauthenticated' });
+
+        registerActions({ actionsRegistry, service, auth, userInfo });
+      },
+    });
+  },
+});

@@ -66,6 +66,9 @@ backend.add(import('@backstage/plugin-user-settings-backend'));
 backend.add(import('@backstage/plugin-notifications-backend'));
 backend.add(import('@backstage/plugin-signals-backend'));
 
+// boards plugin
+backend.add(import('@internal/plugin-boards-backend'));
+
 // mcp actions plugin
 backend.add(import('@backstage/plugin-mcp-actions-backend'));
 

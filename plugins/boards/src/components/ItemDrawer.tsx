@@ -1,0 +1,514 @@
+import { useState } from 'react';
+import {
+  Dialog as AriaDialog,
+  Modal,
+  ModalOverlay,
+} from 'react-aria-components';
+import { useApi } from '@backstage/frontend-plugin-api';
+import {
+  Button,
+  ButtonIcon,
+  Flex,
+  Select,
+  Switch,
+  Text,
+  TextAreaField,
+  TextField,
+} from '@backstage/ui';
+import {
+  BoardItem,
+  BoardWithContext,
+  ItemComment,
+  TimelineEntry,
+} from '@internal/plugin-boards-common';
+import { boardsApiRef } from '../api';
+import {
+  formatDate,
+  InlineEdit,
+  MarkdownContent,
+  RefChips,
+  RefDisplay,
+  useAsyncData,
+} from './common';
+
+function CloseIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden>
+      <path
+        d="M6 6l12 12M18 6L6 18"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function parseLabels(text: string): Record<string, string> {
+  const labels: Record<string, string> = {};
+  for (const pair of text.split(',')) {
+    const trimmed = pair.trim();
+    if (!trimmed) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq > 0) {
+      labels[trimmed.slice(0, eq).trim()] = trimmed.slice(eq + 1).trim();
+    }
+  }
+  return labels;
+}
+
+function parseList(text: string): string[] {
+  return text
+    .split(',')
+    .map(entry => entry.trim())
+    .filter(Boolean);
+}
+
+function CommentBlock(props: {
+  boardId: string;
+  itemId: string;
+  comment: ItemComment;
+  canWrite: boolean;
+  onChanged: () => Promise<void>;
+}) {
+  const { boardId, itemId, comment, canWrite, onChanged } = props;
+  const boardsApi = useApi(boardsApiRef);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(comment.text);
+  const [showVersions, setShowVersions] = useState(false);
+  const { data: versions, refresh: refreshVersions } = useAsyncData(
+    () =>
+      showVersions
+        ? boardsApi.listCommentVersions(boardId, itemId, comment.id)
+        : Promise.resolve(undefined),
+    [boardsApi, boardId, itemId, comment.id, showVersions, comment.versionCount],
+  );
+
+  const save = async () => {
+    const text = draft.trim();
+    setEditing(false);
+    if (text && text !== comment.text) {
+      await boardsApi.updateComment(boardId, itemId, comment.id, text);
+      await onChanged();
+      await refreshVersions();
+    }
+  };
+
+  return (
+    <div
+      style={{
+        border: '1px solid var(--bui-border, #ddd)',
+        borderRadius: 8,
+        padding: 8,
+      }}
+    >
+      <Flex align="center" gap="2" justify="between">
+        <Text variant="body-small">
+          <RefDisplay refString={comment.authorRef} />{' '}
+          commented {formatDate(comment.createdAt)}
+          {comment.versionCount > 1 ? ' (edited)' : ''}
+        </Text>
+        <Flex gap="1">
+          {comment.versionCount > 1 && (
+            <Button
+              variant="tertiary"
+              size="small"
+              onPress={() => setShowVersions(!showVersions)}
+            >
+              {showVersions ? 'Hide history' : 'History'}
+            </Button>
+          )}
+          {canWrite && !editing && (
+            <Button
+              variant="tertiary"
+              size="small"
+              onPress={() => {
+                setDraft(comment.text);
+                setEditing(true);
+              }}
+            >
+              Edit
+            </Button>
+          )}
+        </Flex>
+      </Flex>
+      {editing ? (
+        <Flex direction="column" gap="2">
+          <TextAreaField
+            aria-label="Edit comment"
+            value={draft}
+            onChange={setDraft}
+            // eslint-disable-next-line jsx-a11y/no-autofocus -- focus moves into a field the user just revealed
+            autoFocus
+          />
+          <Flex gap="2">
+            <Button variant="secondary" size="small" onPress={() => setEditing(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" size="small" onPress={save}>
+              Save
+            </Button>
+          </Flex>
+        </Flex>
+      ) : (
+        <MarkdownContent text={comment.text} />
+      )}
+      {showVersions && versions && (
+        <div style={{ marginTop: 8, paddingLeft: 8, borderLeft: '2px solid var(--bui-border, #ddd)' }}>
+          {versions.map(version => (
+            <div key={version.id}>
+              <Text variant="body-x-small" color="secondary">
+                {formatDate(version.editedAt)} by{' '}
+                <RefDisplay refString={version.editedBy} />
+              </Text>
+              <MarkdownContent text={version.text} />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Timeline(props: {
+  boardId: string;
+  itemId: string;
+  entries: TimelineEntry[];
+  canWrite: boolean;
+  onChanged: () => Promise<void>;
+}) {
+  return (
+    <Flex direction="column" gap="2">
+      {props.entries.map((entry, index) => {
+        if (entry.kind === 'comment') {
+          return (
+            <CommentBlock
+              key={`comment-${entry.comment.id}`}
+              boardId={props.boardId}
+              itemId={props.itemId}
+              comment={entry.comment}
+              canWrite={props.canWrite}
+              onChanged={props.onChanged}
+            />
+          );
+        }
+        const { change } = entry;
+        let summary: string;
+        if (change.type === 'created') {
+          summary = 'created this item';
+        } else if (change.type === 'moved') {
+          summary = `moved this item from “${String(change.oldValue)}” to “${String(change.newValue)}”`;
+        } else {
+          summary = `changed ${change.field}: ${JSON.stringify(change.oldValue) ?? '(empty)'} → ${JSON.stringify(change.newValue) ?? '(empty)'}`;
+        }
+        return (
+          <Text key={`change-${index}`} variant="body-small" color="secondary">
+            <RefDisplay refString={change.actorRef} /> {summary} ·{' '}
+            {formatDate(change.at)}
+          </Text>
+        );
+      })}
+    </Flex>
+  );
+}
+
+export function ItemDrawer(props: {
+  board: BoardWithContext;
+  item: BoardItem;
+  canWrite: boolean;
+  onClose: () => void;
+  onChanged: () => Promise<void>;
+}) {
+  const { board, item, canWrite, onClose, onChanged } = props;
+  const boardsApi = useApi(boardsApiRef);
+  const readonly = !canWrite || !!item.externalManager;
+  const [newComment, setNewComment] = useState('');
+  const [editAssignees, setEditAssignees] = useState(false);
+  const [editLabels, setEditLabels] = useState(false);
+  const [editTags, setEditTags] = useState(false);
+
+  const {
+    data: timeline,
+    refresh: refreshTimeline,
+  } = useAsyncData(
+    () => boardsApi.getTimeline(board.id, item.id),
+    [boardsApi, board.id, item.id, item.updatedAt],
+  );
+
+  const changed = async () => {
+    await onChanged();
+    await refreshTimeline();
+  };
+
+  const addComment = async () => {
+    const text = newComment.trim();
+    if (!text) return;
+    await boardsApi.addComment(board.id, item.id, text);
+    setNewComment('');
+    await changed();
+  };
+
+  return (
+    <ModalOverlay
+      isOpen
+      onOpenChange={open => {
+        if (!open) onClose();
+      }}
+      isDismissable
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 1000,
+        background: 'rgba(0,0,0,0.35)',
+      }}
+    >
+      <Modal
+        style={{
+          position: 'fixed',
+          top: 0,
+          right: 0,
+          bottom: 0,
+          width: 'min(560px, 90vw)',
+          background: 'var(--bui-bg-surface-1, #fff)',
+          boxShadow: '-4px 0 16px rgba(0,0,0,0.2)',
+          overflowY: 'auto',
+        }}
+      >
+        <AriaDialog
+          aria-label={`Item ${item.title}`}
+          style={{ outline: 'none', padding: 16 }}
+        >
+          <Flex direction="column" gap="3">
+            <Flex align="center" justify="between" gap="2">
+              <InlineEdit
+                value={item.title}
+                canEdit={!readonly}
+                ariaLabel="item title"
+                onCommit={async title => {
+                  await boardsApi.updateItem(board.id, item.id, { title });
+                  await changed();
+                }}
+                display={
+                  <Text variant="title-small" as="h2">
+                    {item.title}
+                  </Text>
+                }
+              />
+              <ButtonIcon
+                aria-label="Close item details"
+                variant="tertiary"
+                icon={<CloseIcon />}
+                onPress={onClose}
+              />
+            </Flex>
+
+            {item.externalManager && (
+              <Text variant="body-small" color="secondary">
+                This item is managed by “{item.externalManager}” and read-only.
+              </Text>
+            )}
+
+            <Select
+              label="Status"
+              isDisabled={readonly}
+              options={board.columns.map(column => ({
+                value: column.id,
+                label: column.title,
+              }))}
+              selectedKey={item.columnId}
+              onSelectionChange={async key => {
+                if (key && String(key) !== item.columnId) {
+                  await boardsApi.moveItem(board.id, item.id, {
+                    columnId: String(key),
+                  });
+                  await changed();
+                }
+              }}
+            />
+
+            <div>
+              <Text variant="body-small" color="secondary">
+                Assignees
+              </Text>
+              {editAssignees ? (
+                <TextField
+                  aria-label="Assignees (comma separated refs)"
+                  description="Comma-separated: user:default/jane, group:default/team-a, text:External"
+                  defaultValue={item.assignees.join(', ')}
+                  // eslint-disable-next-line jsx-a11y/no-autofocus -- focus moves into a field the user just revealed
+                  autoFocus
+                  onBlur={async event => {
+                    setEditAssignees(false);
+                    await boardsApi.updateItem(board.id, item.id, {
+                      assignees: parseList(event.target.value),
+                    });
+                    await changed();
+                  }}
+                />
+              ) : (
+                <Flex align="center" gap="2">
+                  <RefChips refs={item.assignees} />
+                  {!readonly && (
+                    <Button
+                      variant="tertiary"
+                      size="small"
+                      onPress={() => setEditAssignees(true)}
+                    >
+                      {item.assignees.length > 0 ? 'Edit' : 'Assign'}
+                    </Button>
+                  )}
+                </Flex>
+              )}
+            </div>
+
+            <div>
+              <Text variant="body-small" color="secondary">
+                Labels
+              </Text>
+              {editLabels ? (
+                <TextField
+                  aria-label="Labels (key=value, comma separated)"
+                  description="Comma-separated key=value pairs, e.g. priority=high, env=prod"
+                  defaultValue={Object.entries(item.labels)
+                    .map(([key, value]) => `${key}=${value}`)
+                    .join(', ')}
+                  // eslint-disable-next-line jsx-a11y/no-autofocus -- focus moves into a field the user just revealed
+                  autoFocus
+                  onBlur={async event => {
+                    setEditLabels(false);
+                    await boardsApi.updateItem(board.id, item.id, {
+                      labels: parseLabels(event.target.value),
+                    });
+                    await changed();
+                  }}
+                />
+              ) : (
+                <Flex align="center" gap="2">
+                  <Text variant="body-small">
+                    {Object.entries(item.labels)
+                      .map(([key, value]) => `${key}=${value}`)
+                      .join(', ') || '—'}
+                  </Text>
+                  {!readonly && (
+                    <Button
+                      variant="tertiary"
+                      size="small"
+                      onPress={() => setEditLabels(true)}
+                    >
+                      Edit
+                    </Button>
+                  )}
+                </Flex>
+              )}
+            </div>
+
+            <div>
+              <Text variant="body-small" color="secondary">
+                Tags
+              </Text>
+              {editTags ? (
+                <TextField
+                  aria-label="Tags (comma separated)"
+                  defaultValue={item.tags.join(', ')}
+                  // eslint-disable-next-line jsx-a11y/no-autofocus -- focus moves into a field the user just revealed
+                  autoFocus
+                  onBlur={async event => {
+                    setEditTags(false);
+                    await boardsApi.updateItem(board.id, item.id, {
+                      tags: parseList(event.target.value),
+                    });
+                    await changed();
+                  }}
+                />
+              ) : (
+                <Flex align="center" gap="2">
+                  <Text variant="body-small">
+                    {item.tags.map(tag => `#${tag}`).join(' ') || '—'}
+                  </Text>
+                  {!readonly && (
+                    <Button
+                      variant="tertiary"
+                      size="small"
+                      onPress={() => setEditTags(true)}
+                    >
+                      Edit
+                    </Button>
+                  )}
+                </Flex>
+              )}
+            </div>
+
+            <Flex direction="column" gap="1">
+              <Text variant="body-x-small" color="secondary">
+                Created by <RefDisplay refString={item.createdBy} /> at{' '}
+                {formatDate(item.createdAt)}
+              </Text>
+              {item.creatorRef && (
+                <Text variant="body-x-small" color="secondary">
+                  Creator: <RefDisplay refString={item.creatorRef} />
+                </Text>
+              )}
+              <Text variant="body-x-small" color="secondary">
+                Updated by <RefDisplay refString={item.updatedBy} /> at{' '}
+                {formatDate(item.updatedAt)}
+              </Text>
+            </Flex>
+
+            <Flex align="center" gap="2" justify="between">
+              <Switch
+                label="Watch this item"
+                isSelected={!!item.watching}
+                onChange={async watching => {
+                  await boardsApi.setWatchItem(board.id, item.id, watching);
+                  await onChanged();
+                }}
+              />
+              {!readonly && (
+                <Button
+                  variant="secondary"
+                  size="small"
+                  destructive
+                  onPress={async () => {
+                    await boardsApi.deleteItem(board.id, item.id);
+                    onClose();
+                    await onChanged();
+                  }}
+                >
+                  Delete item
+                </Button>
+              )}
+            </Flex>
+
+            <Text variant="body-medium" weight="bold" as="h3">
+              Activity
+            </Text>
+            {timeline && (
+              <Timeline
+                boardId={board.id}
+                itemId={item.id}
+                entries={timeline}
+                canWrite={canWrite}
+                onChanged={changed}
+              />
+            )}
+            {canWrite && (
+              <Flex direction="column" gap="2">
+                <TextAreaField
+                  aria-label="New comment"
+                  placeholder="Write a comment… (markdown subset, entity refs like system:default/example auto-link)"
+                  value={newComment}
+                  onChange={setNewComment}
+                />
+                <div>
+                  <Button variant="primary" size="small" onPress={addComment}>
+                    Comment
+                  </Button>
+                </div>
+              </Flex>
+            )}
+          </Flex>
+        </AriaDialog>
+      </Modal>
+    </ModalOverlay>
+  );
+}
