@@ -164,6 +164,8 @@ export function BoardPage() {
         ),
       setItemDueDate: (itemId, dueDate) =>
         guarded(() => boardsApi.updateItem(boardId, itemId, { dueDate })),
+      setAssignees: (itemId, assignees) =>
+        guarded(() => boardsApi.updateItem(boardId, itemId, { assignees })),
       deleteItem: itemId =>
         guarded(() => boardsApi.deleteItem(boardId, itemId)),
       openItem: itemId => {
