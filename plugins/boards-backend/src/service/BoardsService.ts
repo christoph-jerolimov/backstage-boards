@@ -600,13 +600,22 @@ export class BoardsService {
   async duplicateBoard(
     principal: BoardsPrincipal,
     boardId: string,
-    options: { name?: string; copyColumns: boolean; copyPermissions: boolean },
+    options: {
+      name?: string;
+      copyColumns: boolean;
+      copyItems?: boolean;
+      copyEntities?: boolean;
+      copyPermissions: boolean;
+    },
   ): Promise<BoardWithContext> {
     const { board, level } = await this.requireBoard(principal, boardId, 'read');
     if (options.copyPermissions && !levelIncludes(level, 'admin')) {
       throw new NotAllowedError(
         'Copying share settings requires admin access to the source board',
       );
+    }
+    if (options.copyItems && !options.copyColumns) {
+      throw new InputError('Items can only be copied together with columns');
     }
     if (principal.type === 'anonymous') {
       throw new NotAllowedError('Duplicating a board requires authentication');
@@ -618,6 +627,9 @@ export class BoardsService {
       name: options.name?.trim() || `${board.name} (copy)`,
       columns: options.copyColumns
         ? sourceColumns.map(column => column.title)
+        : undefined,
+      entityRefs: options.copyEntities
+        ? (await this.entityRefsByBoard([boardId])).get(boardId)
         : undefined,
       visibility: options.copyPermissions ? board.visibility : 'private',
     });
@@ -633,6 +645,15 @@ export class BoardsService {
             .where('id', newColumns[index].id)
             .update({ color });
         }
+      }
+      if (options.copyItems) {
+        await this.copyItemsInto(
+          principal,
+          boardId,
+          created.id,
+          sourceColumns,
+          newColumns,
+        );
       }
     }
     if (options.copyPermissions) {
@@ -655,6 +676,87 @@ export class BoardsService {
       }
     }
     return this.getBoard(principal, created.id);
+  }
+
+  /**
+   * Copies the source board's active items into the duplicated board.
+   * Columns are matched by order; comments, history, watches, and
+   * external-manager flags are intentionally not copied.
+   */
+  private async copyItemsInto(
+    principal: BoardsPrincipal,
+    sourceBoardId: string,
+    targetBoardId: string,
+    sourceColumns: ColumnRow[],
+    targetColumns: ColumnRow[],
+  ): Promise<void> {
+    const actor = actorRef(principal);
+    const timestamp = now();
+    const items = await this.knex<ItemRow>('items')
+      .where('board_id', sourceBoardId)
+      .whereNull('archived_at');
+    const itemIds = items.map(item => item.id);
+    const [assignees, labels, tags] = await Promise.all([
+      this.knex('item_assignees').whereIn('item_id', itemIds),
+      this.knex('item_labels').whereIn('item_id', itemIds),
+      this.knex('item_tags').whereIn('item_id', itemIds),
+    ]);
+    const columnIdMap = new Map<string, string>();
+    sourceColumns.forEach((column, index) => {
+      const target = targetColumns[index];
+      if (target) {
+        columnIdMap.set(column.id, target.id);
+      }
+    });
+    await this.knex.transaction(async trx => {
+      for (const item of items) {
+        const targetColumnId = columnIdMap.get(item.column_id);
+        if (!targetColumnId) {
+          continue;
+        }
+        const newId = uuid();
+        await trx<ItemRow>('items').insert({
+          id: newId,
+          board_id: targetBoardId,
+          column_id: targetColumnId,
+          position: item.position,
+          title: item.title,
+          created_by: actor,
+          created_at: timestamp,
+          updated_by: actor,
+          updated_at: timestamp,
+          creator_ref: item.creator_ref,
+          external_manager: null,
+          description: item.description,
+          archived_at: null,
+          archived_by: null,
+          due_date: item.due_date,
+        });
+        const links = (rows: Array<Record<string, unknown>>) =>
+          rows
+            .filter(row => row.item_id === item.id)
+            .map(row => ({ ...row, item_id: newId }));
+        const newAssignees = links(assignees);
+        if (newAssignees.length > 0) {
+          await trx('item_assignees').insert(newAssignees);
+        }
+        const newLabels = links(labels);
+        if (newLabels.length > 0) {
+          await trx('item_labels').insert(newLabels);
+        }
+        const newTags = links(tags);
+        if (newTags.length > 0) {
+          await trx('item_tags').insert(newTags);
+        }
+        await this.recordChange(trx, {
+          itemId: newId,
+          boardId: targetBoardId,
+          actor,
+          type: 'created',
+          newValue: item.title,
+        });
+      }
+    });
   }
 
   // ----------------------------------------------------------- permissions

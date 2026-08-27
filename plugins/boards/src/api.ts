@@ -41,7 +41,13 @@ export interface BoardsApi {
   hardDeleteBoard(boardId: string): Promise<void>;
   duplicateBoard(
     boardId: string,
-    options: { name?: string; copyColumns: boolean; copyPermissions: boolean },
+    options: {
+      name?: string;
+      copyColumns: boolean;
+      copyItems?: boolean;
+      copyEntities?: boolean;
+      copyPermissions: boolean;
+    },
   ): Promise<BoardWithContext>;
   setFavorite(boardId: string, favorite: boolean): Promise<void>;
   setWatchBoard(boardId: string, watching: boolean): Promise<void>;
@@ -221,7 +227,13 @@ export class BoardsClient implements BoardsApi {
 
   duplicateBoard(
     boardId: string,
-    options: { name?: string; copyColumns: boolean; copyPermissions: boolean },
+    options: {
+      name?: string;
+      copyColumns: boolean;
+      copyItems?: boolean;
+      copyEntities?: boolean;
+      copyPermissions: boolean;
+    },
   ): Promise<BoardWithContext> {
     return this.request('POST', `/boards/${boardId}/duplicate`, options);
   }

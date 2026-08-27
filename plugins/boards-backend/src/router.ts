@@ -142,6 +142,8 @@ export async function createRouter(
       await service.duplicateBoard(principal, req.params.boardId, {
         name: req.body.name,
         copyColumns: !!req.body.copyColumns,
+        copyItems: !!req.body.copyItems,
+        copyEntities: !!req.body.copyEntities,
         copyPermissions: !!req.body.copyPermissions,
       }),
     );
