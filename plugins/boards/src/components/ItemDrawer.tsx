@@ -1,9 +1,4 @@
-import { useState } from 'react';
-import {
-  Dialog as AriaDialog,
-  Modal,
-  ModalOverlay,
-} from 'react-aria-components';
+import { useEffect, useState } from 'react';
 import { useApi } from '@backstage/frontend-plugin-api';
 import {
   Button,
@@ -22,11 +17,11 @@ import {
 } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
 import { WatchButton } from './WatchButton';
+import { PrincipalPicker } from './PrincipalPicker';
 import {
   formatDate,
   InlineEdit,
   MarkdownContent,
-  RefChips,
   RefDisplay,
   useAsyncData,
 } from './common';
@@ -223,7 +218,6 @@ export function ItemDrawer(props: {
   const boardsApi = useApi(boardsApiRef);
   const readonly = !canWrite || !!item.externalManager;
   const [newComment, setNewComment] = useState('');
-  const [editAssignees, setEditAssignees] = useState(false);
   const [editLabels, setEditLabels] = useState(false);
   const [editTags, setEditTags] = useState(false);
 
@@ -240,6 +234,17 @@ export function ItemDrawer(props: {
     await refreshTimeline();
   };
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !event.defaultPrevented) {
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const addComment = async () => {
     const text = newComment.trim();
     if (!text) return;
@@ -249,35 +254,38 @@ export function ItemDrawer(props: {
   };
 
   return (
-    <ModalOverlay
-      isOpen
-      onOpenChange={open => {
-        if (!open) onClose();
-      }}
-      isDismissable
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 1000,
-        background: 'rgba(0,0,0,0.35)',
-      }}
-    >
-      <Modal
+    <>
+      {/* A plain (non-modal) overlay: Backstage UI popovers (menus,
+          comboboxes) render in their own portal layer, and a modal
+          overlay would swallow their pointer events. */}
+      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions,jsx-a11y/click-events-have-key-events -- backdrop click-to-close; Escape handled globally */}
+      <div
+        aria-hidden
+        onClick={onClose}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 900,
+          background: 'rgba(0,0,0,0.35)',
+        }}
+      />
+      <div
+        role="dialog"
+        aria-label={`Item ${item.title}`}
         style={{
           position: 'fixed',
           top: 0,
           right: 0,
           bottom: 0,
+          zIndex: 901,
           width: 'min(560px, 90vw)',
           background: 'var(--bui-bg-surface-1, #fff)',
           boxShadow: '-4px 0 16px rgba(0,0,0,0.2)',
           overflowY: 'auto',
+          outline: 'none',
+          padding: 16,
         }}
       >
-        <AriaDialog
-          aria-label={`Item ${item.title}`}
-          style={{ outline: 'none', padding: 16 }}
-        >
           <Flex direction="column" gap="3">
             <Flex align="center" justify="between" gap="2">
               <InlineEdit
@@ -330,35 +338,62 @@ export function ItemDrawer(props: {
               <Text variant="body-small" color="secondary">
                 Assignees
               </Text>
-              {editAssignees ? (
-                <TextField
-                  aria-label="Assignees (comma separated refs)"
-                  description="Comma-separated: user:default/jane, group:default/team-a, text:External"
-                  defaultValue={item.assignees.join(', ')}
-                  // eslint-disable-next-line jsx-a11y/no-autofocus -- focus moves into a field the user just revealed
-                  autoFocus
-                  onBlur={async event => {
-                    setEditAssignees(false);
-                    await boardsApi.updateItem(board.id, item.id, {
-                      assignees: parseList(event.target.value),
-                    });
-                    await changed();
-                  }}
-                />
-              ) : (
-                <Flex align="center" gap="2">
-                  <RefChips refs={item.assignees} />
-                  {!readonly && (
-                    <Button
-                      variant="tertiary"
-                      size="small"
-                      onPress={() => setEditAssignees(true)}
-                    >
-                      {item.assignees.length > 0 ? 'Edit' : 'Assign'}
-                    </Button>
-                  )}
-                </Flex>
-              )}
+              <Flex direction="column" gap="2">
+                {item.assignees.length > 0 ? (
+                  <Flex gap="1" align="center" style={{ flexWrap: 'wrap' }}>
+                    {item.assignees.map(assignee => (
+                      <span
+                        key={assignee}
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          border: '1px solid var(--bui-border, #ddd)',
+                          borderRadius: 12,
+                          padding: '2px 4px 2px 8px',
+                        }}
+                      >
+                        <RefDisplay refString={assignee} />
+                        {!readonly && (
+                          <Button
+                            variant="tertiary"
+                            size="small"
+                            aria-label={`Remove assignee ${assignee}`}
+                            onPress={async () => {
+                              await boardsApi.updateItem(board.id, item.id, {
+                                assignees: item.assignees.filter(
+                                  ref => ref !== assignee,
+                                ),
+                              });
+                              await changed();
+                            }}
+                          >
+                            ✕
+                          </Button>
+                        )}
+                      </span>
+                    ))}
+                  </Flex>
+                ) : (
+                  <Text variant="body-small" color="secondary">
+                    Unassigned
+                  </Text>
+                )}
+                {!readonly && (
+                  <PrincipalPicker
+                    ariaLabel="Add assignee"
+                    placeholder="Add assignee…"
+                    allowText
+                    exclude={item.assignees}
+                    onSelect={async ref => {
+                      await boardsApi.updateItem(board.id, item.id, {
+                        assignees: [...item.assignees, ref],
+                      });
+                      await changed();
+                    }}
+                  />
+                )}
+              </Flex>
             </div>
 
             <div>
@@ -510,8 +545,7 @@ export function ItemDrawer(props: {
               </Flex>
             )}
           </Flex>
-        </AriaDialog>
-      </Modal>
-    </ModalOverlay>
+      </div>
+    </>
   );
 }
