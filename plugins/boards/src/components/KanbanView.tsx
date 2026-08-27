@@ -105,9 +105,11 @@ function ItemCard(props: {
       }}
       style={{
         border: '1px solid var(--bui-border-1)',
-        borderTop: isDropTarget
-          ? '3px solid var(--bui-fg-link)'
-          : '1px solid var(--bui-border-1)',
+        // never mix the border shorthand with a conditional longhand:
+        // React serializes that into a broken style attribute
+        boxShadow: isDropTarget
+          ? '0 -3px 0 0 var(--bui-fg-link)'
+          : undefined,
         borderRadius: 8,
         padding: 8,
         background: 'var(--bui-bg-neutral-1)',
