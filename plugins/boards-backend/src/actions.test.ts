@@ -208,9 +208,7 @@ describe('actions', () => {
     );
     const changes = await knex('changes').where('item_id', item.id);
     const types = changes.map(c => c.type).sort();
-    expect(types).toEqual(
-      ['created', 'moved', 'updated', 'updated'].sort(),
-    );
+    expect(types).toEqual(['created', 'moved', 'updated', 'updated'].sort());
   });
 
   it('comment actions keep versions like the UI path', async () => {

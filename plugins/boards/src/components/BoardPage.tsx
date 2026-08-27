@@ -1,9 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  useNavigate,
-  useParams,
-  useSearchParams,
-} from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   BreadcrumbEntry,
   useApi,
@@ -138,8 +134,9 @@ export function BoardPageContent(props: {
       await action();
       await refreshAll();
     } catch (err) {
+      // refresh directly: refreshAll() would clear the error again
+      await invalidateBoard(queryClient, boardId);
       setError((err as Error).message);
-      await refreshAll();
     }
   };
 
@@ -167,7 +164,8 @@ export function BoardPageContent(props: {
         guarded(() => boardsApi.updateColumn(boardId, columnId, { title })),
       reorderColumn: (columnId, position) =>
         guarded(() => boardsApi.updateColumn(boardId, columnId, { position })),
-      addColumn: title => guarded(() => boardsApi.addColumn(boardId, { title })),
+      addColumn: title =>
+        guarded(() => boardsApi.addColumn(boardId, { title })),
       setColumnColor: (columnId, color) =>
         guarded(() => boardsApi.updateColumn(boardId, columnId, { color })),
       deleteColumn: (columnId, moveItemsTo) =>
@@ -195,7 +193,8 @@ export function BoardPageContent(props: {
   if (boardError || !board) {
     return (
       <Text style={{ padding: 16 }}>
-        Board could not be loaded: {(boardError as Error)?.message ?? 'not found'}
+        Board could not be loaded:{' '}
+        {(boardError as Error)?.message ?? 'not found'}
       </Text>
     );
   }
@@ -203,8 +202,7 @@ export function BoardPageContent(props: {
   const archived = !!board.archivedAt;
   const canWrite = levelIncludes(board.access, 'write') && !archived;
   const isAdmin = levelIncludes(board.access, 'admin') && !archived;
-  const isArchivedAdmin =
-    levelIncludes(board.access, 'admin') && archived;
+  const isArchivedAdmin = levelIncludes(board.access, 'admin') && archived;
   const purgeDate = board.archivedAt
     ? new Date(
         new Date(board.archivedAt).getTime() + 30 * 24 * 60 * 60 * 1000,
@@ -242,38 +240,43 @@ export function BoardPageContent(props: {
   const basePath = rootLink?.() ?? '/boards';
 
   const content = (
-      <Flex direction="column" gap="3" style={{ padding: 16 }}>
-        {archived && (
-          <Alert
-            status="warning"
-            title="This board is archived and read-only"
-            description={`It is no longer listed and will be permanently deleted on ${purgeDate}. Until then only admins can view it via this link.`}
-            customActions={
-              isArchivedAdmin ? (
-                <Flex gap="2">
-                  <Button
-                    variant="secondary"
-                    size="small"
-                    onPress={() =>
-                      guarded(() => boardsApi.unarchiveBoard(board.id))
-                    }
-                  >
-                    Unarchive
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="small"
-                    destructive
-                    onPress={() => setDeleteOpen(true)}
-                  >
-                    Delete now
-                  </Button>
-                </Flex>
-              ) : undefined
-            }
-          />
-        )}
-      <Flex align="center" gap="2" justify="between" style={{ flexWrap: 'wrap' }}>
+    <Flex direction="column" gap="3" style={{ padding: 16 }}>
+      {archived && (
+        <Alert
+          status="warning"
+          title="This board is archived and read-only"
+          description={`It is no longer listed and will be permanently deleted on ${purgeDate}. Until then only admins can view it via this link.`}
+          customActions={
+            isArchivedAdmin ? (
+              <Flex gap="2">
+                <Button
+                  variant="secondary"
+                  size="small"
+                  onPress={() =>
+                    guarded(() => boardsApi.unarchiveBoard(board.id))
+                  }
+                >
+                  Unarchive
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="small"
+                  destructive
+                  onPress={() => setDeleteOpen(true)}
+                >
+                  Delete now
+                </Button>
+              </Flex>
+            ) : undefined
+          }
+        />
+      )}
+      <Flex
+        align="center"
+        gap="2"
+        justify="between"
+        style={{ flexWrap: 'wrap' }}
+      >
         <Flex align="center" gap="2">
           <InlineEdit
             value={board.name}
@@ -319,7 +322,9 @@ export function BoardPageContent(props: {
               { value: 'tags', label: 'By tags' },
             ]}
             selectedKey={groupBy}
-            onSelectionChange={key => setGroupBy((key as GroupByMode) ?? 'none')}
+            onSelectionChange={key =>
+              setGroupBy((key as GroupByMode) ?? 'none')
+            }
           />
           <ToggleButtonGroup
             aria-label="View"
@@ -454,7 +459,7 @@ export function BoardPageContent(props: {
               onPress={() => {
                 setFilterText('');
                 setFilterTags([]);
-                              }}
+              }}
             >
               Clear filters
             </Button>
@@ -463,10 +468,7 @@ export function BoardPageContent(props: {
       </Flex>
 
       {error && (
-        <Text
-          variant="body-small"
-          style={{ color: '#cc3344' }}
-        >
+        <Text variant="body-small" style={{ color: '#cc3344' }}>
           {error}
         </Text>
       )}
@@ -578,7 +580,7 @@ export function BoardPageContent(props: {
           </Flex>
         </DialogFooter>
       </Dialog>
-      </Flex>
+    </Flex>
   );
 
   if (embedded) {

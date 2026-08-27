@@ -416,14 +416,16 @@ export async function createRouter(
 
   router.post('/boards/:boardId/items/:itemId/comments', async (req, res) => {
     const principal = await principalOf(req);
-    res.status(201).json(
-      await service.addComment(
-        principal,
-        req.params.boardId,
-        req.params.itemId,
-        req.body.text,
-      ),
-    );
+    res
+      .status(201)
+      .json(
+        await service.addComment(
+          principal,
+          req.params.boardId,
+          req.params.itemId,
+          req.body.text,
+        ),
+      );
   });
 
   router.patch(

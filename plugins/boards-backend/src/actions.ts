@@ -187,8 +187,7 @@ export function registerActions(options: ActionsOptions): void {
     description: 'Removes a permission entry from a board.',
     attributes: { destructive: true },
     schema: {
-      input: z =>
-        z.object({ boardId: z.string(), permissionId: z.string() }),
+      input: z => z.object({ boardId: z.string(), permissionId: z.string() }),
       output: z => z.object({}),
     },
     action: async ({ input, credentials }) => {

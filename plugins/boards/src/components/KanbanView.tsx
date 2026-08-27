@@ -111,9 +111,7 @@ function ItemCard(props: {
         border: '1px solid var(--bui-border-1)',
         // never mix the border shorthand with a conditional longhand:
         // React serializes that into a broken style attribute
-        boxShadow: isDropTarget
-          ? '0 -3px 0 0 var(--bui-fg-link)'
-          : undefined,
+        boxShadow: isDropTarget ? '0 -3px 0 0 var(--bui-fg-link)' : undefined,
         borderRadius: 8,
         padding: 8,
         background: 'var(--bui-bg-neutral-1)',
@@ -183,10 +181,7 @@ function ItemCard(props: {
   );
 }
 
-function AddItemRow(props: {
-  columnId: string;
-  actions: BoardActions;
-}) {
+function AddItemRow(props: { columnId: string; actions: BoardActions }) {
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState('');
   const fieldRef = useRef<HTMLDivElement>(null);
@@ -399,9 +394,7 @@ function ColumnLane(props: {
                 </Menu>
               </SubmenuTrigger>
               <MenuItem
-                onAction={() =>
-                  props.onRequestDelete(column, items.length > 0)
-                }
+                onAction={() => props.onRequestDelete(column, items.length > 0)}
               >
                 Delete column
               </MenuItem>
@@ -522,8 +515,8 @@ export function KanbanView(props: {
         <DialogHeader>Delete column “{deleteTarget?.title}”</DialogHeader>
         <DialogBody>
           <Text>
-            This column still contains items. Choose the column they should
-            move to:
+            This column still contains items. Choose the column they should move
+            to:
           </Text>
           <Select
             label="Move items to"
@@ -536,7 +529,10 @@ export function KanbanView(props: {
         </DialogBody>
         <DialogFooter>
           <Flex gap="2">
-            <Button variant="secondary" onPress={() => setDeleteTarget(undefined)}>
+            <Button
+              variant="secondary"
+              onPress={() => setDeleteTarget(undefined)}
+            >
               Cancel
             </Button>
             <Button

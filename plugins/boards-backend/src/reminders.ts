@@ -65,18 +65,21 @@ export function readRemindersConfig(
         `boards.reminders '${id}' has an invalid 'schedule': ${error}`,
       );
     }
-    const scope = (entry.getOptionalString('scope') ??
-      'all') as ReminderScope;
+    const scope = (entry.getOptionalString('scope') ?? 'all') as ReminderScope;
     if (!REMINDER_SCOPES.includes(scope)) {
       throw new Error(
-        `boards.reminders '${id}' has invalid scope '${scope}' (expected one of ${REMINDER_SCOPES.join(', ')})`,
+        `boards.reminders '${id}' has invalid scope '${scope}' (expected one of ${REMINDER_SCOPES.join(
+          ', ',
+        )})`,
       );
     }
     const grouping = (entry.getOptionalString('grouping') ??
       'combined') as ReminderGrouping;
     if (!REMINDER_GROUPINGS.includes(grouping)) {
       throw new Error(
-        `boards.reminders '${id}' has invalid grouping '${grouping}' (expected one of ${REMINDER_GROUPINGS.join(', ')})`,
+        `boards.reminders '${id}' has invalid grouping '${grouping}' (expected one of ${REMINDER_GROUPINGS.join(
+          ', ',
+        )})`,
       );
     }
     // read as raw JSON: field names may contain dots, which the config

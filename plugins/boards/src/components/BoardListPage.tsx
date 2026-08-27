@@ -169,7 +169,11 @@ export function BoardListPage() {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
-  const { data: boards, isLoading: loading, refetch: refresh } = useBoardsQuery();
+  const {
+    data: boards,
+    isLoading: loading,
+    refetch: refresh,
+  } = useBoardsQuery();
 
   const { lastSignal } = useSignal('boards');
   useEffect(() => {

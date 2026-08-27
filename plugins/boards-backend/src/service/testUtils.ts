@@ -48,7 +48,10 @@ export async function createTestKnex(): Promise<Knex> {
     pool: {
       min: 1,
       max: 1,
-      afterCreate: (conn: any, done: (err: Error | null, conn: any) => void) => {
+      afterCreate: (
+        conn: any,
+        done: (err: Error | null, conn: any) => void,
+      ) => {
         conn.pragma('foreign_keys = ON');
         done(null, conn);
       },

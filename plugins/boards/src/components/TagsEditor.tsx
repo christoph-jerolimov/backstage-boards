@@ -46,9 +46,9 @@ export function TagsEditor(props: {
     .filter(
       tag =>
         !input ||
-        tag.toLocaleLowerCase('en-US').includes(
-          input.toLocaleLowerCase('en-US'),
-        ),
+        tag
+          .toLocaleLowerCase('en-US')
+          .includes(input.toLocaleLowerCase('en-US')),
     )
     .sort();
 

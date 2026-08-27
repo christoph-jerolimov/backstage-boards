@@ -8,10 +8,7 @@ import {
   TableRoot,
   Text,
 } from '@backstage/ui';
-import {
-  BoardItem,
-  BoardWithContext,
-} from '@internal/plugin-boards-common';
+import { BoardItem, BoardWithContext } from '@internal/plugin-boards-common';
 import {
   GroupByMode,
   groupItems,

@@ -44,8 +44,7 @@ export function BoardSettingsDialog(props: {
       <DialogBody>
         <Flex direction="column" gap="3">
           <Text variant="body-small" color="secondary">
-            Referenced catalog entities, e.g. a component and the owning
-            team.
+            Referenced catalog entities, e.g. a component and the owning team.
           </Text>
           {error && (
             <Text style={{ color: 'var(--bui-fg-negative)' }}>{error}</Text>

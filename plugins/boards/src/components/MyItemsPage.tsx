@@ -39,7 +39,11 @@ function groupByBoard(entries: MyBoardItem[]): BoardGroup[] {
   for (const entry of entries) {
     let group = groups.get(entry.boardId);
     if (!group) {
-      group = { boardId: entry.boardId, boardName: entry.boardName, entries: [] };
+      group = {
+        boardId: entry.boardId,
+        boardName: entry.boardName,
+        entries: [],
+      };
       groups.set(entry.boardId, group);
     }
     group.entries.push(entry);

@@ -1,6 +1,13 @@
 import { useState } from 'react';
 import { RiArrowDownSLine, RiEyeLine, RiEyeOffLine } from '@remixicon/react';
-import { Button, ButtonIcon, Menu, MenuItem, MenuTrigger, Text } from '@backstage/ui';
+import {
+  Button,
+  ButtonIcon,
+  Menu,
+  MenuItem,
+  MenuTrigger,
+  Text,
+} from '@backstage/ui';
 import { RefDisplay, useAsyncData } from './common';
 
 /**
@@ -48,7 +55,9 @@ export function WatchButton(props: {
       <Button
         variant={watching ? 'secondary' : 'tertiary'}
         size="small"
-        iconStart={watching ? <RiEyeLine size={16} /> : <RiEyeOffLine size={16} />}
+        iconStart={
+          watching ? <RiEyeLine size={16} /> : <RiEyeOffLine size={16} />
+        }
         onPress={() => onToggle(!watching)}
         aria-label={
           watching ? `Stop watching ${targetLabel}` : `Watch ${targetLabel}`
