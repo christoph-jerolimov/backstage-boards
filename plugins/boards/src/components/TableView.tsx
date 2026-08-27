@@ -13,11 +13,12 @@ import {
   BoardWithContext,
 } from '@internal/plugin-boards-common';
 import {
-  groupByAssignee,
+  GroupByMode,
+  groupItems,
   ItemSortDescriptor,
   sortItems,
-  UNASSIGNED,
 } from './grouping';
+import { GroupLabel } from './GroupLabel';
 import { formatDate, RefDisplay } from './common';
 import { AssigneeAvatars } from './AssigneeAvatars';
 import { DueDateBadge } from './DueDate';
@@ -99,12 +100,12 @@ function ItemsTable(props: {
 export function TableView(props: {
   board: BoardWithContext;
   items: BoardItem[];
-  groupBy: boolean;
+  groupBy: GroupByMode;
   openItem: (itemId: string) => void;
 }) {
   const { board, items, groupBy, openItem } = props;
   const [sort, setSort] = useState<ItemSortDescriptor | undefined>(undefined);
-  if (!groupBy) {
+  if (groupBy === 'none') {
     return (
       <ItemsTable
         board={board}
@@ -117,14 +118,10 @@ export function TableView(props: {
   }
   return (
     <>
-      {groupByAssignee(items).map(group => (
+      {groupItems(items, groupBy).map(group => (
         <Fragment key={group.key}>
           <Text variant="body-medium" weight="bold" as="h3">
-            {group.key === UNASSIGNED ? (
-              'Unassigned'
-            ) : (
-              <RefDisplay refString={group.key} />
-            )}
+            <GroupLabel mode={groupBy} groupKey={group.key} />
           </Text>
           <ItemsTable
             board={board}

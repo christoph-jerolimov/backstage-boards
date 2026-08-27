@@ -26,8 +26,9 @@ import {
   todayISO,
   tomorrowISO,
 } from '@internal/plugin-boards-common';
-import { groupByAssignee, positionBefore, UNASSIGNED } from './grouping';
-import { InlineEdit, RefDisplay } from './common';
+import { GroupByMode, groupItems, positionBefore } from './grouping';
+import { GroupLabel } from './GroupLabel';
+import { InlineEdit } from './common';
 import { AssigneeAvatars } from './AssigneeAvatars';
 import { DueDateBadge } from './DueDate';
 import { ColumnDot } from './StatusBadge';
@@ -297,7 +298,7 @@ function ColumnLane(props: {
   items: BoardItem[];
   canWrite: boolean;
   actions: BoardActions;
-  groupBy: boolean;
+  groupBy: GroupByMode;
   onRequestDelete: (column: BoardColumn, hasItems: boolean) => void;
 }) {
   const { board, column, items, canWrite, actions, groupBy } = props;
@@ -453,15 +454,11 @@ function ColumnLane(props: {
           </MenuTrigger>
         )}
       </Flex>
-      {groupBy
-        ? groupByAssignee(sorted).map(group => (
+      {groupBy !== 'none'
+        ? groupItems(sorted, groupBy).map(group => (
             <div key={group.key}>
               <Text variant="body-x-small" color="secondary">
-                {group.key === UNASSIGNED ? (
-                  'Unassigned'
-                ) : (
-                  <RefDisplay refString={group.key} />
-                )}
+                <GroupLabel mode={groupBy} groupKey={group.key} />
               </Text>
               <Flex direction="column" gap="2">
                 {group.items.map(renderCard)}
@@ -479,7 +476,7 @@ export function KanbanView(props: {
   items: BoardItem[];
   canWrite: boolean;
   actions: BoardActions;
-  groupBy: boolean;
+  groupBy: GroupByMode;
 }) {
   const { board, items, canWrite, actions, groupBy } = props;
   const [deleteTarget, setDeleteTarget] = useState<BoardColumn | undefined>();
