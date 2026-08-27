@@ -21,6 +21,7 @@ import {
   RiMore2Fill,
 } from '@remixicon/react';
 import {
+  Alert,
   Button,
   ButtonIcon,
   Dialog,
@@ -178,8 +179,16 @@ export function BoardPage() {
     );
   }
 
-  const canWrite = levelIncludes(board.access, 'write');
-  const isAdmin = levelIncludes(board.access, 'admin');
+  const archived = !!board.archivedAt;
+  const canWrite = levelIncludes(board.access, 'write') && !archived;
+  const isAdmin = levelIncludes(board.access, 'admin') && !archived;
+  const isArchivedAdmin =
+    levelIncludes(board.access, 'admin') && archived;
+  const purgeDate = board.archivedAt
+    ? new Date(
+        new Date(board.archivedAt).getTime() + 30 * 24 * 60 * 60 * 1000,
+      ).toLocaleDateString()
+    : undefined;
   const openItemId = searchParams.get('item') ?? undefined;
   const openItem = (items ?? []).find(item => item.id === openItemId);
 
@@ -276,6 +285,25 @@ export function BoardPage() {
       entry={{ href: `${basePath}/${board.id}`, label: board.name }}
     >
       <Flex direction="column" gap="3" style={{ padding: 16 }}>
+        {archived && (
+          <Alert
+            status="warning"
+            title="This board is archived and read-only"
+            description={`It is no longer listed and will be permanently deleted on ${purgeDate}. Until then only admins can view it via this link.`}
+            customActions={
+              isArchivedAdmin ? (
+                <Button
+                  variant="secondary"
+                  size="small"
+                  destructive
+                  onPress={() => setDeleteOpen(true)}
+                >
+                  Delete now
+                </Button>
+              ) : undefined
+            }
+          />
+        )}
       <Flex align="center" gap="2" justify="between" style={{ flexWrap: 'wrap' }}>
         <Flex align="center" gap="2">
           <InlineEdit
@@ -376,7 +404,7 @@ export function BoardPage() {
                   color="danger"
                   onAction={() => setDeleteOpen(true)}
                 >
-                  Delete board…
+                  Archive board…
                 </MenuItem>
               )}
             </Menu>
@@ -536,11 +564,16 @@ export function BoardPage() {
       />
 
       <Dialog isOpen={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogHeader>Delete board “{board.name}”</DialogHeader>
+        <DialogHeader>
+          {archived
+            ? `Permanently delete “${board.name}”`
+            : `Archive board “${board.name}”`}
+        </DialogHeader>
         <DialogBody>
           <Text>
-            This permanently deletes the board with all items, comments, and
-            history. This cannot be undone.
+            {archived
+              ? 'This permanently deletes the board with all items, comments, and history right now. This cannot be undone.'
+              : 'The board becomes read-only, disappears from all lists, and stays reachable for admins via its link. It is permanently deleted after 30 days.'}
           </Text>
         </DialogBody>
         <DialogFooter>
@@ -552,11 +585,15 @@ export function BoardPage() {
               variant="primary"
               destructive
               onPress={async () => {
-                await boardsApi.deleteBoard(board.id);
+                if (archived) {
+                  await boardsApi.hardDeleteBoard(board.id);
+                } else {
+                  await boardsApi.deleteBoard(board.id);
+                }
                 navigate('..');
               }}
             >
-              Delete board
+              {archived ? 'Delete now' : 'Archive board'}
             </Button>
           </Flex>
         </DialogFooter>

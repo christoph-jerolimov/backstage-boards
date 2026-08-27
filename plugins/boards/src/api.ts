@@ -32,7 +32,10 @@ export interface BoardsApi {
   }): Promise<BoardWithContext>;
   getBoard(boardId: string): Promise<BoardWithContext>;
   updateBoard(boardId: string, update: BoardUpdate): Promise<BoardWithContext>;
+  /** Archives the board (read-only, purged after 30 days). */
   deleteBoard(boardId: string): Promise<void>;
+  /** Permanently deletes an archived board immediately. */
+  hardDeleteBoard(boardId: string): Promise<void>;
   duplicateBoard(
     boardId: string,
     options: { name?: string; copyColumns: boolean; copyPermissions: boolean },
@@ -199,6 +202,10 @@ export class BoardsClient implements BoardsApi {
 
   deleteBoard(boardId: string): Promise<void> {
     return this.request('DELETE', `/boards/${boardId}`);
+  }
+
+  hardDeleteBoard(boardId: string): Promise<void> {
+    return this.request('POST', `/boards/${boardId}/delete-now`);
   }
 
   duplicateBoard(

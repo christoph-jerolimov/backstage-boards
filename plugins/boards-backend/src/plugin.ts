@@ -68,14 +68,16 @@ export const boardsPlugin = createBackendPlugin({
 
         const RETENTION_DAYS = 30;
         await scheduler.scheduleTask({
-          id: 'boards-purge-archived-items',
+          id: 'boards-purge-archived',
           frequency: { hours: 6 },
           timeout: { minutes: 5 },
           initialDelay: { minutes: 1 },
           fn: async () => {
-            await service.purgeArchivedItems(
-              new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000),
+            const cutoff = new Date(
+              Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000,
             );
+            await service.purgeArchivedItems(cutoff);
+            await service.purgeArchivedBoards(cutoff);
           },
         });
       },

@@ -53,6 +53,8 @@ type BoardRow = {
   created_by: string;
   created_at: string;
   updated_at: string;
+  archived_at: string | null;
+  archived_by: string | null;
 };
 
 type ColumnRow = {
@@ -112,6 +114,8 @@ function toBoard(row: BoardRow): Board {
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    archivedAt: row.archived_at ?? undefined,
+    archivedBy: row.archived_by ?? undefined,
   };
 }
 
@@ -243,6 +247,18 @@ export class BoardsService {
     if (!level) {
       throw new NotFoundError(`Board ${boardId} not found`);
     }
+    if (board.archived_at) {
+      // archived boards: admins may read via the direct link, nobody writes
+      if (!levelIncludes(level, 'admin')) {
+        throw new NotFoundError(`Board ${boardId} not found`);
+      }
+      if (required !== 'read') {
+        throw new ConflictError(
+          'Board is archived and read-only until it is permanently deleted',
+        );
+      }
+      return { board, level };
+    }
     if (!levelIncludes(level, required)) {
       throw new NotAllowedError(
         `This operation requires '${required}' access to the board`,
@@ -371,7 +387,9 @@ export class BoardsService {
     principal: BoardsPrincipal,
     options?: { favoritesOnly?: boolean; entityRef?: string },
   ): Promise<BoardListEntry[]> {
-    const query = this.knex<BoardRow>('boards').orderBy('name');
+    const query = this.knex<BoardRow>('boards')
+      .whereNull('archived_at')
+      .orderBy('name');
     if (options?.entityRef) {
       query.where('entity_ref', options.entityRef);
     }
@@ -433,18 +451,49 @@ export class BoardsService {
     return this.getBoard(principal, boardId);
   }
 
+  /** Archives a board; it stays reachable read-only for admins until purged. */
   async deleteBoard(
     principal: BoardsPrincipal,
     boardId: string,
   ): Promise<void> {
     await this.requireBoard(principal, boardId, 'admin');
+    await this.knex('boards').where('id', boardId).update({
+      archived_at: now(),
+      archived_by: actorRef(principal),
+      updated_at: now(),
+    });
+    await this.emitBoardSignal(boardId);
+  }
+
+  /** Permanently deletes an archived board; the "delete now" escape hatch. */
+  async hardDeleteBoard(
+    principal: BoardsPrincipal,
+    boardId: string,
+  ): Promise<void> {
+    const { board } = await this.requireBoard(principal, boardId, 'read');
+    const level = await this.effectiveLevel(principal, board);
+    if (!levelIncludes(level, 'admin')) {
+      throw new NotAllowedError('Deleting a board requires admin access');
+    }
+    if (!board.archived_at) {
+      throw new ConflictError('Only archived boards can be deleted');
+    }
+    await this.cascadeDeleteBoards([boardId]);
+    await this.emitBoardSignal(boardId);
+  }
+
+  private async cascadeDeleteBoards(boardIds: string[]): Promise<void> {
+    if (boardIds.length === 0) {
+      return;
+    }
     await this.knex.transaction(async trx => {
       // changes/comments/items/columns/permissions/favorites cascade from FKs
       await trx('watches')
-        .where({ target_type: 'board', target_id: boardId })
+        .where('target_type', 'board')
+        .whereIn('target_id', boardIds)
         .delete();
       const itemIds = (
-        await trx('items').where('board_id', boardId).select('id')
+        await trx('items').whereIn('board_id', boardIds).select('id')
       ).map(row => row.id);
       if (itemIds.length > 0) {
         await trx('watches')
@@ -452,9 +501,22 @@ export class BoardsService {
           .whereIn('target_id', itemIds)
           .delete();
       }
-      await trx('boards').where('id', boardId).delete();
+      await trx('boards').whereIn('id', boardIds).delete();
     });
-    await this.emitBoardSignal(boardId);
+  }
+
+  /** Permanently removes boards archived before `olderThan`. */
+  async purgeArchivedBoards(olderThan: Date): Promise<number> {
+    const rows = await this.knex('boards')
+      .whereNotNull('archived_at')
+      .where('archived_at', '<', olderThan.toISOString())
+      .select('id');
+    const ids = rows.map(row => row.id as string);
+    if (ids.length > 0) {
+      await this.cascadeDeleteBoards(ids);
+      this.logger.info(`Purged ${ids.length} archived boards`);
+    }
+    return ids.length;
   }
 
   async setFavorite(
