@@ -77,12 +77,12 @@ describe('BoardsService', () => {
     it('filters the listing by assigned entity, access still enforced', async () => {
       const mine = await service.createBoard(alice, {
         name: 'Mine',
-        entityRef: 'system:default/payments',
+        entityRefs: ['system:default/payments', 'group:default/team-a'],
       });
       await service.createBoard(alice, { name: 'Other entity' });
       await service.createBoard(bob, {
         name: 'Inaccessible',
-        entityRef: 'system:default/payments',
+        entityRefs: ['system:default/payments'],
       });
       const filtered = await service.listBoards(alice, {
         entityRef: 'system:default/payments',
@@ -214,16 +214,27 @@ describe('BoardsService', () => {
       expect(await knex('boards').where('id', newBoard.id)).toHaveLength(1);
     });
 
-    it('manages entity assignment', async () => {
+    it('manages the entity reference list', async () => {
       const board = await service.createBoard(alice, { name: 'B' });
+      expect(board.entityRefs).toEqual([]);
       const assigned = await service.updateBoard(alice, board.id, {
-        entityRef: 'system:default/payments',
+        entityRefs: [
+          'system:default/payments',
+          'group:default/team-a',
+          'system:default/payments',
+        ],
       });
-      expect(assigned.entityRef).toBe('system:default/payments');
+      expect(assigned.entityRefs).toEqual([
+        'group:default/team-a',
+        'system:default/payments',
+      ]);
       const cleared = await service.updateBoard(alice, board.id, {
-        entityRef: null,
+        entityRefs: [],
       });
-      expect(cleared.entityRef).toBeUndefined();
+      expect(cleared.entityRefs).toEqual([]);
+      await expect(
+        service.updateBoard(alice, board.id, { entityRefs: ['not a ref !'] }),
+      ).rejects.toThrow(/Invalid entity ref/);
     });
 
     it('tracks per-user favorites', async () => {

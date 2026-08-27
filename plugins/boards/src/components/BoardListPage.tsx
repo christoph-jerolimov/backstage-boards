@@ -77,9 +77,14 @@ function BoardRows(props: {
               {board.name}
             </Button>
           </div>
-          {board.entityRef && (
+          {board.entityRefs.length > 0 && (
             <Text variant="body-small">
-              <EntityRefLink entityRef={board.entityRef} />
+              {board.entityRefs.map((ref, index) => (
+                <span key={ref}>
+                  {index > 0 && ', '}
+                  <EntityRefLink entityRef={ref} />
+                </span>
+              ))}
             </Text>
           )}
           <Text variant="body-small" color="secondary">

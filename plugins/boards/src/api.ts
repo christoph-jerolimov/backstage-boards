@@ -29,7 +29,7 @@ export interface BoardsApi {
   createBoard(options: {
     name: string;
     columns?: string[];
-    entityRef?: string;
+    entityRefs?: string[];
   }): Promise<BoardWithContext>;
   /** All items assigned to the current user across readable boards. */
   listMyItems(): Promise<MyBoardItem[]>;
@@ -198,7 +198,7 @@ export class BoardsClient implements BoardsApi {
   createBoard(options: {
     name: string;
     columns?: string[];
-    entityRef?: string;
+    entityRefs?: string[];
   }): Promise<BoardWithContext> {
     return this.request('POST', '/boards', options);
   }

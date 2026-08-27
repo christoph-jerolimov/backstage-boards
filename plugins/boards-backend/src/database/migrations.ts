@@ -284,6 +284,47 @@ const itemDueDates: Migration = {
   },
 };
 
+const boardEntities: Migration = {
+  name: '20260827_07_board_entities',
+  async up(knex) {
+    await knex.schema.createTable('board_entities', table => {
+      table
+        .string('board_id')
+        .notNullable()
+        .references('id')
+        .inTable('boards')
+        .onDelete('CASCADE');
+      table.string('entity_ref').notNullable();
+      table.unique(['board_id', 'entity_ref']);
+      table.index(['entity_ref']);
+    });
+    const rows = await knex('boards')
+      .whereNotNull('entity_ref')
+      .select('id', 'entity_ref');
+    if (rows.length > 0) {
+      await knex('board_entities').insert(
+        rows.map(row => ({ board_id: row.id, entity_ref: row.entity_ref })),
+      );
+    }
+    await knex.schema.alterTable('boards', table => {
+      table.dropColumn('entity_ref');
+    });
+  },
+  async down(knex) {
+    await knex.schema.alterTable('boards', table => {
+      table.string('entity_ref').nullable();
+    });
+    const rows = await knex('board_entities').select('board_id', 'entity_ref');
+    for (const row of rows) {
+      await knex('boards')
+        .where('id', row.board_id)
+        .whereNull('entity_ref')
+        .update({ entity_ref: row.entity_ref });
+    }
+    await knex.schema.dropTableIfExists('board_entities');
+  },
+};
+
 const migrations: Migration[] = [
   initial,
   itemDescriptions,
@@ -291,6 +332,7 @@ const migrations: Migration[] = [
   columnColors,
   boardArchival,
   itemDueDates,
+  boardEntities,
 ];
 
 class BoardsMigrationSource implements Knex.MigrationSource<Migration> {

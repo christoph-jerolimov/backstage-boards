@@ -77,3 +77,13 @@ export const ALL_VISIBILITIES: BoardVisibility[] = [
 ];
 
 export const ALL_LEVELS: BoardPermissionLevel[] = ['read', 'write', 'admin'];
+
+/** True when `ref` parses as a catalog entity ref of any kind. */
+export function isValidEntityRef(ref: string): boolean {
+  try {
+    parseEntityRef(ref);
+    return true;
+  } catch {
+    return false;
+  }
+}

@@ -59,10 +59,10 @@ export function registerActions(options: ActionsOptions): void {
             .array(z.string())
             .optional()
             .describe('Initial column titles, in order'),
-          entityRef: z
-            .string()
+          entityRefs: z
+            .array(z.string())
             .optional()
-            .describe('Catalog entity ref to assign the board to'),
+            .describe('Catalog entity refs the board references'),
           visibility: z.enum(VISIBILITIES).optional(),
           admins: z
             .array(z.string())
@@ -75,7 +75,7 @@ export function registerActions(options: ActionsOptions): void {
       const board = await service.createBoard(await toPrincipal(credentials), {
         name: input.name,
         columns: input.columns,
-        entityRef: input.entityRef,
+        entityRefs: input.entityRefs,
         visibility: input.visibility,
         admins: input.admins,
       });
@@ -87,17 +87,16 @@ export function registerActions(options: ActionsOptions): void {
     name: 'update-board',
     title: 'Update Board',
     description:
-      "Updates a board's name, catalog entity assignment, or visibility.",
+      "Updates a board's name, referenced catalog entities, or visibility.",
     schema: {
       input: z =>
         z.object({
           boardId: z.string(),
           name: z.string().optional(),
-          entityRef: z
-            .string()
-            .nullable()
+          entityRefs: z
+            .array(z.string())
             .optional()
-            .describe('Entity ref to assign, or null to clear'),
+            .describe('Replaces the full list of referenced entity refs'),
           visibility: z.enum(VISIBILITIES).optional(),
         }),
       output: z => z.object({ id: z.string() }),
@@ -108,7 +107,7 @@ export function registerActions(options: ActionsOptions): void {
         input.boardId,
         {
           name: input.name,
-          entityRef: input.entityRef,
+          entityRefs: input.entityRefs,
           visibility: input.visibility,
         },
       );

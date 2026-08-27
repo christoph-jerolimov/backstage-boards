@@ -77,7 +77,7 @@ export async function createRouter(
     const board = await service.createBoard(principal, {
       name: req.body.name,
       columns: req.body.columns,
-      entityRef: req.body.entityRef ?? undefined,
+      entityRefs: req.body.entityRefs,
       visibility: req.body.visibility ?? undefined,
       admins: req.body.admins,
     });
@@ -94,7 +94,7 @@ export async function createRouter(
     res.json(
       await service.updateBoard(principal, req.params.boardId, {
         name: req.body.name,
-        entityRef: req.body.entityRef,
+        entityRefs: req.body.entityRefs,
         visibility: req.body.visibility,
       }),
     );
