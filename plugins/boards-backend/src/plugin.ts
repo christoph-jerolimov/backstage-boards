@@ -5,6 +5,7 @@ import {
 import { Knex } from 'knex';
 import { actionsRegistryServiceRef } from '@backstage/backend-plugin-api/alpha';
 import { notificationService } from '@backstage/plugin-notifications-node';
+import { signalsServiceRef } from '@backstage/plugin-signals-node';
 import { applyDatabaseMigrations } from './database/migrations';
 import { BoardsService } from './service/BoardsService';
 import { createRouter } from './router';
@@ -28,6 +29,7 @@ export const boardsPlugin = createBackendPlugin({
         auth: coreServices.auth,
         userInfo: coreServices.userInfo,
         notifications: notificationService,
+        signals: signalsServiceRef,
         actionsRegistry: actionsRegistryServiceRef,
       },
       async init({
@@ -38,6 +40,7 @@ export const boardsPlugin = createBackendPlugin({
         auth,
         userInfo,
         notifications,
+        signals,
         actionsRegistry,
       }) {
         // the framework bundles its own copy of the knex types
@@ -48,6 +51,7 @@ export const boardsPlugin = createBackendPlugin({
           knex,
           logger,
           notifications,
+          signals,
         });
 
         httpRouter.use(
