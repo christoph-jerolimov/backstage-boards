@@ -32,7 +32,7 @@ Each board SHALL have an ordered list of columns configurable from the UI by use
 - **THEN** the system requires the user to choose a target column for those items (or blocks deletion until the column is empty) so that no item is left without a status
 
 ### Requirement: Board list view
-The system SHALL provide a list view showing the user's favorited boards and all boards the user can access (via direct permission, group permission, or public visibility). The list SHALL allow toggling between "Favorites" and "All" and show at least the board name, its catalog entity (if assigned), and the user's access level.
+The system SHALL provide a list view showing the user's favorited boards and all boards the user can access (via direct permission, group permission, or public visibility). The list SHALL allow toggling between "Favorites" and "All" and show at least the board name, its catalog entity (if assigned), and the user's access level. Each list SHALL be rendered as a table whose last column is an actions column holding a menu button; activating a row SHALL open the board. The actions menu SHALL also open, anchored at the pointer, when the user right-clicks the row.
 
 #### Scenario: List accessible boards
 - **WHEN** a user opens the boards list
@@ -41,6 +41,14 @@ The system SHALL provide a list view showing the user's favorited boards and all
 #### Scenario: Favorite a board
 - **WHEN** a user marks a board as favorite
 - **THEN** the board appears in their "Favorites" list on subsequent visits; favorites are per-user and do not affect other users
+
+#### Scenario: Row actions menu
+- **WHEN** a user activates the menu button in a board row's actions column
+- **THEN** a menu offers opening the board and toggling its favorite state, and choosing an entry acts on that row's board
+
+#### Scenario: Right-click opens the same menu
+- **WHEN** a user right-clicks a board row
+- **THEN** the browser context menu is suppressed and the row's actions menu opens at the pointer position
 
 ### Requirement: Optional catalog entity assignment
 A board SHALL optionally be assigned to a single catalog entity by entity ref. The assignment SHALL be editable by users with `admin` access and displayed in the board list and board header.
