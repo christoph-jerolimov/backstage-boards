@@ -83,6 +83,19 @@ function StarIcon(props: { filled: boolean }) {
 
 export function BoardPage() {
   const { boardId = '' } = useParams();
+  return <BoardPageContent boardId={boardId} />;
+}
+
+/**
+ * The complete board experience. With `embedded` (e.g. inside the
+ * catalog entity tab) the breadcrumb wrapper is skipped and archiving
+ * stays in place instead of navigating away.
+ */
+export function BoardPageContent(props: {
+  boardId: string;
+  embedded?: boolean;
+}) {
+  const { boardId, embedded } = props;
   const boardsApi = useApi(boardsApiRef);
   const navigate = useNavigate();
   const rootLink = useRouteRef(rootRouteRef);
@@ -228,10 +241,7 @@ export function BoardPage() {
 
   const basePath = rootLink?.() ?? '/boards';
 
-  return (
-    <BreadcrumbEntry
-      entry={{ href: `${basePath}/${board.id}`, label: board.name }}
-    >
+  const content = (
       <Flex direction="column" gap="3" style={{ padding: 16 }}>
         {archived && (
           <Alert
@@ -539,7 +549,11 @@ export function BoardPage() {
                 } else {
                   await boardsApi.deleteBoard(board.id);
                 }
-                navigate('..');
+                if (embedded) {
+                  await refreshAll();
+                } else {
+                  navigate(basePath);
+                }
               }}
             >
               {archived ? 'Delete now' : 'Archive board'}
@@ -548,6 +562,16 @@ export function BoardPage() {
         </DialogFooter>
       </Dialog>
       </Flex>
+  );
+
+  if (embedded) {
+    return content;
+  }
+  return (
+    <BreadcrumbEntry
+      entry={{ href: `${basePath}/${board.id}`, label: board.name }}
+    >
+      {content}
     </BreadcrumbEntry>
   );
 }
