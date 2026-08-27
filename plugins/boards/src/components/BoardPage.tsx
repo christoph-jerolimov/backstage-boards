@@ -32,7 +32,15 @@ import {
   levelIncludes,
 } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
-import { InlineEdit, useAsyncData } from './common';
+import {
+  invalidateBoard,
+  useBoardQuery,
+  useItemsQuery,
+  useMoveItem,
+  useRenameItem,
+} from '../queries';
+import { useQueryClient } from '@tanstack/react-query';
+import { InlineEdit } from './common';
 import { BoardActions, KanbanView } from './KanbanView';
 import { TableView } from './TableView';
 import { ItemDrawer } from './ItemDrawer';
@@ -71,28 +79,23 @@ export function BoardPage() {
   const [editEntity, setEditEntity] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
+  const queryClient = useQueryClient();
   const {
     data: board,
-    loading: boardLoading,
+    isLoading: boardLoading,
     error: boardError,
-    refresh: refreshBoard,
-  } = useAsyncData(() => boardsApi.getBoard(boardId), [boardsApi, boardId]);
-
-  const {
-    data: items,
-    refresh: refreshItems,
-  } = useAsyncData(() => boardsApi.listItems(boardId), [boardsApi, boardId]);
+  } = useBoardQuery(boardId);
+  const { data: items } = useItemsQuery(boardId);
 
   const refreshAll = async () => {
     setError(undefined);
-    await Promise.all([refreshBoard(), refreshItems()]);
+    await invalidateBoard(queryClient, boardId);
   };
 
   const { lastSignal } = useSignal<{ boardId: string }>('boards');
   useEffect(() => {
     if (lastSignal?.boardId === boardId) {
-      refreshBoard();
-      refreshItems();
+      invalidateBoard(queryClient, boardId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastSignal]);
@@ -107,14 +110,26 @@ export function BoardPage() {
     }
   };
 
+  const moveItemMutation = useMoveItem(boardId, setError);
+  const renameItemMutation = useRenameItem(boardId, setError);
+
   const actions: BoardActions = useMemo(
     () => ({
-      moveItem: (itemId, target) =>
-        guarded(() => boardsApi.moveItem(boardId, itemId, target)),
+      // optimistic: cache updates immediately, server reconciles
+      moveItem: async (itemId, target) => {
+        setError(undefined);
+        await moveItemMutation.mutateAsync({ itemId, ...target }).catch(() => {
+          // error already surfaced via the mutation's onError
+        });
+      },
+      renameItem: async (itemId, title) => {
+        setError(undefined);
+        await renameItemMutation.mutateAsync({ itemId, title }).catch(() => {
+          // error already surfaced via the mutation's onError
+        });
+      },
       createItem: (columnId, title) =>
         guarded(() => boardsApi.createItem(boardId, { columnId, title })),
-      renameItem: (itemId, title) =>
-        guarded(() => boardsApi.updateItem(boardId, itemId, { title })),
       renameColumn: (columnId, title) =>
         guarded(() => boardsApi.updateColumn(boardId, columnId, { title })),
       reorderColumn: (columnId, position) =>
@@ -139,7 +154,7 @@ export function BoardPage() {
   if (boardError || !board) {
     return (
       <Text style={{ padding: 16 }}>
-        Board could not be loaded: {boardError?.message ?? 'not found'}
+        Board could not be loaded: {(boardError as Error)?.message ?? 'not found'}
       </Text>
     );
   }

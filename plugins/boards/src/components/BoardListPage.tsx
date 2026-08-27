@@ -20,7 +20,7 @@ import {
 import { EntityRefLink } from '@backstage/plugin-catalog-react';
 import { BoardListEntry } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
-import { useAsyncData } from './common';
+import { useBoardsQuery, boardsQueryClient, queryKeys } from '../queries';
 
 function StarIcon(props: { filled: boolean }) {
   return (
@@ -100,17 +100,16 @@ export function BoardListPage() {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | undefined>();
 
-  const { data: boards, loading, refresh } = useAsyncData(
-    () => boardsApi.listBoards(),
-    [boardsApi],
-  );
+  const { data: boards, isLoading: loading, refetch: refresh } = useBoardsQuery();
 
   const { lastSignal } = useSignal('boards');
   useEffect(() => {
     if (lastSignal) {
-      refresh();
+      boardsQueryClient.invalidateQueries({
+        queryKey: queryKeys.boards,
+        exact: true,
+      });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastSignal]);
 
   const favorites = useMemo(
