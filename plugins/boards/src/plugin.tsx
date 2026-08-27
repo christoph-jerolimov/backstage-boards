@@ -1,3 +1,4 @@
+import { RiKanbanView } from '@remixicon/react';
 import {
   ApiBlueprint,
   createFrontendPlugin,
@@ -8,16 +9,6 @@ import {
 import { EntityContentBlueprint } from '@backstage/plugin-catalog-react/alpha';
 import { boardsApiRef, BoardsClient } from './api';
 import { rootRouteRef } from './routes';
-
-function BoardsIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden>
-      <rect x="3" y="4" width="5" height="16" rx="1" fill="currentColor" />
-      <rect x="10" y="4" width="5" height="10" rx="1" fill="currentColor" />
-      <rect x="17" y="4" width="5" height="13" rx="1" fill="currentColor" />
-    </svg>
-  );
-}
 
 const boardsApi = ApiBlueprint.make({
   params: define =>
@@ -33,7 +24,7 @@ const boardsPage = PageBlueprint.make({
   params: {
     path: '/boards',
     title: 'Boards',
-    icon: <BoardsIcon />,
+    icon: <RiKanbanView size={20} />,
     routeRef: rootRouteRef,
     loader: () =>
       import('./components/BoardsPage').then(m => <m.BoardsPage />),
