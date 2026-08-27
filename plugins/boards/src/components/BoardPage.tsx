@@ -396,13 +396,15 @@ export function BoardPageContent(props: {
       </Flex>
 
       <Flex align="center" gap="2" style={{ flexWrap: 'wrap' }}>
-        <SearchField
-          aria-label="Search items"
-          placeholder="Search items…"
-          value={filterText}
-          onChange={setFilterText}
-          size="small"
-        />
+        <div style={{ width: 240, flexShrink: 0 }}>
+          <SearchField
+            aria-label="Search items"
+            placeholder="Search items…"
+            value={filterText}
+            onChange={setFilterText}
+            size="small"
+          />
+        </div>
         {allTags.length > 0 && (
           <MenuTrigger>
             <Button variant="tertiary" size="small">
@@ -426,9 +428,13 @@ export function BoardPageContent(props: {
             </Menu>
           </MenuTrigger>
         )}
-                {filterActive && (
+        {filterActive && (
           <>
-            <Text variant="body-small" color="secondary">
+            <Text
+              variant="body-small"
+              color="secondary"
+              style={{ flexGrow: 1 }}
+            >
               {filteredItems.length} of {(items ?? []).length} items
             </Text>
             <Button
