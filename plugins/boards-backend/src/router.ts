@@ -121,6 +121,18 @@ export async function createRouter(
     res.status(204).end();
   });
 
+  router.get('/boards/:boardId/changes', async (req, res) => {
+    const principal = await principalOf(req);
+    res.json({
+      changes: await service.getBoardChanges(principal, req.params.boardId, {
+        limit:
+          typeof req.query.limit === 'string'
+            ? Number(req.query.limit)
+            : undefined,
+      }),
+    });
+  });
+
   router.get('/boards/:boardId/watchers', async (req, res) => {
     const principal = await principalOf(req);
     res.json({

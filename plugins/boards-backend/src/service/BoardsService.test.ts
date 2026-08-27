@@ -416,6 +416,39 @@ describe('BoardsService', () => {
     });
   });
 
+  describe('board change feed', () => {
+    it('lists recent changes newest first with item titles', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const item = await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'First',
+      });
+      await service.updateItem(alice, board.id, item.id, { title: 'Renamed' });
+      await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Second',
+      });
+      const changes = await service.getBoardChanges(alice, board.id);
+      expect(changes.length).toBe(3);
+      expect(changes[0].itemTitle).toBe('Second');
+      expect(changes[0].change.type).toBe('created');
+      expect(changes.map(entry => entry.change.at)).toEqual(
+        [...changes.map(entry => entry.change.at)].sort().reverse(),
+      );
+      const limited = await service.getBoardChanges(alice, board.id, {
+        limit: 1,
+      });
+      expect(limited).toHaveLength(1);
+    });
+
+    it('requires read access', async () => {
+      const board = await service.createBoard(alice, { name: 'Hidden' });
+      await expect(service.getBoardChanges(bob, board.id)).rejects.toThrow(
+        /not found/,
+      );
+    });
+  });
+
   describe('signals', () => {
     it('broadcasts id-only signals on item and column mutations', async () => {
       const board = await service.createBoard(alice, { name: 'B' });

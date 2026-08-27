@@ -37,6 +37,7 @@ import { BoardActions, KanbanView } from './KanbanView';
 import { TableView } from './TableView';
 import { ItemDrawer } from './ItemDrawer';
 import { ShareDialog } from './ShareDialog';
+import { RecentChangesDialog } from './RecentChangesDialog';
 import { WatchButton } from './WatchButton';
 
 function StarIcon(props: { filled: boolean }) {
@@ -63,6 +64,7 @@ export function BoardPage() {
   const [filterTags, setFilterTags] = useState<string[]>([]);
   const [filterLabels, setFilterLabels] = useState<string[]>([]);
   const [shareOpen, setShareOpen] = useState(false);
+  const [changesOpen, setChangesOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [editEntity, setEditEntity] = useState(false);
   const [error, setError] = useState<string | undefined>();
@@ -290,22 +292,27 @@ export function BoardPage() {
             <ToggleButton id="board">Board</ToggleButton>
             <ToggleButton id="table">Table</ToggleButton>
           </ToggleButtonGroup>
-          {isAdmin && (
-            <MenuTrigger>
-              <ButtonIcon
-                aria-label="More board actions"
-                variant="tertiary"
-                size="small"
-                icon={<RiMore2Fill size={16} />}
-              />
-              <Menu aria-label="Board actions">
+          <MenuTrigger>
+            <ButtonIcon
+              aria-label="More board actions"
+              variant="tertiary"
+              size="small"
+              icon={<RiMore2Fill size={16} />}
+            />
+            <Menu aria-label="Board actions">
+              <MenuItem onAction={() => setChangesOpen(true)}>
+                Recent changes…
+              </MenuItem>
+              {isAdmin && (
                 <MenuItem onAction={() => setShareOpen(true)}>Share…</MenuItem>
+              )}
+              {isAdmin && (
                 <MenuItem onAction={() => setDeleteOpen(true)}>
                   Delete board…
                 </MenuItem>
-              </Menu>
-            </MenuTrigger>
-          )}
+              )}
+            </Menu>
+          </MenuTrigger>
         </Flex>
       </Flex>
 
@@ -437,6 +444,13 @@ export function BoardPage() {
         isOpen={shareOpen}
         onOpenChange={setShareOpen}
         onChanged={refreshAll}
+      />
+
+      <RecentChangesDialog
+        boardId={board.id}
+        isOpen={changesOpen}
+        onOpenChange={setChangesOpen}
+        onOpenItem={actions.openItem}
       />
 
       <Dialog isOpen={deleteOpen} onOpenChange={setDeleteOpen}>

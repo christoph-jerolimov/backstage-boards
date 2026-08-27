@@ -9,6 +9,7 @@ import { NotificationService } from '@backstage/plugin-notifications-node';
 import { SignalsService } from '@backstage/plugin-signals-node';
 import {
   Board,
+  BoardChangeEntry,
   BoardColumn,
   BoardItem,
   BoardListEntry,
@@ -1365,6 +1366,27 @@ export class BoardsService {
       }),
     ];
     return entries.sort((a, b) => a.at.localeCompare(b.at));
+  }
+
+  async getBoardChanges(
+    principal: BoardsPrincipal,
+    boardId: string,
+    options?: { limit?: number },
+  ): Promise<BoardChangeEntry[]> {
+    await this.requireBoard(principal, boardId, 'read');
+    const limit = Math.min(Math.max(options?.limit ?? 50, 1), 200);
+    const rows: Array<ChangeRow & { item_title: string }> = await this.knex(
+      'changes',
+    )
+      .join('items', 'items.id', 'changes.item_id')
+      .where('changes.board_id', boardId)
+      .orderBy('changes.at', 'desc')
+      .limit(limit)
+      .select('changes.*', 'items.title as item_title');
+    return rows.map(row => ({
+      change: toChange(row),
+      itemTitle: row.item_title,
+    }));
   }
 
   // --------------------------------------------------------------- watches
