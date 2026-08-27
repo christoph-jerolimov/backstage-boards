@@ -670,7 +670,9 @@ export class BoardsService {
             id: uuid(),
             board_id: created.id,
             principal_ref: row.principal_ref,
-            level: row.level,
+            // the duplicator is the copy's only admin; other admins of
+            // the source become writers
+            level: row.level === 'admin' ? 'write' : row.level,
           })),
         );
       }

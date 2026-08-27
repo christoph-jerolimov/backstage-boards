@@ -374,6 +374,31 @@ describe('BoardsService', () => {
       ).toEqual(['user:default/alice:admin', 'user:default/bob:write']);
     });
 
+    it('downgrades other admins to write on the copy', async () => {
+      const board = await service.createBoard(alice, { name: 'Source' });
+      await service.addPermission(alice, board.id, {
+        principalRef: 'user:default/bob',
+        level: 'admin',
+      });
+      await service.addPermission(alice, board.id, {
+        principalRef: 'user:default/carol',
+        level: 'read',
+      });
+      // bob (also an admin of the source) duplicates it with sharing
+      const copy = await service.duplicateBoard(bob, board.id, {
+        copyColumns: false,
+        copyPermissions: true,
+      });
+      const permissions = await service.listPermissions(bob, copy.id);
+      expect(
+        permissions.map(entry => `${entry.principalRef}:${entry.level}`).sort(),
+      ).toEqual([
+        'user:default/alice:write',
+        'user:default/bob:admin',
+        'user:default/carol:read',
+      ]);
+    });
+
     it('rejects share-settings copy without source admin', async () => {
       const board = await service.createBoard(alice, {
         name: 'Source',
