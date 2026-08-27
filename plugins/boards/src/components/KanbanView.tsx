@@ -120,7 +120,17 @@ function ItemCard(props: {
     >
       <Flex align="center" gap="2" justify="between">
         {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions,jsx-a11y/click-events-have-key-events */}
-        <div style={{ flexGrow: 1, minWidth: 0 }} onClick={e => e.stopPropagation()}>
+        <div
+          style={{ flexGrow: 1, minWidth: 0 }}
+          onClick={e => {
+            // clicks on the inline-editable text must not open the
+            // drawer, but the empty area beside it should
+            e.stopPropagation();
+            if (e.target === e.currentTarget) {
+              actions.openItem(item.id);
+            }
+          }}
+        >
           <InlineEdit
             value={item.title}
             canEdit={!readonly}
