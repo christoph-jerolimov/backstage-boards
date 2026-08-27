@@ -629,6 +629,34 @@ describe('BoardsService', () => {
       expect(notifications.send).not.toHaveBeenCalled();
     });
 
+    it('lists board and item watchers for readers', async () => {
+      const { board, item } = await setupWatchedItem();
+      await service.setWatchBoard(carol, board.id, true);
+      await service.setWatchItem(carol, board.id, item.id, true);
+      await service.setWatchItem(bob, board.id, item.id, true);
+      expect(await service.listBoardWatchers(bob, board.id)).toEqual([
+        'user:default/carol',
+      ]);
+      expect(await service.listItemWatchers(bob, board.id, item.id)).toEqual([
+        'user:default/bob',
+        'user:default/carol',
+      ]);
+    });
+
+    it('rejects watcher listing without read access', async () => {
+      const board = await service.createBoard(alice, { name: 'Hidden' });
+      const item = await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Item',
+      });
+      await expect(service.listBoardWatchers(bob, board.id)).rejects.toThrow(
+        /not found/,
+      );
+      await expect(
+        service.listItemWatchers(bob, board.id, item.id),
+      ).rejects.toThrow(/not found/);
+    });
+
     it('notifies watchers when an item is deleted', async () => {
       const { board, item } = await setupWatchedItem();
       await service.setWatchItem(carol, board.id, item.id, true);

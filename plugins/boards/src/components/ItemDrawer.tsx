@@ -10,7 +10,6 @@ import {
   ButtonIcon,
   Flex,
   Select,
-  Switch,
   Text,
   TextAreaField,
   TextField,
@@ -22,6 +21,7 @@ import {
   TimelineEntry,
 } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
+import { WatchButton } from './WatchButton';
 import {
   formatDate,
   InlineEdit,
@@ -455,13 +455,16 @@ export function ItemDrawer(props: {
             </Flex>
 
             <Flex align="center" gap="2" justify="between">
-              <Switch
-                label="Watch this item"
-                isSelected={!!item.watching}
-                onChange={async watching => {
+              <WatchButton
+                watching={!!item.watching}
+                targetLabel="this item"
+                onToggle={async watching => {
                   await boardsApi.setWatchItem(board.id, item.id, watching);
                   await onChanged();
                 }}
+                loadWatchers={() =>
+                  boardsApi.listItemWatchers(board.id, item.id)
+                }
               />
               {!readonly && (
                 <Button
