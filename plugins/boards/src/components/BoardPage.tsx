@@ -5,6 +5,7 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 import { useApi } from '@backstage/frontend-plugin-api';
+import { RiMore2Fill } from '@remixicon/react';
 import {
   Button,
   ButtonIcon,
@@ -13,6 +14,9 @@ import {
   DialogFooter,
   DialogHeader,
   Flex,
+  Menu,
+  MenuItem,
+  MenuTrigger,
   Switch,
   Text,
   ToggleButton,
@@ -26,6 +30,7 @@ import { BoardActions, KanbanView } from './KanbanView';
 import { TableView } from './TableView';
 import { ItemDrawer } from './ItemDrawer';
 import { ShareDialog } from './ShareDialog';
+import { WatchButton } from './WatchButton';
 
 function StarIcon(props: { filled: boolean }) {
   return (
@@ -217,12 +222,13 @@ export function BoardPage() {
           />
         </Flex>
         <Flex align="center" gap="2" style={{ flexWrap: 'wrap' }}>
-          <Switch
-            label="Watch"
-            isSelected={board.watching}
-            onChange={watching =>
+          <WatchButton
+            watching={board.watching}
+            targetLabel="this board"
+            onToggle={watching =>
               guarded(() => boardsApi.setWatchBoard(board.id, watching))
             }
+            loadWatchers={() => boardsApi.listBoardWatchers(board.id)}
           />
           <Switch
             label="Group by assignee"
@@ -243,19 +249,20 @@ export function BoardPage() {
             <ToggleButton id="table">Table</ToggleButton>
           </ToggleButtonGroup>
           {isAdmin && (
-            <Button variant="secondary" size="small" onPress={() => setShareOpen(true)}>
-              Share
-            </Button>
-          )}
-          {isAdmin && (
-            <Button
-              variant="secondary"
-              size="small"
-              destructive
-              onPress={() => setDeleteOpen(true)}
-            >
-              Delete
-            </Button>
+            <MenuTrigger>
+              <ButtonIcon
+                aria-label="More board actions"
+                variant="tertiary"
+                size="small"
+                icon={<RiMore2Fill size={16} />}
+              />
+              <Menu aria-label="Board actions">
+                <MenuItem onAction={() => setShareOpen(true)}>Share…</MenuItem>
+                <MenuItem onAction={() => setDeleteOpen(true)}>
+                  Delete board…
+                </MenuItem>
+              </Menu>
+            </MenuTrigger>
           )}
         </Flex>
       </Flex>

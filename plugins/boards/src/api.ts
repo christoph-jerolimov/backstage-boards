@@ -77,6 +77,8 @@ export interface BoardsApi {
     itemId: string,
     watching: boolean,
   ): Promise<void>;
+  listBoardWatchers(boardId: string): Promise<string[]>;
+  listItemWatchers(boardId: string, itemId: string): Promise<string[]>;
 
   addComment(
     boardId: string,
@@ -299,6 +301,22 @@ export class BoardsClient implements BoardsApi {
       watching ? 'PUT' : 'DELETE',
       `/boards/${boardId}/items/${itemId}/watch`,
     );
+  }
+
+  async listBoardWatchers(boardId: string): Promise<string[]> {
+    const result = await this.request<{ watchers: string[] }>(
+      'GET',
+      `/boards/${boardId}/watchers`,
+    );
+    return result.watchers;
+  }
+
+  async listItemWatchers(boardId: string, itemId: string): Promise<string[]> {
+    const result = await this.request<{ watchers: string[] }>(
+      'GET',
+      `/boards/${boardId}/items/${itemId}/watchers`,
+    );
+    return result.watchers;
   }
 
   addComment(

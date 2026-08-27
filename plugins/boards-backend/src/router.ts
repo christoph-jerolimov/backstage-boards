@@ -121,6 +121,13 @@ export async function createRouter(
     res.status(204).end();
   });
 
+  router.get('/boards/:boardId/watchers', async (req, res) => {
+    const principal = await principalOf(req);
+    res.json({
+      watchers: await service.listBoardWatchers(principal, req.params.boardId),
+    });
+  });
+
   // ---- permissions
 
   router.get('/boards/:boardId/permissions', async (req, res) => {
@@ -298,6 +305,17 @@ export async function createRouter(
       false,
     );
     res.status(204).end();
+  });
+
+  router.get('/boards/:boardId/items/:itemId/watchers', async (req, res) => {
+    const principal = await principalOf(req);
+    res.json({
+      watchers: await service.listItemWatchers(
+        principal,
+        req.params.boardId,
+        req.params.itemId,
+      ),
+    });
   });
 
   // ---- comments and timeline

@@ -280,6 +280,24 @@ describe('createRouter', () => {
     expect(favorites.body.boards.map((b: any) => b.id)).toEqual([board.id]);
   });
 
+  it('lists watchers over http for readers only', async () => {
+    const board = await service.createBoard(alice, {
+      name: 'B',
+      visibility: 'logged-in-read',
+    });
+    await request(app)
+      .put(`/boards/${board.id}/watch`)
+      .set('x-test-user', 'alice')
+      .expect(204);
+    const watchers = await request(app)
+      .get(`/boards/${board.id}/watchers`)
+      .set('x-test-user', 'bob')
+      .expect(200);
+    expect(watchers.body.watchers).toEqual(['user:default/alice']);
+    // anonymous cannot read a logged-in board's watchers
+    await request(app).get(`/boards/${board.id}/watchers`).expect(404);
+  });
+
   it('lets service principals create external read-only items', async () => {
     const board = await service.createBoard(alice, { name: 'B' });
     const columnId = (await service.getBoard(alice, board.id)).columns[0].id;

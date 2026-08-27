@@ -1287,6 +1287,37 @@ export class BoardsService {
     }
   }
 
+  async listBoardWatchers(
+    principal: BoardsPrincipal,
+    boardId: string,
+  ): Promise<string[]> {
+    await this.requireBoard(principal, boardId, 'read');
+    const rows = await this.knex('watches')
+      .where({ target_type: 'board', target_id: boardId })
+      .orderBy('user_ref')
+      .select('user_ref');
+    return rows.map(row => row.user_ref as string);
+  }
+
+  async listItemWatchers(
+    principal: BoardsPrincipal,
+    boardId: string,
+    itemId: string,
+  ): Promise<string[]> {
+    await this.requireBoard(principal, boardId, 'read');
+    const item = await this.knex('items')
+      .where({ id: itemId, board_id: boardId })
+      .first();
+    if (!item) {
+      throw new NotFoundError(`Item ${itemId} not found`);
+    }
+    const rows = await this.knex('watches')
+      .where({ target_type: 'item', target_id: itemId })
+      .orderBy('user_ref')
+      .select('user_ref');
+    return rows.map(row => row.user_ref as string);
+  }
+
   /** Watchers of the item or its board, excluding the actor. */
   private async watcherRefs(
     boardId: string,
