@@ -79,6 +79,14 @@ export function ItemMenu(props: {
           </Menu>
         </SubmenuTrigger>
       )}
+      {!readonly && (
+        <MenuItem
+          color="danger"
+          onAction={() => actions.deleteItem(item.id)}
+        >
+          Delete item
+        </MenuItem>
+      )}
     </Menu>
   );
 }

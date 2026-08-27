@@ -47,6 +47,7 @@ export interface BoardActions {
   openItem: (itemId: string) => void;
   renameItem: (itemId: string, title: string) => Promise<void>;
   setItemDueDate: (itemId: string, dueDate: string | null) => Promise<void>;
+  deleteItem: (itemId: string) => Promise<void>;
 }
 
 function MoreIcon() {
