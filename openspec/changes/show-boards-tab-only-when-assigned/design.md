@@ -9,8 +9,10 @@ See `proposal.md` — Why. What shapes the approach:
   `filter?: string | FilterPredicate | ((entity: Entity) => boolean)`, and the
   extension's config schema accepts a `FilterPredicate`, so a default set in
   params stays overridable from `app-config.yaml`. A `FilterPredicate` is an
-  object of dot-separated paths, e.g. `{ 'metadata.labels.boards': 'true' }`;
-  matching is case-insensitive.
+  object of dot-separated paths, e.g.
+  `{ 'metadata.labels.boards/is-referenced': 'auto-detected' }` — only `.`
+  separates path segments, so a prefixed label key stays one segment. Matching
+  is case-insensitive.
 - Boards store their entity assignments in `board_entities` (many refs per
   board). `listBoards` already filters by `entityRef` and excludes archived
   boards (`whereNull('archived_at')`) — the tab therefore only ever shows
@@ -62,14 +64,16 @@ two backend features and pulls catalog-processing types into the boards plugin
 for no gain. The module depends on `@internal/plugin-boards-common` for the
 shared label constant and on nothing from `boards-backend` — it talks HTTP.
 
-**Label `boards: "true"`, always derived.**
-`postProcessEntity` sets `metadata.labels.boards = 'true'` when referenced and
-deletes the key otherwise — including when the source declared it. Deleting
+**Label `boards/is-referenced: "auto-detected"`, always derived.**
+`postProcessEntity` sets `metadata.labels['boards/is-referenced'] =
+'auto-detected'` when referenced and deletes the key otherwise — including when the source declared it. Deleting
 unconditionally on the negative path is what makes the label unforgeable and
 what makes removal work when the last board reference goes away. An annotation
 (`boards.backstage.io/...`) was the alternative; a label is the right kind
 because it is a small, filterable, closed-vocabulary value, and label paths are
-what the frontend filter predicate reads.
+what the frontend filter predicate reads. Both key and value stay within the
+Kubernetes-style label rules the catalog enforces (`boards` prefix +
+`is-referenced` name; a value of letters and dashes).
 
 **One lookup per entity, not a cached full set.**
 The endpoint answers a single ref: `GET /service/entity-references?entityRef=…`
@@ -120,7 +124,8 @@ outage freezes the label at its last known value; only entities never processed
 before are left unlabelled.
 
 **Frontend: a default filter param, still config-overridable.**
-`entityBoardsContent` gets `filter: { 'metadata.labels.boards': 'true' }` in its
+`entityBoardsContent` gets
+`filter: { 'metadata.labels.boards/is-referenced': 'auto-detected' }` in its
 params. Because `EntityContentBlueprint` exposes `filter` in its config schema,
 an operator can override it under
 `extensions: - entity-content:boards/entity: config: filter: …` — which is the
@@ -149,10 +154,11 @@ existence beyond what the tab's presence already implies.
 - [One HTTP request per entity per processing run] → Local, indexed, and
   bounded by the catalog size; the full-set endpoint stays available as a later
   optimisation if a large catalog ever makes it matter.
-- [`boards` is a short, unnamespaced label key that could collide with an
-  existing deployment convention] → The processor overwrites it deterministically
-  and the READMEs document the ownership; a namespaced key was rejected because
-  the requested behaviour is the plain `boards: "true"` label.
+- [The label key is owned outright: whatever an entity declares under
+  `boards/is-referenced` is overwritten or deleted] → The `boards/` prefix
+  keeps it clear of unprefixed deployment conventions, the value
+  `auto-detected` says the platform wrote it, and the READMEs document the
+  ownership.
 
 ## Migration Plan
 

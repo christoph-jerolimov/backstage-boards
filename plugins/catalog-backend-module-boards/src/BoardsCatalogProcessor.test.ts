@@ -83,7 +83,9 @@ describe('BoardsCatalogProcessor', () => {
   it('labels an entity a board references', async () => {
     fetchMock.mockResolvedValue(mockResponse(true));
     const result = await process(entityWithLabels());
-    expect(result.metadata.labels).toEqual({ boards: 'true' });
+    expect(result.metadata.labels).toEqual({
+      'boards/is-referenced': 'auto-detected',
+    });
   });
 
   it('asks the boards backend for this entity, as a service', async () => {
@@ -104,7 +106,9 @@ describe('BoardsCatalogProcessor', () => {
 
   it('strips a label the entity declared itself', async () => {
     fetchMock.mockResolvedValue(mockResponse(false));
-    const result = await process(entityWithLabels({ boards: 'true' }));
+    const result = await process(
+      entityWithLabels({ 'boards/is-referenced': 'auto-detected' }),
+    );
     expect(result.metadata.labels).toEqual({});
   });
 
@@ -115,7 +119,9 @@ describe('BoardsCatalogProcessor', () => {
 
     fetchMock.mockRejectedValue(new Error('connection refused'));
     const result = await process(entityWithLabels(), cache);
-    expect(result.metadata.labels).toEqual({ boards: 'true' });
+    expect(result.metadata.labels).toEqual({
+      'boards/is-referenced': 'auto-detected',
+    });
     expect(logger.warn).toHaveBeenCalledWith(
       expect.stringContaining('keeping the last known state'),
     );
@@ -137,7 +143,9 @@ describe('BoardsCatalogProcessor', () => {
       statusText: 'Forbidden',
       json: async () => ({}),
     } as Response);
-    const result = await process(entityWithLabels({ boards: 'true' }));
+    const result = await process(
+      entityWithLabels({ 'boards/is-referenced': 'auto-detected' }),
+    );
     expect(result.metadata.labels).toEqual({});
     expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('403'));
   });

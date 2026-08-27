@@ -17,9 +17,10 @@ Backstage UI component exists (drag & drop, the drawer overlay).
 ## When the entity "Boards" tab appears
 
 The tab is not offered on every entity. It is filtered on the label
-`boards: "true"`, which `@internal/plugin-catalog-backend-module-boards`
-derives for entities that at least one non-archived board references — so
-**that module must be installed in the backend**, or the tab appears nowhere.
+`boards/is-referenced: "auto-detected"`, which
+`@internal/plugin-catalog-backend-module-boards` derives for entities that at
+least one non-archived board references — so **that module must be installed
+in the backend**, or the tab appears nowhere.
 
 Because the label says "a board references this entity" and not "this viewer
 may read that board", the tab can be empty for a user without access to the

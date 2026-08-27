@@ -39,7 +39,8 @@ function withBoardsLabel(entity: Entity, referenced: boolean): Entity {
 
 /**
  * Labels every entity that at least one non-archived board references with
- * `boards: "true"`, and removes that label from every other entity.
+ * `boards/is-referenced: "auto-detected"`, and removes that label from every
+ * other entity.
  *
  * The label is always derived from the boards backend, never taken from the
  * entity's own description, so a `catalog-info.yaml` cannot claim it. The

@@ -6,10 +6,10 @@
  * run: it is set on referenced entities and removed from all others, so a
  * value declared in an entity's own description never survives.
  */
-export const BOARDS_ENTITY_LABEL = 'boards';
+export const BOARDS_ENTITY_LABEL = 'boards/is-referenced';
 
 /** The only value {@link BOARDS_ENTITY_LABEL} is ever set to. */
-export const BOARDS_ENTITY_LABEL_VALUE = 'true';
+export const BOARDS_ENTITY_LABEL_VALUE = 'auto-detected';
 
 /**
  * The label as a dot-separated entity path, for use in catalog filter

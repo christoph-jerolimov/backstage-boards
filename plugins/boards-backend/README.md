@@ -18,7 +18,8 @@ sync integrations) are read-only for regular users.
 `GET /service/entity-references?entityRef=…` answers `{ referenced: boolean }`
 for the catalog processor in
 `@internal/plugin-catalog-backend-module-boards`, which turns that answer into
-the `boards: "true"` label deciding where the entity "Boards" tab appears.
+the `boards/is-referenced: "auto-detected"` label deciding where the entity
+"Boards" tab appears.
 
 The endpoint accepts **service-to-service credentials only**: its answer
 deliberately ignores board visibility, so letting a user call it would reveal

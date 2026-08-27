@@ -29,7 +29,9 @@ describe('entity boards content filter', () => {
 
   it('matches only entities a board references', () => {
     const filter = filterFor();
-    expect(filter(entity({ boards: 'true' }))).toBe(true);
+    expect(filter(entity({ 'boards/is-referenced': 'auto-detected' }))).toBe(
+      true,
+    );
     expect(filter(entity({ other: 'label' }))).toBe(false);
     expect(filter(entity())).toBe(false);
   });

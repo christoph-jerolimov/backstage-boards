@@ -9,12 +9,14 @@ so the entity "Boards" tab can be shown only where it has something to show.
 catalog processes. It asks the boards backend whether any non-archived board
 references that entity and then:
 
-- sets the label `boards: "true"` on the entity if one does, or
+- sets the label `boards/is-referenced: "auto-detected"` on the entity if one
+  does, or
 - removes that label if none does.
 
 The label is always derived, never read from the entity's own description: an
-entity that declares `boards: "true"` in its `catalog-info.yaml` has the label
-stripped again unless a board really references it.
+entity that declares `boards/is-referenced: "auto-detected"` in its
+`catalog-info.yaml` has the label stripped again unless a board really
+references it.
 
 The lookup goes to `GET /api/boards/service/entity-references?entityRef=…`
 with a plugin request token targeting the `boards` plugin. That endpoint only

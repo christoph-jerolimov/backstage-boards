@@ -11,7 +11,8 @@ one board references.
 
 - A new backend module package `@internal/plugin-catalog-backend-module-boards`
   registers a `BoardsCatalogProcessor` that, in `postProcessEntity`, sets the
-  label `boards: "true"` on entities referenced by at least one board and
+  label `boards/is-referenced: "auto-detected"` on entities referenced by at
+  least one board and
   removes it otherwise. The label is always derived, never taken from the
   source entity (`catalog-info.yaml` cannot forge it).
 - boards-backend gains a service-to-service-only endpoint that answers whether
@@ -36,7 +37,8 @@ one board references.
 ### New Capabilities
 
 - `boards/catalog-entity-tab`: when the catalog "Boards" tab is shown for an
-  entity — the derived `boards` label, the service-only reference lookup, the
+  entity — the derived `boards/is-referenced` label, the service-only reference
+  lookup, the
   refresh trigger that keeps the label current, and the access-aware empty
   state.
 
@@ -55,5 +57,5 @@ one board references.
 - `plugins/boards`: filter on `entityBoardsContent`, empty-state wording,
   README.
 - Catalog data: every processed entity referenced by a board carries a
-  `boards: "true"` label, visible through the catalog API and usable in other
-  entity filters.
+  `boards/is-referenced: "auto-detected"` label, visible through the catalog
+  API and usable in other entity filters.

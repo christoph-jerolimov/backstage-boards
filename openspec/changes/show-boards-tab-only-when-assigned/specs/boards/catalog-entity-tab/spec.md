@@ -8,26 +8,27 @@ viewer cannot access.
 
 ### Requirement: Referenced entities are marked in the catalog
 The system SHALL mark every catalog entity that is referenced by at least one
-non-archived board with the label `boards: "true"`, and SHALL NOT carry that
+non-archived board with the label `boards/is-referenced: "auto-detected"`, and
+SHALL NOT carry that
 label on any other entity. The label SHALL be derived by the system on every
 processing run; a value present in the entity's source description SHALL be
 ignored and replaced by the derived value.
 
 #### Scenario: Referenced entity gets the label
 - **WHEN** a catalog entity is processed while a non-archived board references it
-- **THEN** the stored entity carries the label `boards: "true"`
+- **THEN** the stored entity carries the label `boards/is-referenced: "auto-detected"`
 
 #### Scenario: Unreferenced entity carries no label
 - **WHEN** a catalog entity is processed while no non-archived board references it
-- **THEN** the stored entity carries no `boards` label, including when its source description declared one
+- **THEN** the stored entity carries no `boards/is-referenced` label, including when its source description declared one
 
 #### Scenario: Source-declared label is not trusted
-- **WHEN** an entity whose `catalog-info.yaml` declares `boards: "true"` is processed and no board references it
+- **WHEN** an entity whose `catalog-info.yaml` declares `boards/is-referenced: "auto-detected"` is processed and no board references it
 - **THEN** the label is removed from the stored entity
 
 #### Scenario: Archived boards do not mark their entities
 - **WHEN** the only boards referencing an entity are archived
-- **THEN** the entity is processed as unreferenced and carries no `boards` label
+- **THEN** the entity is processed as unreferenced and carries no `boards/is-referenced` label
 
 ### Requirement: Board references are only readable service-to-service
 The boards backend SHALL expose the lookup of whether an entity ref is
@@ -86,16 +87,17 @@ catalog) SHALL be logged and SHALL NOT fail the board operation.
 
 ### Requirement: The Boards tab is shown only for marked entities
 The catalog "Boards" tab SHALL be offered only on entities carrying the
-`boards: "true"` label, and SHALL be absent on all other entities. The
+`boards/is-referenced: "auto-detected"` label, and SHALL be absent on all
+other entities. The
 condition SHALL be overridable through app configuration so a deployment can
 widen or narrow it.
 
 #### Scenario: Tab on a referenced entity
-- **WHEN** a user opens an entity carrying the `boards` label
+- **WHEN** a user opens an entity carrying the `boards/is-referenced` label
 - **THEN** the "Boards" tab is offered and lists the boards for that entity the user can access
 
 #### Scenario: No tab on an unreferenced entity
-- **WHEN** a user opens an entity without the `boards` label
+- **WHEN** a user opens an entity without the `boards/is-referenced` label
 - **THEN** no "Boards" tab is offered, and its route is not reachable for that entity
 
 #### Scenario: Deployment overrides the condition

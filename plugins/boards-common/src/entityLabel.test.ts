@@ -6,8 +6,8 @@ import {
 
 describe('boards entity label', () => {
   it('is exported from the package index', () => {
-    expect(BOARDS_ENTITY_LABEL).toBe('boards');
-    expect(BOARDS_ENTITY_LABEL_VALUE).toBe('true');
+    expect(BOARDS_ENTITY_LABEL).toBe('boards/is-referenced');
+    expect(BOARDS_ENTITY_LABEL_VALUE).toBe('auto-detected');
   });
 
   it('exposes the label as an entity path for filter predicates', () => {
