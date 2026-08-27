@@ -5,23 +5,33 @@ import { useSignal } from '@backstage/plugin-signals-react';
 import {
   Button,
   ButtonIcon,
+  Cell,
+  Column,
   Dialog,
   DialogBody,
   DialogFooter,
   DialogHeader,
   Flex,
+  Menu,
+  MenuItem,
+  Row,
   Tab,
+  TableBody,
+  TableHeader,
+  TableRoot,
   TabList,
   TabPanel,
   Tabs,
   Text,
   TextField,
 } from '@backstage/ui';
+import { RiArrowRightLine, RiStarFill, RiStarLine } from '@remixicon/react';
 import { EntityRefLink } from '@backstage/plugin-catalog-react';
 import { BoardListEntry } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
 import { useBoardsQuery, boardsQueryClient, queryKeys } from '../queries';
 import { MyItemsList } from './MyItemsPage';
+import { RowActionsMenu, RowContextMenu, useRowContextMenu } from './RowMenu';
 
 function StarIcon(props: { filled: boolean }) {
   return (
@@ -36,64 +46,117 @@ function StarIcon(props: { filled: boolean }) {
   );
 }
 
-function BoardRows(props: {
+function favoriteLabel(board: BoardListEntry): string {
+  return board.favorite
+    ? `Remove ${board.name} from favorites`
+    : `Add ${board.name} to favorites`;
+}
+
+/** The shared board actions menu: row button and right-click alike. */
+function BoardMenu(props: {
+  board: BoardListEntry;
+  onOpen: (board: BoardListEntry) => void;
+  onToggleFavorite: (board: BoardListEntry) => void;
+}) {
+  const { board, onOpen, onToggleFavorite } = props;
+  return (
+    <Menu aria-label={`Actions for ${board.name}`}>
+      <MenuItem
+        iconStart={<RiArrowRightLine size={16} />}
+        onAction={() => onOpen(board)}
+      >
+        Open board
+      </MenuItem>
+      <MenuItem
+        iconStart={
+          board.favorite ? <RiStarFill size={16} /> : <RiStarLine size={16} />
+        }
+        onAction={() => onToggleFavorite(board)}
+      >
+        {board.favorite ? 'Remove from favorites' : 'Add to favorites'}
+      </MenuItem>
+    </Menu>
+  );
+}
+
+function BoardsTable(props: {
+  label: string;
   boards: BoardListEntry[];
   onToggleFavorite: (board: BoardListEntry) => void;
   emptyText: string;
 }) {
+  const { label, boards, onToggleFavorite, emptyText } = props;
   const navigate = useNavigate();
-  if (props.boards.length === 0) {
-    return <Text>{props.emptyText}</Text>;
+  const contextMenu = useRowContextMenu<BoardListEntry>();
+  const openBoard = (board: BoardListEntry) => navigate(board.id);
+  if (boards.length === 0) {
+    return <Text>{emptyText}</Text>;
   }
   return (
-    <Flex direction="column" gap="2">
-      {props.boards.map(board => (
-        <Flex
-          key={board.id}
-          align="center"
-          gap="3"
-          style={{
-            border: '1px solid var(--bui-border-1)',
-            borderRadius: 8,
-            padding: '8px 12px',
-          }}
-        >
-          <ButtonIcon
-            aria-label={
-              board.favorite
-                ? `Remove ${board.name} from favorites`
-                : `Add ${board.name} to favorites`
-            }
-            variant="tertiary"
-            size="small"
-            icon={<StarIcon filled={board.favorite} />}
-            onPress={() => props.onToggleFavorite(board)}
-          />
-          <div style={{ flexGrow: 1, minWidth: 0 }}>
-            <Button
-              variant="tertiary"
-              onPress={() => navigate(board.id)}
-              aria-label={`Open board ${board.name}`}
+    <>
+      <TableRoot aria-label={label} onRowAction={key => navigate(String(key))}>
+        <TableHeader>
+          <Column>Favorite</Column>
+          <Column isRowHeader>Name</Column>
+          <Column>Entities</Column>
+          <Column>Access</Column>
+          <Column>Actions</Column>
+        </TableHeader>
+        <TableBody>
+          {boards.map(board => (
+            <Row
+              key={board.id}
+              id={board.id}
+              onContextMenu={(event: React.MouseEvent) =>
+                contextMenu.open(board, event)
+              }
             >
-              {board.name}
-            </Button>
-          </div>
-          {board.entityRefs.length > 0 && (
-            <Text variant="body-small">
-              {board.entityRefs.map((ref, index) => (
-                <span key={ref}>
-                  {index > 0 && ', '}
-                  <EntityRefLink entityRef={ref} />
-                </span>
-              ))}
-            </Text>
-          )}
-          <Text variant="body-small" color="secondary">
-            {board.access}
-          </Text>
-        </Flex>
-      ))}
-    </Flex>
+              <Cell>
+                <ButtonIcon
+                  aria-label={favoriteLabel(board)}
+                  variant="tertiary"
+                  size="small"
+                  icon={<StarIcon filled={board.favorite} />}
+                  onPress={() => onToggleFavorite(board)}
+                />
+              </Cell>
+              <Cell>{board.name}</Cell>
+              <Cell>
+                {board.entityRefs.map((ref, index) => (
+                  <span key={ref}>
+                    {index > 0 && ', '}
+                    <EntityRefLink entityRef={ref} />
+                  </span>
+                ))}
+              </Cell>
+              <Cell>{board.access}</Cell>
+              <Cell>
+                <RowActionsMenu label={`Actions for ${board.name}`}>
+                  <BoardMenu
+                    board={board}
+                    onOpen={openBoard}
+                    onToggleFavorite={onToggleFavorite}
+                  />
+                </RowActionsMenu>
+              </Cell>
+            </Row>
+          ))}
+        </TableBody>
+      </TableRoot>
+      <RowContextMenu
+        state={contextMenu.state}
+        onClose={contextMenu.close}
+        label={board => `Context menu for ${board.name}`}
+      >
+        {board => (
+          <BoardMenu
+            board={board}
+            onOpen={openBoard}
+            onToggleFavorite={onToggleFavorite}
+          />
+        )}
+      </RowContextMenu>
+    </>
   );
 }
 
@@ -152,14 +215,9 @@ export function BoardListPage() {
         <Text variant="title-medium" as="h1">
           Boards
         </Text>
-        <Flex gap="2">
-          <Button variant="secondary" onPress={() => navigate('my-items')}>
-            My items
-          </Button>
-          <Button variant="primary" onPress={() => setCreateOpen(true)}>
-            Create board
-          </Button>
-        </Flex>
+        <Button variant="primary" onPress={() => setCreateOpen(true)}>
+          Create board
+        </Button>
       </Flex>
       {error && <Text color="danger">{error}</Text>}
       {loading ? (
@@ -172,14 +230,16 @@ export function BoardListPage() {
             <Tab id="my-items">My items</Tab>
           </TabList>
           <TabPanel id="favorites">
-            <BoardRows
+            <BoardsTable
+              label="Favorite boards"
               boards={favorites}
               onToggleFavorite={toggleFavorite}
               emptyText="No favorite boards yet — star a board in the All tab."
             />
           </TabPanel>
           <TabPanel id="all">
-            <BoardRows
+            <BoardsTable
+              label="All boards"
               boards={boards ?? []}
               onToggleFavorite={toggleFavorite}
               emptyText="No boards are accessible to you yet. Create one!"

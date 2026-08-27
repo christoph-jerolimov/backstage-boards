@@ -1,10 +1,4 @@
-import {
-  ButtonIcon,
-  Menu,
-  MenuItem,
-  MenuTrigger,
-  SubmenuTrigger,
-} from '@backstage/ui';
+import { Menu, MenuItem, SubmenuTrigger } from '@backstage/ui';
 import { useApi, identityApiRef } from '@backstage/frontend-plugin-api';
 import { parseEntityRef } from '@backstage/catalog-model';
 import {
@@ -17,6 +11,7 @@ import {
   tomorrowISO,
 } from '@internal/plugin-boards-common';
 import { useAsyncData } from './common';
+import { RowContextMenu, RowContextMenuState } from './RowMenu';
 import type { BoardActions } from './KanbanView';
 
 function assigneeLabel(ref: string): string {
@@ -143,19 +138,9 @@ export function ItemMenu(props: {
   );
 }
 
-export interface ContextMenuState {
-  item: BoardItem;
-  x: number;
-  y: number;
-}
-
-/**
- * The shared menu opened at the pointer position: a controlled
- * MenuTrigger anchored to an invisible button placed where the user
- * right-clicked.
- */
+/** The item actions menu opened at the pointer on right-click. */
 export function ItemContextMenu(props: {
-  state: ContextMenuState | undefined;
+  state: RowContextMenuState<BoardItem> | undefined;
   onClose: () => void;
   columns: BoardColumn[];
   readonly: boolean;
@@ -163,33 +148,21 @@ export function ItemContextMenu(props: {
   assigneePool: string[];
 }) {
   const { state, onClose, columns, readonly, actions, assigneePool } = props;
-  if (!state) {
-    return null;
-  }
   return (
-    <MenuTrigger isOpen onOpenChange={open => !open && onClose()}>
-      <ButtonIcon
-        aria-label={`Context menu for ${state.item.title}`}
-        icon={<span />}
-        style={{
-          position: 'fixed',
-          left: state.x,
-          top: state.y,
-          width: 1,
-          height: 1,
-          minWidth: 0,
-          padding: 0,
-          opacity: 0,
-          pointerEvents: 'none',
-        }}
-      />
-      <ItemMenu
-        item={state.item}
-        columns={columns}
-        readonly={readonly}
-        actions={actions}
-        assigneePool={assigneePool}
-      />
-    </MenuTrigger>
+    <RowContextMenu
+      state={state}
+      onClose={onClose}
+      label={item => `Context menu for ${item.title}`}
+    >
+      {item => (
+        <ItemMenu
+          item={item}
+          columns={columns}
+          readonly={readonly}
+          actions={actions}
+          assigneePool={assigneePool}
+        />
+      )}
+    </RowContextMenu>
   );
 }

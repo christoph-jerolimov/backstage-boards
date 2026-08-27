@@ -25,7 +25,8 @@ import {
 } from '@internal/plugin-boards-common';
 import { GroupByMode, groupItems, positionBefore } from './grouping';
 import { GroupLabel } from './GroupLabel';
-import { ContextMenuState, ItemContextMenu, ItemMenu } from './ItemMenu';
+import { ItemContextMenu, ItemMenu } from './ItemMenu';
+import { useRowContextMenu } from './RowMenu';
 import { InlineEdit } from './common';
 import { AssigneeAvatars } from './AssigneeAvatars';
 import { DueDateBadge } from './DueDate';
@@ -434,7 +435,7 @@ export function KanbanView(props: {
 }) {
   const { board, items, canWrite, actions, groupBy } = props;
   const assigneePool = [...new Set(items.flatMap(item => item.assignees))];
-  const [contextMenu, setContextMenu] = useState<ContextMenuState | undefined>();
+  const contextMenu = useRowContextMenu<BoardItem>();
   const [deleteTarget, setDeleteTarget] = useState<BoardColumn | undefined>();
   const [moveItemsTo, setMoveItemsTo] = useState<string | undefined>();
   const [addingColumn, setAddingColumn] = useState(false);
@@ -461,10 +462,7 @@ export function KanbanView(props: {
           actions={actions}
           groupBy={groupBy}
           assigneePool={assigneePool}
-          onItemContextMenu={(item, event) => {
-            event.preventDefault();
-            setContextMenu({ item, x: event.clientX, y: event.clientY });
-          }}
+          onItemContextMenu={contextMenu.open}
           onRequestDelete={(target, hasItems) => {
             if (hasItems) {
               setDeleteTarget(target);
@@ -508,10 +506,10 @@ export function KanbanView(props: {
           </Button>
         ))}
       <ItemContextMenu
-        state={contextMenu}
-        onClose={() => setContextMenu(undefined)}
+        state={contextMenu.state}
+        onClose={contextMenu.close}
         columns={board.columns}
-        readonly={!canWrite || !!contextMenu?.item.externalManager}
+        readonly={!canWrite || !!contextMenu.state?.row.externalManager}
         actions={actions}
         assigneePool={assigneePool}
       />

@@ -29,7 +29,7 @@ button at the pointer — for right-click. See proposal.md for why.
 exports `useRowContextMenu<T>()` (state plus an `open(row, event)` that
 calls `preventDefault`), `RowContextMenu` (the invisible anchored
 `MenuTrigger`, rendering its children for the captured row), and
-`RowActionsCell` (the three-dot `ButtonIcon` + `MenuTrigger`).
+`RowActionsMenu` (the three-dot `ButtonIcon` + `MenuTrigger` for a row's actions cell).
 `ItemContextMenu` is rebuilt on `RowContextMenu` so the board table,
 the boards list, and my items share one copy of the fixed-position
 trick. The alternative — pasting the anchor into two more components —
