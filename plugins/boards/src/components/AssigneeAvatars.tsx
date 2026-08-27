@@ -167,10 +167,20 @@ export function AssigneeAvatars(props: { refs: string[] }) {
         </span>
       )}
       {entityRefs.length === 1 && (
-        <Text variant="body-x-small">
-          {profiles.get(entityRefs[0])?.displayName ??
-            refFallbackName(entityRefs[0])}
-        </Text>
+        // clicking the name navigates to the entity, not the drawer
+        // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
+        <span onClick={event => event.stopPropagation()}>
+          <Text variant="body-x-small">
+            <EntityRefLink
+              entityRef={entityRefs[0]}
+              hideIcon
+              disableTooltip
+            >
+              {profiles.get(entityRefs[0])?.displayName ??
+                refFallbackName(entityRefs[0])}
+            </EntityRefLink>
+          </Text>
+        </span>
       )}
       {textRefs.map(ref => (
         <Badge key={ref} size="small">
