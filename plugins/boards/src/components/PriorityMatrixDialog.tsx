@@ -1,12 +1,65 @@
-import { Button, Dialog, DialogBody, DialogHeader, Text } from '@backstage/ui';
+import { useState } from 'react';
+import { Dialog, DialogBody, DialogHeader, Text } from '@backstage/ui';
 import { BoardItem, BoardWithContext } from '@internal/plugin-boards-common';
-import { ColorDot } from './StatusBadge';
+import { NO_PRIORITY, REST_LABEL } from './grouping';
+import { StatusChip } from './StatusBadge';
+
+/** One row of the matrix: a priority, or the trailing no-priority rest. */
+type MatrixRow = {
+  key: string;
+  name: string;
+  color?: React.ComponentProps<typeof StatusChip>['color'];
+  matches: (item: BoardItem) => boolean;
+};
+
+/** Toggles `key` in `set`, returning a new set. */
+function toggled(set: Set<string>, key: string): Set<string> {
+  const next = new Set(set);
+  if (next.has(key)) {
+    next.delete(key);
+  } else {
+    next.add(key);
+  }
+  return next;
+}
+
+/**
+ * A header badge that toggles its status/priority in and out of the
+ * sums. Everything starts selected; an unselected badge dims but its
+ * cells keep their counts.
+ */
+function ToggleBadge(props: {
+  label: string;
+  color?: React.ComponentProps<typeof StatusChip>['color'];
+  selected: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={props.selected}
+      onClick={props.onToggle}
+      style={{
+        background: 'none',
+        border: 'none',
+        padding: 0,
+        cursor: 'pointer',
+        font: 'inherit',
+        color: 'inherit',
+        opacity: props.selected ? 1 : 0.4,
+      }}
+    >
+      <StatusChip color={props.color}>{props.label}</StatusChip>
+    </button>
+  );
+}
 
 /**
  * The status × priority matrix: one column per board column, one row per
  * priority (order 1 first) plus a trailing "No priority" row when items
- * without one exist. Cells hold the matching items; clicking one opens
- * its details.
+ * without one exist. Cells show the count of matching items; a sum
+ * column, a sum row, and an overall total aggregate the combinations
+ * whose status and priority badges are selected.
  */
 export function PriorityMatrixDialog(props: {
   board: BoardWithContext;
@@ -14,103 +67,145 @@ export function PriorityMatrixDialog(props: {
   items: BoardItem[];
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onOpenItem: (itemId: string) => void;
 }) {
-  const { board, items, isOpen, onOpenChange, onOpenItem } = props;
+  const { board, items, isOpen, onOpenChange } = props;
+  // stored as the *unselected* sets, so the default is everything selected
+  const [unselectedStatuses, setUnselectedStatuses] = useState(
+    new Set<string>(),
+  );
+  const [unselectedRows, setUnselectedRows] = useState(new Set<string>());
+
   const priorities = [...board.priorities].sort((a, b) => a.order - b.order);
-  const hasUnprioritized = items.some(item => !item.priorityId);
-  const rows: Array<{
-    key: string;
-    label: React.ReactNode;
-    matches: (item: BoardItem) => boolean;
-  }> = [
+  const rows: MatrixRow[] = [
     ...priorities.map(priority => ({
       key: priority.id,
-      label: (
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <ColorDot color={priority.color} size={8} />
-          {priority.name}
-        </span>
-      ),
+      name: priority.name,
+      color: priority.color,
       matches: (item: BoardItem) => item.priorityId === priority.id,
     })),
-    ...(hasUnprioritized
+    ...(items.some(item => !item.priorityId)
       ? [
           {
-            key: 'no-priority',
-            label: <>No priority</>,
+            key: NO_PRIORITY,
+            name: REST_LABEL.priority,
             matches: (item: BoardItem) => !item.priorityId,
           },
         ]
       : []),
   ];
+
+  const count = (columnId: string, row: MatrixRow) =>
+    items.filter(item => item.columnId === columnId && row.matches(item))
+      .length;
+  const statusSelected = (columnId: string) =>
+    !unselectedStatuses.has(columnId);
+  const rowSelected = (row: MatrixRow) => !unselectedRows.has(row.key);
+  // every sum counts only combinations whose status AND priority are
+  // selected, so an unselected axis reads 0 in its own sum too
+  const rowSum = (row: MatrixRow) =>
+    rowSelected(row)
+      ? board.columns
+          .filter(column => statusSelected(column.id))
+          .reduce((sum, column) => sum + count(column.id, row), 0)
+      : 0;
+  const columnSum = (columnId: string) =>
+    statusSelected(columnId)
+      ? rows
+          .filter(rowSelected)
+          .reduce((sum, row) => sum + count(columnId, row), 0)
+      : 0;
+  const total = rows.reduce((sum, row) => sum + rowSum(row), 0);
+
   const cellStyle: React.CSSProperties = {
     border: '1px solid var(--bui-border-1)',
     padding: 8,
-    verticalAlign: 'top',
-    minWidth: 140,
+    textAlign: 'center',
+    minWidth: 80,
+  };
+  const headerCellStyle: React.CSSProperties = {
+    ...cellStyle,
+    textAlign: 'left',
   };
   return (
     <Dialog isOpen={isOpen} onOpenChange={onOpenChange} width="90%">
       <DialogHeader>Priority matrix</DialogHeader>
       <DialogBody>
-        <div style={{ overflowX: 'auto' }}>
+        <Text variant="body-small" color="secondary">
+          Click a status or priority badge to leave it out of the sums.
+        </Text>
+        <div style={{ overflowX: 'auto', marginTop: 8 }}>
           <table
             aria-label="Priority matrix"
             style={{ borderCollapse: 'collapse', width: '100%' }}
           >
             <thead>
               <tr>
-                <th style={cellStyle} aria-label="Priority" />
+                <th style={headerCellStyle} aria-label="Priority" />
                 {board.columns.map(column => (
                   <th key={column.id} style={cellStyle} scope="col">
-                    <span
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 6,
-                      }}
-                    >
-                      <ColorDot color={column.color} size={8} />
-                      <Text variant="body-small" weight="bold">
-                        {column.title}
-                      </Text>
-                    </span>
+                    <ToggleBadge
+                      label={column.title}
+                      color={column.color}
+                      selected={statusSelected(column.id)}
+                      onToggle={() =>
+                        setUnselectedStatuses(current =>
+                          toggled(current, column.id),
+                        )
+                      }
+                    />
                   </th>
                 ))}
+                <th style={cellStyle} scope="col">
+                  <Text variant="body-small" weight="bold">
+                    Sum
+                  </Text>
+                </th>
               </tr>
             </thead>
             <tbody>
               {rows.map(row => (
                 <tr key={row.key}>
-                  <th style={cellStyle} scope="row">
-                    <Text variant="body-small" weight="bold">
-                      {row.label}
-                    </Text>
+                  <th style={headerCellStyle} scope="row">
+                    <ToggleBadge
+                      label={row.name}
+                      color={row.color}
+                      selected={rowSelected(row)}
+                      onToggle={() =>
+                        setUnselectedRows(current => toggled(current, row.key))
+                      }
+                    />
                   </th>
                   {board.columns.map(column => (
                     <td key={column.id} style={cellStyle}>
-                      {items
-                        .filter(
-                          item =>
-                            item.columnId === column.id && row.matches(item),
-                        )
-                        .map(item => (
-                          <div key={item.id}>
-                            <Button
-                              variant="tertiary"
-                              size="small"
-                              onPress={() => onOpenItem(item.id)}
-                              aria-label={`Open item ${item.title}`}
-                            >
-                              <Text variant="body-small">{item.title}</Text>
-                            </Button>
-                          </div>
-                        ))}
+                      <Text variant="body-small">{count(column.id, row)}</Text>
                     </td>
                   ))}
+                  <td style={cellStyle}>
+                    <Text variant="body-small" weight="bold">
+                      {rowSum(row)}
+                    </Text>
+                  </td>
                 </tr>
               ))}
+              <tr>
+                <th style={headerCellStyle} scope="row">
+                  <Text variant="body-small" weight="bold">
+                    Sum
+                  </Text>
+                </th>
+                {board.columns.map(column => (
+                  <td key={column.id} style={cellStyle}>
+                    <Text variant="body-small" weight="bold">
+                      {columnSum(column.id)}
+                    </Text>
+                  </td>
+                ))}
+                <td style={cellStyle}>
+                  <Text variant="body-small" weight="bold">
+                    {total}
+                  </Text>
+                </td>
+              </tr>
             </tbody>
           </table>
         </div>

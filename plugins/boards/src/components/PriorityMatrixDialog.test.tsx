@@ -18,73 +18,116 @@ const board = testBoard({
 });
 
 function renderDialog(items: ReturnType<typeof testItem>[]) {
-  const onOpenItem = jest.fn();
   renderWithProviders(
     <PriorityMatrixDialog
       board={board}
       items={items}
       isOpen
       onOpenChange={jest.fn()}
-      onOpenItem={onOpenItem}
     />,
   );
-  return { onOpenItem };
+}
+
+/** One Todo+critical, one Done+critical, one Todo+low. */
+const threeItems = [
+  testItem({
+    id: 'item-1',
+    title: 'Todo critical',
+    columnId: 'column-1',
+    priorityId: 'priority-1',
+  }),
+  testItem({
+    id: 'item-2',
+    title: 'Done critical',
+    columnId: 'column-2',
+    priorityId: 'priority-1',
+  }),
+  testItem({
+    id: 'item-3',
+    title: 'Todo low',
+    columnId: 'column-1',
+    priorityId: 'priority-4',
+  }),
+];
+
+/** The cell texts of the row whose header carries `name`. */
+function rowCells(name: string): string[] {
+  const table = screen.getByRole('table', { name: 'Priority matrix' });
+  const row = within(table)
+    .getAllByRole('row')
+    .find(
+      entry => within(entry).queryByRole('rowheader')?.textContent === name,
+    );
+  if (!row) {
+    throw new Error(`row ${name} not found`);
+  }
+  return within(row)
+    .getAllByRole('cell')
+    .map(cell => cell.textContent ?? '');
 }
 
 describe('PriorityMatrixDialog', () => {
-  it('places items in their status × priority cell', () => {
+  it('shows counts per cell instead of item buttons', () => {
     renderDialog([
+      ...threeItems,
       testItem({
-        id: 'item-1',
-        title: 'Urgent todo',
+        id: 'item-4',
+        title: 'Second todo critical',
         columnId: 'column-1',
         priorityId: 'priority-1',
       }),
-      testItem({
-        id: 'item-2',
-        title: 'Done low',
-        columnId: 'column-2',
-        priorityId: 'priority-4',
-      }),
     ]);
-    const table = screen.getByRole('table', { name: 'Priority matrix' });
-    const rows = within(table).getAllByRole('row');
-    // header, four priorities; no "No priority" row: every item has one
-    expect(rows).toHaveLength(5);
-    const critical = rows[1];
-    const cells = within(critical).getAllByRole('cell');
-    expect(within(cells[0]).getByText('Urgent todo')).toBeInTheDocument();
-    expect(cells[1].textContent).toBe('');
-    const low = rows[4];
+    // Todo, Done, Sum
+    expect(rowCells('critical')).toEqual(['2', '1', '3']);
+    expect(screen.queryByText('Todo critical')).not.toBeInTheDocument();
     expect(
-      within(within(low).getAllByRole('cell')[1]).getByText('Done low'),
-    ).toBeInTheDocument();
+      screen.queryByRole('button', { name: /Open item/ }),
+    ).not.toBeInTheDocument();
   });
 
-  it('collects items without a priority in a trailing row', () => {
+  it('sums rows, columns, and the overall total', () => {
+    renderDialog(threeItems);
+    expect(rowCells('critical')).toEqual(['1', '1', '2']);
+    expect(rowCells('low')).toEqual(['1', '0', '1']);
+    // sum row: Todo 2, Done 1, total 3
+    expect(rowCells('Sum')).toEqual(['2', '1', '3']);
+  });
+
+  it('excludes an unselected status from the sums, reversibly', async () => {
+    renderDialog(threeItems);
+    const done = screen.getByRole('button', { name: 'Done' });
+    expect(done).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(done);
+    expect(done).toHaveAttribute('aria-pressed', 'false');
+    // cell counts stay, sums drop the Done column
+    expect(rowCells('critical')).toEqual(['1', '1', '1']);
+    expect(rowCells('Sum')).toEqual(['2', '0', '2']);
+    await userEvent.click(done);
+    expect(rowCells('critical')).toEqual(['1', '1', '2']);
+    expect(rowCells('Sum')).toEqual(['2', '1', '3']);
+  });
+
+  it('excludes an unselected priority from the sums', async () => {
+    renderDialog(threeItems);
+    await userEvent.click(screen.getByRole('button', { name: 'low' }));
+    expect(rowCells('low')).toEqual(['1', '0', '0']);
+    expect(rowCells('Sum')).toEqual(['1', '1', '2']);
+  });
+
+  it('counts items without a priority in a trailing toggleable row', async () => {
     renderDialog([
-      testItem({ id: 'item-1', title: 'Plain', columnId: 'column-1' }),
+      ...threeItems,
+      testItem({ id: 'item-5', title: 'Plain', columnId: 'column-2' }),
     ]);
-    const table = screen.getByRole('table', { name: 'Priority matrix' });
-    const rows = within(table).getAllByRole('row');
-    expect(rows).toHaveLength(6);
-    const last = rows[rows.length - 1];
-    expect(within(last).getByText('No priority')).toBeInTheDocument();
-    expect(within(last).getByText('Plain')).toBeInTheDocument();
+    expect(rowCells('No priority')).toEqual(['0', '1', '1']);
+    expect(rowCells('Sum')).toEqual(['2', '2', '4']);
+    await userEvent.click(screen.getByRole('button', { name: 'No priority' }));
+    expect(rowCells('No priority')).toEqual(['0', '1', '0']);
+    expect(rowCells('Sum')).toEqual(['2', '1', '3']);
   });
 
-  it('opens an item from its cell', async () => {
-    const { onOpenItem } = renderDialog([
-      testItem({
-        id: 'item-1',
-        title: 'Urgent todo',
-        columnId: 'column-1',
-        priorityId: 'priority-1',
-      }),
-    ]);
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Open item Urgent todo' }),
-    );
-    expect(onOpenItem).toHaveBeenCalledWith('item-1');
+  it('offers no no-priority row when every item has one', () => {
+    renderDialog(threeItems);
+    expect(screen.queryByText('No priority')).not.toBeInTheDocument();
   });
 });

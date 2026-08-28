@@ -98,7 +98,6 @@ export function BoardDialogs(props: {
         items={items}
         isOpen={open === 'matrix'}
         onOpenChange={openChange}
-        onOpenItem={props.onOpenItem}
       />
 
       <Dialog isOpen={open === 'delete'} onOpenChange={openChange}>
