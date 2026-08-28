@@ -262,5 +262,36 @@ describe('groupMyItems', () => {
   it('returns no groups for no entries', () => {
     expect(groupMyItems([], 'board')).toEqual([]);
     expect(groupMyItems([], 'dueDate')).toEqual([]);
+    expect(groupMyItems([], 'none')).toEqual([]);
+    expect(groupMyItems([], 'tags')).toEqual([]);
+  });
+
+  it('yields one unlabelled group when not grouping', () => {
+    const entries = [
+      testMyItem({ boardId: 'b-1', item: { id: '1' } }),
+      testMyItem({ boardId: 'b-2', item: { id: '2' } }),
+    ];
+    expect(groupMyItems(entries, 'none')).toEqual([
+      { key: 'all', label: '', entries },
+    ]);
+  });
+
+  it('groups by tag alphabetically with untagged entries last', () => {
+    const entries = [
+      testMyItem({ item: { id: '1', tags: ['urgent', 'bug'] } }),
+      testMyItem({ item: { id: '2' } }),
+      testMyItem({ item: { id: '3', tags: ['bug'] } }),
+    ];
+    expect(
+      groupMyItems(entries, 'tags').map(group => [
+        group.key,
+        group.label,
+        group.entries.map(entry => entry.item.id),
+      ]),
+    ).toEqual([
+      ['bug', 'bug', ['1', '3']],
+      ['urgent', 'urgent', ['1']],
+      [UNTAGGED, 'Untagged', ['2']],
+    ]);
   });
 });

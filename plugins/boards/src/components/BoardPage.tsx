@@ -16,7 +16,7 @@ import { TableView } from './TableView';
 import { ItemDrawer } from './ItemDrawer';
 import { ArchivedBoardAlert, BoardHeader, BoardViewMode } from './BoardHeader';
 import { BoardDialogKind, BoardDialogs } from './BoardDialogs';
-import { BoardFilterBar, useItemFilter } from './BoardFilterBar';
+import { ItemFilterBar, useItemFilter } from './ItemFilterBar';
 import { ErrorText } from './common';
 import { useBoardActions, useOpenItemParam } from './useBoardActions';
 import { GroupByMode } from './grouping';
@@ -99,7 +99,7 @@ export function BoardPageContent(props: {
         onOpenDialog={setDialog}
       />
 
-      <BoardFilterBar filter={filter} />
+      <ItemFilterBar filter={filter} />
 
       {error && <ErrorText>{error}</ErrorText>}
 

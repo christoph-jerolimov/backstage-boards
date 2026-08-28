@@ -3,8 +3,11 @@ import { expect, request, test, type Page } from '@playwright/test';
 const BACKEND_URL =
   process.env.PLAYWRIGHT_BACKEND_URL ?? 'http://localhost:7007';
 
+/** An item to seed: a bare title, or a title with tags. */
+type SeedItem = string | { title: string; tags?: string[] };
+
 /** A board whose items are assigned to the signed-in guest user. */
-async function seedAssignedBoard(name: string, titles: string[]) {
+async function seedAssignedBoard(name: string, titles: SeedItem[]) {
   const api = await request.newContext({ baseURL: BACKEND_URL });
   const auth = await api.get('/api/auth/guest/refresh', {
     headers: { accept: 'application/json' },
@@ -22,10 +25,12 @@ async function seedAssignedBoard(name: string, titles: string[]) {
   });
   const board = await boardResponse.json();
   const [todo] = board.columns;
-  for (const title of titles) {
+  for (const entry of titles) {
+    const { title, tags } =
+      typeof entry === 'string' ? { title: entry, tags: undefined } : entry;
     await api.post(`/api/boards/boards/${board.id}/items`, {
       headers,
-      data: { columnId: todo.id, title, assignees: [userRef] },
+      data: { columnId: todo.id, title, tags, assignees: [userRef] },
     });
   }
   await api.dispose();
@@ -96,5 +101,46 @@ test.describe('my-items row menu', () => {
 
     await expect(row(page, 'Mine card')).toHaveCount(0);
     await expect(row(page, 'Other card')).toBeVisible();
+  });
+});
+
+test.describe('my-items filter bar and grouping', () => {
+  test('searches, regroups by tag, and keeps the row menu working', async ({
+    page,
+  }) => {
+    const name = `My items E2E filter ${Date.now()}`;
+    const stamp = `${Date.now()}`;
+    const tag = `release-${stamp}`;
+    await seedAssignedBoard(name, [
+      { title: `Alpha ${stamp}`, tags: [tag] },
+      `Beta ${stamp}`,
+    ]);
+    await openMyItems(page, name);
+
+    // the search field narrows the listing and clears again
+    await page.getByRole('searchbox', { name: 'Search items' }).fill('Alpha');
+    await expect(row(page, `Alpha ${stamp}`)).toBeVisible();
+    await expect(row(page, `Beta ${stamp}`)).toHaveCount(0);
+    await page.getByRole('button', { name: 'Clear filters' }).click();
+    await expect(row(page, `Beta ${stamp}`)).toBeVisible();
+
+    // grouping by tag regroups the listing and names each row's board
+    await page.getByRole('button', { name: /Group by/ }).click();
+    await page.getByRole('option', { name: 'By tags' }).click();
+    const tagged = page.getByRole('grid', {
+      name: `My items grouped under ${tag}`,
+    });
+    await expect(tagged).toBeVisible();
+    await expect(
+      tagged.getByRole('button', { name: `Open board ${name}` }),
+    ).toBeVisible();
+
+    // and the row menu still opens on a regrouped row
+    await tagged
+      .getByRole('button', { name: `Actions for Alpha ${stamp}` })
+      .click();
+    await expect(
+      page.getByRole('menuitem', { name: 'Open details' }),
+    ).toBeVisible();
   });
 });

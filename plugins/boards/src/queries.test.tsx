@@ -10,12 +10,14 @@ import {
   useBoardListQuery,
   useBoardQuery,
   useBoardsByEntityQuery,
+  useBoardsQueries,
   useBoardsQuery,
   useItemsQuery,
   useMoveItem,
   useRenameItem,
 } from './queries';
 import {
+  testBoard,
   testBoardsApi,
   testItem,
 } from './components/__testUtils__/testHelpers';
@@ -227,5 +229,64 @@ describe('useRenameItem', () => {
     });
     expect(client.getQueryData(queryKeys.items('board-1'))).toEqual(items);
     expect(onError).toHaveBeenCalledWith('Title too long');
+  });
+});
+
+describe('useBoardsQueries', () => {
+  const getBoard = () =>
+    jest
+      .fn()
+      .mockImplementation(async (boardId: string) =>
+        testBoard({ id: boardId, name: `Board ${boardId}` }),
+      );
+
+  it('resolves one board per distinct id', async () => {
+    const { boardsApi, wrapper } = setup({ getBoard: getBoard() });
+    const { result } = renderHook(
+      () => useBoardsQueries(['board-2', 'board-1', 'board-2']),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.size).toBe(2));
+    expect(result.current.get('board-1')?.name).toBe('Board board-1');
+    expect(result.current.get('board-2')?.name).toBe('Board board-2');
+    expect(boardsApi.getBoard).toHaveBeenCalledTimes(2);
+  });
+
+  it('queries nothing for no ids', () => {
+    const { boardsApi, wrapper } = setup({ getBoard: getBoard() });
+    const { result } = renderHook(() => useBoardsQueries([]), { wrapper });
+    expect(result.current.size).toBe(0);
+    expect(boardsApi.getBoard).not.toHaveBeenCalled();
+  });
+
+  it('serves a board already in the cache without waiting', () => {
+    const { client, wrapper } = setup({ getBoard: getBoard() });
+    client.setQueryData(
+      queryKeys.board('board-1'),
+      testBoard({ id: 'board-1', name: 'Cached' }),
+    );
+    const { result } = renderHook(() => useBoardsQueries(['board-1']), {
+      wrapper,
+    });
+    // the same key `useBoardQuery` uses, so the row renders on the
+    // first pass rather than after a round trip
+    expect(result.current.get('board-1')?.name).toBe('Cached');
+  });
+
+  it('leaves out a board that fails to load', async () => {
+    const { wrapper } = setup({
+      getBoard: jest.fn().mockImplementation(async (boardId: string) => {
+        if (boardId === 'board-2') {
+          throw new Error('Not allowed');
+        }
+        return testBoard({ id: boardId });
+      }),
+    });
+    const { result } = renderHook(
+      () => useBoardsQueries(['board-1', 'board-2']),
+      { wrapper },
+    );
+    await waitFor(() => expect(result.current.size).toBe(1));
+    expect(result.current.has('board-2')).toBe(false);
   });
 });
