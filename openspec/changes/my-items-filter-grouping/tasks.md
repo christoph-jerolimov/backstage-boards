@@ -2,7 +2,7 @@
 
 ## 1. Grouping helpers
 
-- [ ] 1.1 In `plugins/boards/src/components/grouping.ts` widen
+- [x] 1.1 In `plugins/boards/src/components/grouping.ts` widen
       `MyItemsGroupBy` to
       `'none' | 'board' | 'status' | 'dueDate' | 'tags'` and export
       `MY_ITEMS_PAGE_GROUP_BY = ['board', 'none', 'dueDate', 'tags']` as
@@ -20,13 +20,13 @@
 
 ## 2. The shared filter bar
 
-- [ ] 2.1 Rename `components/BoardFilterBar.tsx` to
+- [x] 2.1 Rename `components/BoardFilterBar.tsx` to
       `components/ItemFilterBar.tsx` and the component to `ItemFilterBar`,
       keeping `useItemFilter`, `ItemFilterHandle` and `AssigneeOption`
       as they are, and update `BoardPage.tsx`. Verify by running
       `BoardPage.test.tsx` **unmodified** — it is the regression check for
       the rename.
-- [ ] 2.2 Add `minAssigneeOptions?: number` (default `1`) to
+- [x] 2.2 Add `minAssigneeOptions?: number` (default `1`) to
       `ItemFilterBar`, rendering the assignee menu only when
       `assigneeOptions.length >= minAssigneeOptions`, with a comment
       saying why my-items needs `2`. Verify with component tests: default
@@ -36,14 +36,14 @@
 
 ## 3. Per-row board resolution
 
-- [ ] 3.1 Add `useBoardsQueries(boardIds: string[]): Map<string, Board>`
+- [x] 3.1 Add `useBoardsQueries(boardIds: string[]): Map<string, Board>`
       to `queries.ts`, built on TanStack `useQueries` over
       `queryKeys.board(id)` and `boardsApi.getBoard(id)` — the same key
       `useBoardQuery` uses, so cached boards cost nothing. Verify with a
       `queries.test.tsx` case asserting one entry per distinct id, that a
       duplicate id is queried once, that an empty list issues no query,
       and that a board already in the cache is not refetched.
-- [ ] 3.2 Turn `BoardGroupTable` into
+- [x] 3.2 Turn `BoardGroupTable` into
       `MyItemsTable({ entries, boards, basePath, showBoardColumn, onError })`
       in `MyItemsPage.tsx`: each row looks its board up in the map for the
       `StatusBadge`, the `canWrite` check and an `ItemActions` bound to
@@ -59,7 +59,7 @@
 
 ## 4. Filter bar on my items
 
-- [ ] 4.1 In `MyItemsList` call `useItemFilter` over
+- [x] 4.1 In `MyItemsList` call `useItemFilter` over
       `entries.map(entry => entry.item)`, render
       `<ItemFilterBar filter={filter} minAssigneeOptions={2} />` above the
       listing, and filter the entries with
@@ -68,16 +68,16 @@
       two tags require both; two assignees keep either; the count reads
       "N of M items"; "Clear filters" restores every row; and a board
       whose items all filter out renders no group heading.
-- [ ] 4.2 Make the empty state filter-aware — keep "Nothing is assigned to
+- [x] 4.2 Make the empty state filter-aware — keep "Nothing is assigned to
       you on any board." when no filter is active and show "No items match
       your filters." when one is. Verify with a test for each message.
-- [ ] 4.3 Verify the assignee menu rule end to end: shown when the
+- [x] 4.3 Verify the assignee menu rule end to end: shown when the
       entries carry two assignees (the user and a group, or a shared
       item's colleague), absent when they all carry the same one.
 
 ## 5. Grouping control on my items
 
-- [ ] 5.1 Add `groupBy` state defaulting to `'board'` and a `Select`
+- [x] 5.1 Add `groupBy` state defaulting to `'board'` and a `Select`
       labelled "Group by" with "By board", "Not grouped", "By due date"
       and "By tags", validated with
       `selectedOption(key, MY_ITEMS_PAGE_GROUP_BY)`. Replace the local
@@ -87,7 +87,7 @@
       date" last; tags show a two-tag item under both tags with
       "Untagged" last; and "Not grouped" renders one table with no
       heading.
-- [ ] 5.2 Render the headings per design.md §6 — the board link button
+- [x] 5.2 Render the headings per design.md §6 — the board link button
       with its entry count for `board`, nothing for `none`, and
       `<GroupLabel mode={groupBy} groupKey={group.key} />` for `dueDate`
       and `tags` — and pass `showBoardColumn={groupBy !== 'board'}` so the
@@ -99,14 +99,14 @@
 
 ## 6. Verification
 
-- [ ] 6.1 Run `yarn prettier:check`, `yarn lint:all`, `yarn tsc:full` and
+- [x] 6.1 Run `yarn prettier:check`, `yarn lint:all`, `yarn tsc:full` and
       `yarn test:all`; all pass with the new tests included and no
       existing test modified except where a task above says so.
-- [ ] 6.2 Extend `plugins/boards/e2e-tests/my-items-menu.test.ts` (or add
+- [x] 6.2 Extend `plugins/boards/e2e-tests/my-items-menu.test.ts` (or add
       a sibling spec) with a pass over the new controls: search narrows
       the listing, switching the grouping to tags regroups it and shows
       the board column, and the row menu still opens on a regrouped row.
-- [ ] 6.3 Start the app and check both entry points by hand: `/boards` →
+- [x] 6.3 Start the app and check both entry points by hand: `/boards` →
       "My items" tab and `/boards/my-items` show the filter bar and the
       group-by dropdown, the assignee menu appears only with more than one
       assignee in the listing, the board page's own filter bar is

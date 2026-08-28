@@ -104,10 +104,20 @@ export function useItemFilter(items: BoardItem[]): ItemFilterHandle {
 
 /**
  * Search field, tag and assignee filter menus, and the match count of
- * {@link useItemFilter}.
+ * {@link useItemFilter}. Shared by the board page and the my-items
+ * listing.
+ *
+ * `minAssigneeOptions` is how many assignees must be in play before the
+ * assignee menu is worth showing. A board defaults to one — the menu
+ * then separates that person's items from the unassigned ones. The
+ * my-items listing passes two, because every item there is already the
+ * viewer's, so a single option would match every row.
  */
-export function BoardFilterBar(props: { filter: ItemFilterHandle }) {
-  const { filter } = props;
+export function ItemFilterBar(props: {
+  filter: ItemFilterHandle;
+  minAssigneeOptions?: number;
+}) {
+  const { filter, minAssigneeOptions = 1 } = props;
   return (
     <Flex align="center" gap="2" style={{ flexWrap: 'wrap' }}>
       <div style={{ width: 240, flexShrink: 0 }}>
@@ -133,7 +143,7 @@ export function BoardFilterBar(props: { filter: ItemFilterHandle }) {
           </Menu>
         </MenuTrigger>
       )}
-      {filter.assigneeOptions.length > 0 && (
+      {filter.assigneeOptions.length >= minAssigneeOptions && (
         <MenuTrigger>
           <Button variant="tertiary" size="small">
             Assignees

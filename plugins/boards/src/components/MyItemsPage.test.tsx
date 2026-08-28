@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { identityApiRef } from '@backstage/frontend-plugin-api';
 import { BoardPermissionLevel, todayISO } from '@internal/plugin-boards-common';
@@ -107,6 +107,14 @@ function renderList(
   return { boardsApi };
 }
 
+/** Switches the listing to another grouping, by its menu label. */
+async function groupItemsBy(label: string) {
+  await userEvent.click(
+    await screen.findByRole('button', { name: /Group by/ }),
+  );
+  await userEvent.click(await screen.findByRole('option', { name: label }));
+}
+
 /** Opens the row's actions menu and waits for it to render. */
 async function openRowMenu(title: string) {
   await userEvent.click(
@@ -137,7 +145,10 @@ describe('MyItemsList', () => {
 
   it('shows the column, tags and due date of an item', async () => {
     renderList();
-    expect(await screen.findByText('In progress')).toBeInTheDocument();
+    // two items sit in a column of that title, one per board
+    await waitFor(() =>
+      expect(screen.getAllByText('In progress')).toHaveLength(2),
+    );
     expect(screen.getByText('docs, urgent')).toBeInTheDocument();
     expect(screen.getByText(/Sep 4/)).toBeInTheDocument();
   });
@@ -306,5 +317,232 @@ describe('MyItemsList', () => {
     expect(
       await screen.findByText('My items could not be loaded: Backend down'),
     ).toBeInTheDocument();
+  });
+
+  it('resolves each row against its own board in a mixed group', async () => {
+    renderList({
+      api: {
+        getBoard: jest.fn().mockImplementation(async (boardId: string) => ({
+          id: boardId,
+          name: boardId === 'board-1' ? 'Roadmap' : 'Support',
+          entityRefs: [],
+          visibility: 'private',
+          createdBy: 'user:default/alice',
+          createdAt: '2026-08-01T10:00:00.000Z',
+          updatedAt: '2026-08-01T10:00:00.000Z',
+          columns:
+            boardId === 'board-1'
+              ? boardColumns
+              : [testColumn({ id: 'column-1', title: 'Triage' })],
+          access: boardId === 'board-1' ? 'write' : 'read',
+          favorite: false,
+          watching: false,
+        })),
+      },
+    });
+    await groupItemsBy('Not grouped');
+
+    await openRowMenu('Ship the docs');
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: 'Move to column' }),
+    );
+    expect(
+      (await screen.findAllByRole('menuitem'))
+        .map(entry => entry.textContent)
+        .filter(title => title === 'Todo'),
+    ).toEqual(['Todo']);
+    await userEvent.keyboard('{Escape}{Escape}');
+
+    // the same group, but a board the user may only read
+    await openRowMenu('Answer the ticket');
+    expect(
+      screen.getAllByRole('menuitem').map(entry => entry.textContent),
+    ).toEqual(['Open details', 'Open board']);
+  });
+});
+
+describe('MyItemsList filtering', () => {
+  beforeEach(() => mockNavigate.mockClear());
+
+  it('filters by text and reports how many items match', async () => {
+    renderList();
+    await screen.findByRole('row', { name: /Ship the docs/ });
+    await userEvent.type(
+      screen.getByRole('searchbox', { name: 'Search items' }),
+      'docs',
+    );
+    expect(await screen.findByText('1 of 3 items')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('row', { name: /Fix the build/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('drops a board whose items all filter out', async () => {
+    renderList();
+    await screen.findByRole('button', { name: 'Open board Support' });
+    await userEvent.type(
+      screen.getByRole('searchbox', { name: 'Search items' }),
+      'docs',
+    );
+    await screen.findByText('1 of 3 items');
+    expect(
+      screen.queryByRole('button', { name: 'Open board Support' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('requires every selected tag and clears the filters again', async () => {
+    renderList();
+    await screen.findByRole('row', { name: /Ship the docs/ });
+    await userEvent.click(screen.getByRole('button', { name: 'Tags' }));
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'urgent' }),
+    );
+    expect(await screen.findByText('1 of 3 items')).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Clear filters' }),
+    );
+    expect(
+      await screen.findByRole('row', { name: /Fix the build/ }),
+    ).toBeInTheDocument();
+  });
+
+  it('says when the filters match nothing', async () => {
+    renderList();
+    await screen.findByRole('row', { name: /Ship the docs/ });
+    await userEvent.type(
+      screen.getByRole('searchbox', { name: 'Search items' }),
+      'nothing matches this',
+    );
+    expect(
+      await screen.findByText('No items match your filters.'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('Nothing is assigned to you on any board.'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('offers no assignee filter while one assignee holds everything', async () => {
+    renderList();
+    await screen.findByRole('row', { name: /Ship the docs/ });
+    expect(screen.getByRole('button', { name: 'Tags' })).toBeVisible();
+    expect(
+      screen.queryByRole('button', { name: 'Assignees' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('filters by assignee once the items carry more than one', async () => {
+    renderList({
+      items: [
+        {
+          boardId: 'board-1',
+          boardName: 'Roadmap',
+          columnTitle: 'In progress',
+          item: testItem({
+            id: 'item-1',
+            title: 'Ship the docs',
+            assignees: ['user:default/alice'],
+          }),
+        },
+        {
+          boardId: 'board-1',
+          boardName: 'Roadmap',
+          columnTitle: 'Todo',
+          item: testItem({
+            id: 'item-2',
+            title: 'Fix the build',
+            assignees: ['group:default/team-a'],
+          }),
+        },
+      ],
+    });
+    await screen.findByRole('row', { name: /Ship the docs/ });
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Assignees' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'team-a' }),
+    );
+    expect(await screen.findByText('1 of 2 items')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('row', { name: /Ship the docs/ }),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe('MyItemsList grouping', () => {
+  beforeEach(() => mockNavigate.mockClear());
+
+  it('groups by board without a board column by default', async () => {
+    renderList();
+    await screen.findByRole('button', { name: 'Open board Roadmap' });
+    expect(
+      screen.queryByRole('columnheader', { name: 'Board' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows every item in one table with its board when not grouped', async () => {
+    renderList();
+    await groupItemsBy('Not grouped');
+    expect(screen.getAllByRole('grid')).toHaveLength(1);
+    expect(screen.getAllByRole('columnheader', { name: 'Board' })).toHaveLength(
+      1,
+    );
+    expect(screen.getAllByRole('row')).toHaveLength(4); // header plus three
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Open board Support' }),
+    );
+    // the board cell opens the board, not the row's item
+    expect(mockNavigate.mock.calls).toEqual([['/boards/board-2']]);
+  });
+
+  it('groups by due date with the most urgent first', async () => {
+    renderList({
+      items: [
+        {
+          boardId: 'board-1',
+          boardName: 'Roadmap',
+          columnTitle: 'Todo',
+          item: testItem({ id: 'item-1', title: 'Undated item' }),
+        },
+        {
+          boardId: 'board-1',
+          boardName: 'Roadmap',
+          columnTitle: 'Todo',
+          item: testItem({
+            id: 'item-2',
+            title: 'Dated item',
+            dueDate: todayISO(),
+          }),
+        },
+      ],
+    });
+    await groupItemsBy('By due date');
+    const headings = screen
+      .getAllByRole('grid')
+      .map(grid => grid.getAttribute('aria-label'));
+    expect(headings).toEqual([
+      `My items grouped under ${todayISO()}`,
+      'My items grouped under No due date',
+    ]);
+    // the heading reads like a board's, not like the raw group key
+    expect(screen.getAllByText('Due today')).toHaveLength(2); // heading, badge
+    expect(screen.queryByText(todayISO())).not.toBeInTheDocument();
+    expect(screen.getByText('No due date')).toBeInTheDocument();
+  });
+
+  it('groups by tag, listing a multi-tag item under each', async () => {
+    renderList();
+    await groupItemsBy('By tags');
+    expect(
+      screen.getAllByRole('grid').map(grid => grid.getAttribute('aria-label')),
+    ).toEqual([
+      'My items grouped under docs',
+      'My items grouped under urgent',
+      'My items grouped under Untagged',
+    ]);
+    expect(screen.getAllByRole('row', { name: /Ship the docs/ })).toHaveLength(
+      2,
+    );
+    expect(screen.getByText('Untagged')).toBeInTheDocument();
   });
 });

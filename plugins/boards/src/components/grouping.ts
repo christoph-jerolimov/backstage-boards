@@ -94,10 +94,17 @@ export interface ItemGroup {
 }
 
 /** The group the items carrying none of the grouped values land in. */
-const REST_KEY: Record<Exclude<GroupByMode, 'none'>, string> = {
+export const REST_KEY: Record<Exclude<GroupByMode, 'none'>, string> = {
   assignee: UNASSIGNED,
   dueDate: NO_DUE_DATE,
   tags: UNTAGGED,
+};
+
+/** How that group reads, wherever a grouping is labelled. */
+export const REST_LABEL: Record<Exclude<GroupByMode, 'none'>, string> = {
+  assignee: 'Unassigned',
+  dueDate: 'No due date',
+  tags: 'Untagged',
 };
 
 /** The values an item is grouped under; empty puts it in the rest group. */
@@ -178,11 +185,24 @@ export function positionBefore(
   return (prev + next) / 2;
 }
 
-/** How the "Assigned items" home page widget groups its entries. */
-export type MyItemsGroupBy = 'board' | 'status' | 'dueDate';
+/**
+ * How my-items entries are grouped. `board` and `status` are my-items'
+ * own; `none`, `dueDate` and `tags` mean the same here as on a board.
+ * The home page widget offers `board`, `status` and `dueDate`; the
+ * my-items page offers {@link MY_ITEMS_PAGE_GROUP_BY}.
+ */
+export type MyItemsGroupBy = 'none' | 'board' | 'status' | 'dueDate' | 'tags';
+
+/** The groupings the my-items page offers, in menu order. */
+export const MY_ITEMS_PAGE_GROUP_BY = [
+  'board',
+  'none',
+  'dueDate',
+  'tags',
+] as const;
 
 export interface MyItemGroup {
-  /** Stable identity: board id, column title, or due date. */
+  /** Stable identity: board id, column title, due date, or tag. */
   key: string;
   label: string;
   entries: MyBoardItem[];
@@ -203,47 +223,76 @@ export function filterDueEntries(
   );
 }
 
+/** The values an entry is grouped under; empty puts it in the rest group. */
+function myGroupKeysOf(entry: MyBoardItem, mode: MyItemsGroupBy): string[] {
+  switch (mode) {
+    case 'board':
+      return [entry.boardId];
+    case 'status':
+      return [entry.columnTitle];
+    default:
+      // due dates and tags group the same way they do on a board
+      return groupKeysOf(entry.item, mode);
+  }
+}
+
+/** How a group of `mode` reads, given the key and one of its entries. */
+function myGroupLabelOf(
+  entry: MyBoardItem,
+  mode: MyItemsGroupBy,
+  key: string,
+): string {
+  return mode === 'board' ? entry.boardName : key;
+}
+
 /**
- * Groups my-items entries for the home page widget. Board and status
- * groups are ordered alphabetically by label; due-date groups run
- * chronologically with the most urgent first and undated entries last.
+ * Groups my-items entries. Board and status groups are ordered
+ * alphabetically by label; due-date groups run chronologically with the
+ * most urgent first and tag groups alphabetically, both with the entries
+ * carrying none of the values (no due date / no tags) in a trailing
+ * group. An entry with several tags appears in each of their groups.
+ * Ungrouped (`none`) yields the single group the caller renders headless.
  */
 export function groupMyItems(
   entries: MyBoardItem[],
   mode: MyItemsGroupBy,
 ): MyItemGroup[] {
+  if (mode === 'none') {
+    return entries.length > 0 ? [{ key: 'all', label: '', entries }] : [];
+  }
   const groups = new Map<string, MyItemGroup>();
-  const undated: MyBoardItem[] = [];
+  const rest: MyBoardItem[] = [];
   for (const entry of entries) {
-    if (mode === 'dueDate' && !entry.item.dueDate) {
-      undated.push(entry);
+    const keys = myGroupKeysOf(entry, mode);
+    if (keys.length === 0) {
+      rest.push(entry);
       continue;
     }
-    let key: string;
-    let label: string;
-    if (mode === 'board') {
-      key = entry.boardId;
-      label = entry.boardName;
-    } else if (mode === 'status') {
-      key = entry.columnTitle;
-      label = entry.columnTitle;
-    } else {
-      key = entry.item.dueDate!;
-      label = key;
+    for (const key of keys) {
+      const group = groups.get(key) ?? {
+        key,
+        label: myGroupLabelOf(entry, mode, key),
+        entries: [],
+      };
+      group.entries.push(entry);
+      groups.set(key, group);
     }
-    const group = groups.get(key) ?? { key, label, entries: [] };
-    group.entries.push(entry);
-    groups.set(key, group);
   }
   const result = [...groups.values()].sort((a, b) =>
-    // due dates are `YYYY-MM-DD`, so the same comparison sorts them
-    // chronologically
-    mode === 'dueDate'
-      ? a.key.localeCompare(b.key)
-      : a.label.localeCompare(b.label),
+    // due dates are `YYYY-MM-DD` and tags are their own label, so
+    // comparing the key sorts them chronologically resp. alphabetically
+    mode === 'board' || mode === 'status'
+      ? a.label.localeCompare(b.label)
+      : a.key.localeCompare(b.key),
   );
-  if (undated.length > 0) {
-    result.push({ key: NO_DUE_DATE, label: 'No due date', entries: undated });
+  // only the shared modes can leave an entry without a key: every entry
+  // has a board and a status
+  if (rest.length > 0 && (mode === 'dueDate' || mode === 'tags')) {
+    result.push({
+      key: REST_KEY[mode],
+      label: REST_LABEL[mode],
+      entries: rest,
+    });
   }
   return result;
 }

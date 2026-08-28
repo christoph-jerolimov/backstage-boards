@@ -1,13 +1,18 @@
 import {
   QueryClient,
   useMutation,
+  useQueries,
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { useApi } from '@backstage/frontend-plugin-api';
 import { useSignal } from '@backstage/plugin-signals-react';
-import { BoardItem, errorMessage } from '@internal/plugin-boards-common';
+import {
+  BoardItem,
+  BoardWithContext,
+  errorMessage,
+} from '@internal/plugin-boards-common';
 import { boardsApiRef } from './api';
 
 /**
@@ -123,6 +128,34 @@ export function useBoardQuery(boardId: string) {
     queryKey: queryKeys.board(boardId),
     queryFn: () => boardsApi.getBoard(boardId),
   });
+}
+
+/**
+ * The boards behind a set of entries, keyed by board id. Uses the same
+ * query key as {@link useBoardQuery}, so a board the user already opened
+ * costs nothing and two rows on one board share a single request.
+ */
+export function useBoardsQueries(
+  boardIds: string[],
+): Map<string, BoardWithContext> {
+  const boardsApi = useApi(boardsApiRef);
+  // `useQueries` takes a fresh array every render by design, and the
+  // query keys are what decide whether anything is fetched
+  const ids = [...new Set(boardIds)].sort();
+  const results = useQueries({
+    queries: ids.map(boardId => ({
+      queryKey: queryKeys.board(boardId),
+      queryFn: () => boardsApi.getBoard(boardId),
+    })),
+  });
+  const boards = new Map<string, BoardWithContext>();
+  ids.forEach((boardId, index) => {
+    const board = results[index]?.data;
+    if (board) {
+      boards.set(boardId, board);
+    }
+  });
+  return boards;
 }
 
 export function useItemsQuery(boardId: string) {

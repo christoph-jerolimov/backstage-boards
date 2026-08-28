@@ -10,6 +10,7 @@ import {
   Flex,
   MenuItem,
   Row,
+  Select,
   TableBody,
   TableHeader,
   TableRoot,
@@ -17,7 +18,8 @@ import {
 } from '@backstage/ui';
 import { RiArrowRightLine } from '@remixicon/react';
 import {
-  BoardItem,
+  BoardWithContext,
+  itemMatchesFilter,
   levelIncludes,
   MyBoardItem,
 } from '@internal/plugin-boards-common';
@@ -25,121 +27,126 @@ import { boardsApiRef } from '../api';
 import {
   invalidateBoard,
   invalidateMyItems,
-  useBoardQuery,
+  useBoardsQueries,
   useBoardsSignal,
   useMyItemsQuery,
 } from '../queries';
 import { useBoardsBasePath } from '../routes';
 import { DueDateBadge } from './DueDate';
-import { assigneePool } from './grouping';
+import {
+  assigneePool,
+  groupMyItems,
+  MyItemGroup,
+  MyItemsGroupBy,
+  MY_ITEMS_PAGE_GROUP_BY,
+} from './grouping';
+import { GroupLabel } from './GroupLabel';
 import { ItemActions, ItemMenu } from './ItemMenu';
 import { useRowMenu } from './RowMenu';
-import { AsyncList, ErrorText } from './common';
+import { AsyncList, ErrorText, selectedOption } from './common';
+import { ItemFilterBar, useItemFilter } from './ItemFilterBar';
 import { StatusBadge } from './StatusBadge';
 import { useAsyncAction } from './useAsyncAction';
 
-interface BoardGroup {
-  boardId: string;
-  boardName: string;
+/** How the my-items group-by menu reads, in {@link MY_ITEMS_PAGE_GROUP_BY} order. */
+const GROUP_BY_LABELS: Record<(typeof MY_ITEMS_PAGE_GROUP_BY)[number], string> =
+  {
+    board: 'By board',
+    none: 'Not grouped',
+    dueDate: 'By due date',
+    tags: 'By tags',
+  };
+
+/**
+ * One group's table. Every row resolves its own board, because a group
+ * that is not a board (a tag, a due date, all items) mixes them — and
+ * the status color, the write access and the actions all belong to the
+ * item's own board.
+ */
+function MyItemsTable(props: {
+  label: string;
   entries: MyBoardItem[];
-}
-
-function groupByBoard(entries: MyBoardItem[]): BoardGroup[] {
-  const groups = new Map<string, BoardGroup>();
-  for (const entry of entries) {
-    let group = groups.get(entry.boardId);
-    if (!group) {
-      group = {
-        boardId: entry.boardId,
-        boardName: entry.boardName,
-        entries: [],
-      };
-      groups.set(entry.boardId, group);
-    }
-    group.entries.push(entry);
-  }
-  return [...groups.values()];
-}
-
-function BoardGroupTable(props: {
-  group: BoardGroup;
+  boards: Map<string, BoardWithContext>;
+  pool: string[];
   basePath: string;
+  showBoardColumn: boolean;
   onError: (message?: string) => void;
 }) {
-  const { group, basePath, onError } = props;
+  const { label, entries, boards, pool, basePath, showBoardColumn, onError } =
+    props;
   const navigate = useNavigate();
   const boardsApi = useApi(boardsApiRef);
   const queryClient = useQueryClient();
-  // the board carries the columns and the access level the item menu
-  // needs; it is cached and shared with the board page
-  const { data: board } = useBoardQuery(group.boardId);
   const { run } = useAsyncAction();
 
-  const boardPath = `${basePath}/${group.boardId}`;
-  const openBoard = () => navigate(boardPath);
-  const columnOf = (columnId: string) =>
-    board?.columns.find(column => column.id === columnId);
-  const canWrite =
-    !!board && levelIncludes(board.access, 'write') && !board.archivedAt;
-  // only the user's own items are listed, so the quick-assign shortcuts
-  // are whoever shares them; the drawer offers the full picker
-  const pool = assigneePool(group.entries.map(entry => entry.item));
+  const byId = new Map(entries.map(entry => [entry.item.id, entry]));
+  const boardPath = (boardId: string) => `${basePath}/${boardId}`;
+  const columnOf = (entry: MyBoardItem) =>
+    boards
+      .get(entry.boardId)
+      ?.columns.find(column => column.id === entry.item.columnId);
+  const canWrite = (entry: MyBoardItem) => {
+    const board = boards.get(entry.boardId);
+    return !!board && levelIncludes(board.access, 'write') && !board.archivedAt;
+  };
 
-  const guarded = async (action: () => Promise<unknown>) => {
+  const guarded = async (boardId: string, action: () => Promise<unknown>) => {
     onError(await run(action));
     // resync either way: on failure the listing may still be stale
-    await invalidateBoard(queryClient, group.boardId);
+    await invalidateBoard(queryClient, boardId);
     await invalidateMyItems(queryClient);
   };
 
-  const actions: ItemActions = {
-    openItem: itemId => navigate(`${boardPath}?item=${itemId}`),
+  const actionsOf = (boardId: string): ItemActions => ({
+    openItem: itemId => navigate(`${boardPath(boardId)}?item=${itemId}`),
     moveItem: (itemId, target) =>
-      guarded(() => boardsApi.moveItem(group.boardId, itemId, target)),
+      guarded(boardId, () => boardsApi.moveItem(boardId, itemId, target)),
     setItemDueDate: (itemId, dueDate) =>
-      guarded(() => boardsApi.updateItem(group.boardId, itemId, { dueDate })),
+      guarded(boardId, () =>
+        boardsApi.updateItem(boardId, itemId, { dueDate }),
+      ),
     setAssignees: (itemId, assignees) =>
-      guarded(() => boardsApi.updateItem(group.boardId, itemId, { assignees })),
+      guarded(boardId, () =>
+        boardsApi.updateItem(boardId, itemId, { assignees }),
+      ),
     deleteItem: itemId =>
-      guarded(() => boardsApi.deleteItem(group.boardId, itemId)),
-  };
+      guarded(boardId, () => boardsApi.deleteItem(boardId, itemId)),
+  });
 
-  const openBoardItem = (
-    <MenuItem iconStart={<RiArrowRightLine size={16} />} onAction={openBoard}>
-      Open board
-    </MenuItem>
-  );
-
-  const rowMenu = useRowMenu<BoardItem>({
-    name: item => item.title,
-    children: item => (
+  const rowMenu = useRowMenu<MyBoardItem>({
+    name: entry => entry.item.title,
+    children: entry => (
       <ItemMenu
-        item={item}
-        columns={board?.columns ?? []}
-        readonly={!canWrite || !!item.externalManager}
-        actions={actions}
+        item={entry.item}
+        columns={boards.get(entry.boardId)?.columns ?? []}
+        readonly={!canWrite(entry) || !!entry.item.externalManager}
+        actions={actionsOf(entry.boardId)}
         assigneePool={pool}
-        extraItems={openBoardItem}
+        extraItems={
+          <MenuItem
+            iconStart={<RiArrowRightLine size={16} />}
+            onAction={() => navigate(boardPath(entry.boardId))}
+          >
+            Open board
+          </MenuItem>
+        }
       />
     ),
   });
 
   return (
-    <div>
-      <Button
-        variant="tertiary"
-        onPress={openBoard}
-        aria-label={`Open board ${group.boardName}`}
-      >
-        <Text variant="body-large" weight="bold">
-          {group.boardName}
-        </Text>
-      </Button>
+    <>
       <TableRoot
-        aria-label={`My items on ${group.boardName}`}
-        onRowAction={key => actions.openItem(String(key))}
+        aria-label={label}
+        onRowAction={key => {
+          const entry = byId.get(String(key));
+          if (entry) {
+            navigate(`${boardPath(entry.boardId)}?item=${entry.item.id}`);
+          }
+        }}
       >
         <TableHeader>
+          {showBoardColumn ? <Column>Board</Column> : null}
           <Column isRowHeader>Item</Column>
           <Column>Status</Column>
           <Column>Due</Column>
@@ -147,18 +154,30 @@ function BoardGroupTable(props: {
           <Column>Actions</Column>
         </TableHeader>
         <TableBody>
-          {group.entries.map(entry => (
+          {entries.map(entry => (
             <Row
               key={entry.item.id}
               id={entry.item.id}
               onContextMenu={(event: React.MouseEvent) =>
-                rowMenu.onContextMenu(entry.item, event)
+                rowMenu.onContextMenu(entry, event)
               }
             >
+              {showBoardColumn ? (
+                <Cell>
+                  <Button
+                    variant="tertiary"
+                    size="small"
+                    onPress={() => navigate(boardPath(entry.boardId))}
+                    aria-label={`Open board ${entry.boardName}`}
+                  >
+                    <Text variant="body-small">{entry.boardName}</Text>
+                  </Button>
+                </Cell>
+              ) : null}
               <Cell>{entry.item.title}</Cell>
               <Cell>
-                {columnOf(entry.item.columnId) ? (
-                  <StatusBadge column={columnOf(entry.item.columnId)} />
+                {columnOf(entry) ? (
+                  <StatusBadge column={columnOf(entry)} />
                 ) : (
                   // until the board resolves, the listing's own title
                   <Badge size="small">{entry.columnTitle}</Badge>
@@ -168,30 +187,139 @@ function BoardGroupTable(props: {
                 <DueDateBadge dueDate={entry.item.dueDate} />
               </Cell>
               <Cell>{entry.item.tags.join(', ')}</Cell>
-              <Cell>{rowMenu.rowActions(entry.item)}</Cell>
+              <Cell>{rowMenu.rowActions(entry)}</Cell>
             </Row>
           ))}
         </TableBody>
       </TableRoot>
       {rowMenu.contextMenu}
-    </div>
+    </>
   );
 }
 
-/** The current user's items grouped by board; reused by the Boards tab. */
+/** A group's heading: the board as a link, or the group's own label. */
+function GroupHeading(props: {
+  group: MyItemGroup;
+  groupBy: MyItemsGroupBy;
+  onOpenBoard: (boardId: string) => void;
+}) {
+  const { group, groupBy, onOpenBoard } = props;
+  if (groupBy === 'none') {
+    return null;
+  }
+  const count = (
+    <Text variant="body-small" color="secondary">
+      {group.entries.length}
+    </Text>
+  );
+  if (groupBy === 'board') {
+    return (
+      <Flex align="center" gap="2">
+        <Button
+          variant="tertiary"
+          onPress={() => onOpenBoard(group.key)}
+          aria-label={`Open board ${group.label}`}
+        >
+          <Text variant="body-large" weight="bold">
+            {group.label}
+          </Text>
+        </Button>
+        {count}
+      </Flex>
+    );
+  }
+  return (
+    <Flex align="center" gap="2">
+      <Text variant="body-large" weight="bold">
+        {groupBy === 'status' ? (
+          group.label
+        ) : (
+          // due dates and tags read the way they do on a board
+          <GroupLabel mode={groupBy} groupKey={group.key} />
+        )}
+      </Text>
+      {count}
+    </Flex>
+  );
+}
+
+/** How a group's table is announced. */
+function tableLabel(group: MyItemGroup, groupBy: MyItemsGroupBy): string {
+  if (groupBy === 'none') {
+    return 'My items';
+  }
+  if (groupBy === 'board') {
+    return `My items on ${group.label}`;
+  }
+  return `My items grouped under ${group.label}`;
+}
+
+/** The current user's items, filtered and grouped; reused by the Boards tab. */
 export function MyItemsList() {
+  const navigate = useNavigate();
   const basePath = useBoardsBasePath();
   const [actionError, setActionError] = useState<string | undefined>();
+  const [groupBy, setGroupBy] = useState<MyItemsGroupBy>('board');
 
   const { data: entries, isLoading, error, refetch } = useMyItemsQuery();
 
   useBoardsSignal(refetch);
 
-  const groups = useMemo(() => groupByBoard(entries ?? []), [entries]);
+  const items = useMemo(
+    () => (entries ?? []).map(entry => entry.item),
+    [entries],
+  );
+  const filter = useItemFilter(items);
+  const filtered = useMemo(
+    () =>
+      (entries ?? []).filter(entry =>
+        itemMatchesFilter(entry.item, filter.filter),
+      ),
+    [entries, filter.filter],
+  );
+  // every board behind the listing, so a row can resolve its own even
+  // when the grouping mixes them
+  const boards = useBoardsQueries(
+    useMemo(() => (entries ?? []).map(entry => entry.boardId), [entries]),
+  );
+  const pool = useMemo(() => assigneePool(items), [items]);
+  const groups = useMemo(
+    () => groupMyItems(filtered, groupBy),
+    [filtered, groupBy],
+  );
 
   return (
     <Flex direction="column" gap="4">
       {actionError && <ErrorText>{actionError}</ErrorText>}
+      {(entries ?? []).length > 0 && (
+        <Flex
+          align="center"
+          gap="2"
+          justify="between"
+          style={{ flexWrap: 'wrap' }}
+        >
+          {/* every listed item is already the viewer's, so a single
+              assignee would match every row */}
+          <ItemFilterBar filter={filter} minAssigneeOptions={2} />
+          {/* the select grows into whatever the flex row leaves it */}
+          <div style={{ width: 160, flexShrink: 0 }}>
+            <Select
+              aria-label="Group by"
+              size="small"
+              options={MY_ITEMS_PAGE_GROUP_BY.map(mode => ({
+                value: mode,
+                label: GROUP_BY_LABELS[mode],
+              }))}
+              selectedKey={groupBy}
+              onSelectionChange={key =>
+                setGroupBy(
+                  selectedOption(key, MY_ITEMS_PAGE_GROUP_BY) ?? 'board',
+                )
+              }
+            />
+          </div>
+        </Flex>
+      )}
       <AsyncList
         isLoading={isLoading}
         error={error}
@@ -202,18 +330,30 @@ export function MyItemsList() {
         )}
         empty={
           <Text color="secondary">
-            Nothing is assigned to you on any board.
+            {filter.active
+              ? 'No items match your filters.'
+              : 'Nothing is assigned to you on any board.'}
           </Text>
         }
       >
-        {boards =>
-          boards.map(group => (
-            <BoardGroupTable
-              key={group.boardId}
-              group={group}
-              basePath={basePath}
-              onError={setActionError}
-            />
+        {rendered =>
+          rendered.map(group => (
+            <div key={group.key}>
+              <GroupHeading
+                group={group}
+                groupBy={groupBy}
+                onOpenBoard={boardId => navigate(`${basePath}/${boardId}`)}
+              />
+              <MyItemsTable
+                label={tableLabel(group, groupBy)}
+                entries={group.entries}
+                boards={boards}
+                pool={pool}
+                basePath={basePath}
+                showBoardColumn={groupBy !== 'board'}
+                onError={setActionError}
+              />
+            </div>
           ))
         }
       </AsyncList>
