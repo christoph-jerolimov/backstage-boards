@@ -164,8 +164,8 @@ export function BoardPageContent(props: {
         guarded(() => boardsApi.updateColumn(boardId, columnId, { title })),
       reorderColumn: (columnId, position) =>
         guarded(() => boardsApi.updateColumn(boardId, columnId, { position })),
-      addColumn: title =>
-        guarded(() => boardsApi.addColumn(boardId, { title })),
+      addColumn: (title, position) =>
+        guarded(() => boardsApi.addColumn(boardId, { title, position })),
       setColumnColor: (columnId, color) =>
         guarded(() => boardsApi.updateColumn(boardId, columnId, { color })),
       deleteColumn: (columnId, moveItemsTo) =>

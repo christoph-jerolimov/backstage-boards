@@ -6,7 +6,7 @@ Controls who can see and change a board: per-user and per-group permission level
 ## Requirements
 
 ### Requirement: Permission levels
-The system SHALL support three permission levels for board access: `admin` (manage board settings, columns, permissions, delete board, plus everything below), `write` (add/update/move/delete items, comment, edit labels/tags, manage columns), and `read` (view the board and its items, comments, and history). A user's effective level SHALL be the highest level granted by any of: direct user permission, a permission of a group the user belongs to, or the board's public access mode.
+The system SHALL support three permission levels for board access: `admin` (manage board settings, columns, permissions, delete board, plus everything below), `write` (add/update/move/delete items, comment, edit tags, manage columns), and `read` (view the board and its items, comments, and history). A user's effective level SHALL be the highest level granted by any of: direct user permission, a permission of a group the user belongs to, or the board's public access mode.
 
 #### Scenario: Effective permission is the highest grant
 - **WHEN** a user has direct `read` access and is a member of a group with `write` access on the same board

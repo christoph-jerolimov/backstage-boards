@@ -35,7 +35,7 @@ A comment's author (or a board admin) SHALL be able to edit or delete the commen
 - **THEN** the request is rejected with a permission error
 
 ### Requirement: Change history for items
-Every change to an item other than comments — creation, field updates (title, labels, tags, assignees, creator), status/column moves, and deletion-relevant events — SHALL be recorded in a changes store with who made the change, when, and what changed (field, old value, new value).
+Every change to an item other than comments — creation, field updates (title, tags, assignees, creator), status/column moves, and deletion-relevant events — SHALL be recorded in a changes store with who made the change, when, and what changed (field, old value, new value).
 
 #### Scenario: Field change is recorded
 - **WHEN** a user changes an item's title from "A" to "B"

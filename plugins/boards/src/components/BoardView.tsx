@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { Fragment, useRef, useState } from 'react';
 import { useDrag, useDrop } from 'react-aria';
 import {
   Button,
@@ -42,7 +42,8 @@ export interface BoardActions {
   createItem: (columnId: string, title: string) => Promise<void>;
   renameColumn: (columnId: string, title: string) => Promise<void>;
   reorderColumn: (columnId: string, position: number) => Promise<void>;
-  addColumn: (title: string) => Promise<void>;
+  /** Appends a column when `position` is omitted, inserts it there otherwise. */
+  addColumn: (title: string, position?: number) => Promise<void>;
   setColumnColor: (columnId: string, color: string | null) => Promise<void>;
   deleteColumn: (columnId: string, moveItemsTo?: string) => Promise<void>;
   openItem: (itemId: string) => void;
@@ -246,6 +247,8 @@ function ColumnLane(props: {
   actions: BoardActions;
   groupBy: GroupByMode;
   onRequestDelete: (column: BoardColumn, hasItems: boolean) => void;
+  onInsertBefore: () => void;
+  onInsertAfter: () => void;
   onItemContextMenu: (item: BoardItem, event: React.MouseEvent) => void;
   assigneePool: string[];
 }) {
@@ -331,6 +334,12 @@ function ColumnLane(props: {
               icon={<MoreIcon />}
             />
             <Menu placement="right top">
+              <MenuItem onAction={props.onInsertBefore}>
+                Insert column before
+              </MenuItem>
+              <MenuItem onAction={props.onInsertAfter}>
+                Insert column after
+              </MenuItem>
               {index > 0 && (
                 <MenuItem
                   onAction={() =>
@@ -431,73 +440,93 @@ export function BoardView(props: {
   const contextMenu = useRowContextMenu<BoardItem>();
   const [deleteTarget, setDeleteTarget] = useState<BoardColumn | undefined>();
   const [moveItemsTo, setMoveItemsTo] = useState<string | undefined>();
-  const [addingColumn, setAddingColumn] = useState(false);
+  // the slot the new column goes into, as an index into board.columns:
+  // `n` means "before the column at n", so board.columns.length appends.
+  // undefined means no column is being added.
+  const [insertAt, setInsertAt] = useState<number | undefined>();
   const [columnTitle, setColumnTitle] = useState('');
+
+  const cancelColumn = () => {
+    setInsertAt(undefined);
+    setColumnTitle('');
+  };
 
   const commitColumn = async () => {
     const value = columnTitle.trim();
-    setAddingColumn(false);
-    setColumnTitle('');
-    if (value) {
-      await actions.addColumn(value);
+    const slot = insertAt;
+    cancelColumn();
+    if (!value || slot === undefined) {
+      return;
     }
+    // appending is left to the backend, which places the column after the
+    // last one; only a gap needs a position worked out here
+    await actions.addColumn(
+      value,
+      slot === board.columns.length
+        ? undefined
+        : positionBefore(board.columns, slot),
+    );
   };
+
+  const titleField = (
+    <div style={{ minWidth: 200 }}>
+      <TextField
+        aria-label="New column title"
+        value={columnTitle}
+        onChange={setColumnTitle}
+        placeholder="Column title"
+        // eslint-disable-next-line jsx-a11y/no-autofocus -- focus moves into a field the user just revealed
+        autoFocus
+        onBlur={commitColumn}
+        onKeyDown={event => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            commitColumn();
+          } else if (event.key === 'Escape') {
+            cancelColumn();
+          }
+        }}
+      />
+    </div>
+  );
 
   return (
     <Flex gap="3" align="start" style={{ overflowX: 'auto', paddingBottom: 8 }}>
-      {board.columns.map(column => (
-        <ColumnLane
-          key={column.id}
-          board={board}
-          column={column}
-          items={items.filter(item => item.columnId === column.id)}
-          canWrite={canWrite}
-          actions={actions}
-          groupBy={groupBy}
-          assigneePool={assigneePool}
-          onItemContextMenu={contextMenu.open}
-          onRequestDelete={(target, hasItems) => {
-            if (hasItems) {
-              setDeleteTarget(target);
-              setMoveItemsTo(undefined);
-            } else {
-              actions.deleteColumn(target.id);
-            }
-          }}
-        />
+      {board.columns.map((column, index) => (
+        <Fragment key={column.id}>
+          {insertAt === index && titleField}
+          <ColumnLane
+            board={board}
+            column={column}
+            items={items.filter(item => item.columnId === column.id)}
+            canWrite={canWrite}
+            actions={actions}
+            groupBy={groupBy}
+            assigneePool={assigneePool}
+            onItemContextMenu={contextMenu.open}
+            onInsertBefore={() => setInsertAt(index)}
+            onInsertAfter={() => setInsertAt(index + 1)}
+            onRequestDelete={(target, hasItems) => {
+              if (hasItems) {
+                setDeleteTarget(target);
+                setMoveItemsTo(undefined);
+              } else {
+                actions.deleteColumn(target.id);
+              }
+            }}
+          />
+        </Fragment>
       ))}
-      {canWrite &&
-        board.columns.length === 0 &&
-        (addingColumn ? (
-          <div style={{ minWidth: 200 }}>
-            <TextField
-              aria-label="New column title"
-              value={columnTitle}
-              onChange={setColumnTitle}
-              placeholder="Column title"
-              // eslint-disable-next-line jsx-a11y/no-autofocus -- focus moves into a field the user just revealed
-              autoFocus
-              onBlur={commitColumn}
-              onKeyDown={event => {
-                if (event.key === 'Enter') {
-                  event.preventDefault();
-                  commitColumn();
-                } else if (event.key === 'Escape') {
-                  setAddingColumn(false);
-                  setColumnTitle('');
-                }
-              }}
-            />
-          </div>
-        ) : (
-          <Button
-            variant="tertiary"
-            onPress={() => setAddingColumn(true)}
-            aria-label="Add column"
-          >
-            + Add column
-          </Button>
-        ))}
+      {insertAt === board.columns.length && titleField}
+      {canWrite && board.columns.length === 0 && insertAt === undefined && (
+        <Button
+          variant="tertiary"
+          onPress={() => setInsertAt(0)}
+          aria-label="Add column"
+        >
+          + Add column
+        </Button>
+      )}
       <ItemContextMenu
         state={contextMenu.state}
         onClose={contextMenu.close}

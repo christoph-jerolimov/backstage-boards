@@ -239,6 +239,15 @@ describe('BoardsClient column endpoints', () => {
     expect(bodyOf(calls[1].init)).toEqual({ color: null });
   });
 
+  it('omits the position entirely when adding without one', async () => {
+    const { client, calls } = setup(() => ({ status: 204 }));
+    // the backend appends only while `position` is absent from the body,
+    // so an undefined position must not survive as a null
+    await client.addColumn('board-1', { title: 'Todo', position: undefined });
+    expect(bodyOf(calls[0].init)).toEqual({ title: 'Todo' });
+    expect('position' in bodyOf(calls[0].init)).toBe(false);
+  });
+
   it('deletes columns, optionally moving the items', async () => {
     const { client, calls } = setup(() => ({ status: 204 }));
     await client.deleteColumn('board-1', 'column-1');

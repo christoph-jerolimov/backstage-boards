@@ -19,9 +19,27 @@ The system SHALL allow an authenticated user to create a board with a name. The 
 ### Requirement: Configurable columns per board
 Each board SHALL have an ordered list of columns configurable from the UI by users with `admin` or `write` access. A column represents an item status; there SHALL be no built-in statuses (including no built-in "done" status) — all statuses come from the board's columns. Columns SHALL be creatable, renamable, reorderable, and deletable inline in the board view.
 
+On a board that already has columns, creation SHALL be offered from each column's menu as "Insert column before" and "Insert column after", which place the new column immediately before or after the column whose menu was used. On a board with no columns, creation SHALL be offered as a standalone affordance in the empty board area. Both entry points SHALL take the new column's title inline in the board view, and SHALL create nothing if the user cancels or supplies an empty title.
+
 #### Scenario: Add a column
 - **WHEN** a user with write access adds a column named "In Review" to a board
 - **THEN** the column appears at the chosen position in the board view and becomes a selectable status for items on that board
+
+#### Scenario: Insert a column after another
+- **WHEN** a user with write access chooses "Insert column after" on the "Todo" column of a board whose columns are "Todo" and "Done", and confirms the title "In Review"
+- **THEN** the board's columns are "Todo", "In Review", "Done" in that order, and the new column is never shown at the end of the board on its way there
+
+#### Scenario: Insert a column before the first one
+- **WHEN** a user with write access chooses "Insert column before" on the leftmost column and confirms a title
+- **THEN** the new column becomes the leftmost column of the board
+
+#### Scenario: Cancelled insert creates nothing
+- **WHEN** a user with write access opens an insert affordance and then cancels it or confirms an empty title
+- **THEN** the board's columns are unchanged
+
+#### Scenario: Read-only user has no insert entries
+- **WHEN** a user with only read access opens a column's menu
+- **THEN** no insert entries are offered and the column set cannot be changed
 
 #### Scenario: Rename a column
 - **WHEN** a user with write access renames a column
@@ -32,7 +50,7 @@ Each board SHALL have an ordered list of columns configurable from the UI by use
 - **THEN** the system requires the user to choose a target column for those items (or blocks deletion until the column is empty) so that no item is left without a status
 
 ### Requirement: Board list view
-The system SHALL provide a list view showing the user's favorited boards and all boards the user can access (via direct permission, group permission, or public visibility). The list SHALL allow toggling between "Favorites" and "All" and show at least the board name, its catalog entity (if assigned), and the user's access level. Each list SHALL be rendered as a table whose last column is an actions column holding a menu button; activating a row SHALL open the board. The actions menu SHALL also open, anchored at the pointer, when the user right-clicks the row.
+The system SHALL provide a list view showing the user's favorited boards and all boards the user can access (via direct permission, group permission, or public visibility). The list SHALL allow toggling between "Favorites" and "All" and show at least the board name, the catalog entities it references, and the user's access level. Each list SHALL be rendered as a table whose last column is an actions column holding a menu button; activating a row SHALL open the board. The actions menu SHALL also open, anchored at the pointer, when the user right-clicks the row.
 
 #### Scenario: List accessible boards
 - **WHEN** a user opens the boards list
@@ -49,17 +67,6 @@ The system SHALL provide a list view showing the user's favorited boards and all
 #### Scenario: Right-click opens the same menu
 - **WHEN** a user right-clicks a board row
 - **THEN** the browser context menu is suppressed and the row's actions menu opens at the pointer position
-
-### Requirement: Optional catalog entity assignment
-A board SHALL optionally be assigned to a single catalog entity by entity ref. The assignment SHALL be editable by users with `admin` access and displayed in the board list and board header.
-
-#### Scenario: Assign a board to an entity
-- **WHEN** a board admin assigns the board to catalog entity `system:default/payments`
-- **THEN** the board stores the entity ref and displays a link to that entity
-
-#### Scenario: Unassign the entity
-- **WHEN** a board admin clears the entity assignment
-- **THEN** the board has no associated entity and no entity link is shown
 
 ### Requirement: Update and delete boards
 Users with `admin` access SHALL be able to rename a board and delete it. Deleting a board SHALL delete its columns, items, comments, change history, permissions, favorites, and watches. Users with `write` or `read` access SHALL NOT be able to rename or delete the board.
@@ -99,7 +106,7 @@ A column SHALL have an optional display color chosen from a fixed palette by use
 - **THEN** status indicators for that column render in a neutral color
 
 ### Requirement: Duplicate a board
-Users with read access SHALL be able to duplicate a board from its more menu, choosing a name and whether to copy the source board's columns (including colors) and/or its share settings; items are never copied. The duplicating user SHALL become admin of the copy. Share settings SHALL only be copyable by admins of the source board; the copy otherwise starts private with only the duplicator's admin grant.
+Users with read access SHALL be able to duplicate a board from its more menu, choosing a name and which parts of the source board to copy: its columns (including colors), its items, its entity references, and/or its share settings. The duplicating user SHALL become admin of the copy. Share settings SHALL only be copyable by admins of the source board; the copy otherwise starts private with only the duplicator's admin grant.
 
 #### Scenario: Duplicate with columns
 - **WHEN** a user duplicates a board choosing to copy columns
@@ -163,8 +170,8 @@ entity. Invalid entity refs SHALL be rejected.
 ### Requirement: Duplicate copies items and entity references on request
 
 Board duplication SHALL optionally copy the source board's non-archived
-items — titles, positions, descriptions, due dates, assignees, labels,
-and tags — into the corresponding copied columns. Copying items SHALL
+items — titles, positions, descriptions, due dates, assignees, and
+tags — into the corresponding copied columns. Copying items SHALL
 require copying columns; a request to copy items without columns SHALL
 be rejected. Comments, item history, watches, and external-manager
 flags SHALL NOT be copied. Duplication SHALL also optionally copy the
