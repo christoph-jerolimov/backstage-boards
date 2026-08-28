@@ -15,6 +15,7 @@ import {
 } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
 import { ArchivedItemsDialog } from './ArchivedItemsDialog';
+import { AssigneeMatrixDialog } from './AssigneeMatrixDialog';
 import { BoardSettingsDialog } from './BoardSettingsDialog';
 import { DuplicateBoardDialog } from './DuplicateBoardDialog';
 import { PriorityMatrixDialog } from './PriorityMatrixDialog';
@@ -28,7 +29,8 @@ export type BoardDialogKind =
   | 'changes'
   | 'archived'
   | 'duplicate'
-  | 'matrix'
+  | 'priorityMatrix'
+  | 'assigneeMatrix'
   | 'delete';
 
 /**
@@ -96,7 +98,14 @@ export function BoardDialogs(props: {
       <PriorityMatrixDialog
         board={board}
         items={items}
-        isOpen={open === 'matrix'}
+        isOpen={open === 'priorityMatrix'}
+        onOpenChange={openChange}
+      />
+
+      <AssigneeMatrixDialog
+        board={board}
+        items={items}
+        isOpen={open === 'assigneeMatrix'}
         onOpenChange={openChange}
       />
 

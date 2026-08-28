@@ -168,10 +168,16 @@ export function BoardHeader(props: {
                   Archived items…
                 </MenuItem>
               )}
+              <MenuItem
+                iconStart={<RiTableLine size={16} />}
+                onAction={() => onOpenDialog('assigneeMatrix')}
+              >
+                Assignee matrix…
+              </MenuItem>
               {board.priorities.length > 0 && (
                 <MenuItem
                   iconStart={<RiTableLine size={16} />}
-                  onAction={() => onOpenDialog('matrix')}
+                  onAction={() => onOpenDialog('priorityMatrix')}
                 >
                   Priority matrix…
                 </MenuItem>
