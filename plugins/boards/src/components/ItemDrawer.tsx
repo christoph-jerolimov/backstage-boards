@@ -12,20 +12,24 @@ import {
 import {
   BoardItem,
   BoardWithContext,
-  isTextRef,
   ItemComment,
   TimelineEntry,
 } from '@internal/plugin-boards-common';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { boardsApiRef } from '../api';
 import { queryKeys } from '../queries';
-import { AssigneeAvatars } from './AssigneeAvatars';
 import { WatchButton } from './WatchButton';
 import { DueDateBadge } from './DueDate';
 import { EditableMarkdown } from './EditableMarkdown';
 import { PrincipalPicker } from './PrincipalPicker';
 import { TagsEditor } from './TagsEditor';
-import { changeSummary, formatDate, InlineEdit, RefDisplay } from './common';
+import {
+  changeSummary,
+  formatDate,
+  InlineEdit,
+  RefChips,
+  RefDisplay,
+} from './common';
 import { StatusBadge } from './StatusBadge';
 
 function CommentBlock(props: {
@@ -318,44 +322,22 @@ export function ItemDrawer(props: {
             </Text>
             <Flex direction="column" gap="2">
               {item.assignees.length > 0 ? (
-                <Flex gap="1" align="center" style={{ flexWrap: 'wrap' }}>
-                  {item.assignees.map(assignee => (
-                    <span
-                      key={assignee}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 4,
-                        border: '1px solid var(--bui-border-1)',
-                        borderRadius: 12,
-                        padding: '2px 4px 2px 8px',
-                      }}
-                    >
-                      {isTextRef(assignee) ? (
-                        <RefDisplay refString={assignee} />
-                      ) : (
-                        <AssigneeAvatars refs={[assignee]} />
-                      )}
-                      {!readonly && (
-                        <Button
-                          variant="tertiary"
-                          size="small"
-                          aria-label={`Remove assignee ${assignee}`}
-                          onPress={async () => {
-                            await boardsApi.updateItem(board.id, item.id, {
-                              assignees: item.assignees.filter(
-                                ref => ref !== assignee,
-                              ),
-                            });
-                            await changed();
-                          }}
-                        >
-                          ✕
-                        </Button>
-                      )}
-                    </span>
-                  ))}
-                </Flex>
+                <RefChips
+                  refs={item.assignees}
+                  withAvatars
+                  onRemove={
+                    readonly
+                      ? undefined
+                      : async assignee => {
+                          await boardsApi.updateItem(board.id, item.id, {
+                            assignees: item.assignees.filter(
+                              ref => ref !== assignee,
+                            ),
+                          });
+                          await changed();
+                        }
+                  }
+                />
               ) : (
                 <Text variant="body-small" color="secondary">
                   Unassigned

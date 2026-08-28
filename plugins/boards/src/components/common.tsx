@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Badge, Flex, Text, TextField } from '@backstage/ui';
+import { Badge, Button, Flex, Text, TextField } from '@backstage/ui';
 import { EntityRefLink } from '@backstage/plugin-catalog-react';
 import { isTextRef, textRefDisplay } from '@internal/plugin-boards-common';
+import { AssigneeAvatars } from './AssigneeAvatars';
 import { BlockToken, InlineToken, parseMarkdown } from './markdown';
 
 /** Renders a creator/assignee/actor ref: catalog refs link, `text:` refs don't. */
@@ -13,16 +14,69 @@ export function RefDisplay(props: { refString: string }) {
   return <EntityRefLink entityRef={refString} />;
 }
 
-export function RefChips(props: { refs: string[] }) {
+/** One ref as a chip: a catalog ref links, a `text:` ref reads plainly. */
+function RefChip(props: {
+  refString: string;
+  withAvatar?: boolean;
+  onRemove?: (ref: string) => void;
+}) {
+  const { refString, withAvatar, onRemove } = props;
+  // AssigneeAvatars already tells catalog refs and text refs apart
+  const content = withAvatar ? (
+    <AssigneeAvatars refs={[refString]} />
+  ) : (
+    <RefDisplay refString={refString} />
+  );
+  if (!withAvatar && !onRemove) {
+    return <Badge size="small">{content}</Badge>;
+  }
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 4,
+        border: '1px solid var(--bui-border-1)',
+        borderRadius: 12,
+        padding: onRemove ? '2px 4px 2px 8px' : '2px 8px',
+      }}
+    >
+      {content}
+      {onRemove && (
+        <Button
+          variant="tertiary"
+          size="small"
+          aria-label={`Remove assignee ${refString}`}
+          onPress={() => onRemove(refString)}
+        >
+          ✕
+        </Button>
+      )}
+    </span>
+  );
+}
+
+/**
+ * A row of refs as chips. With `withAvatars` the catalog refs show their
+ * profile picture, and `onRemove` puts a remove button in each chip.
+ */
+export function RefChips(props: {
+  refs: string[];
+  withAvatars?: boolean;
+  onRemove?: (ref: string) => void;
+}) {
   if (props.refs.length === 0) {
     return null;
   }
   return (
     <Flex gap="1" align="center" style={{ flexWrap: 'wrap' }}>
       {props.refs.map(ref => (
-        <Badge key={ref} size="small">
-          <RefDisplay refString={ref} />
-        </Badge>
+        <RefChip
+          key={ref}
+          refString={ref}
+          withAvatar={props.withAvatars}
+          onRemove={props.onRemove}
+        />
       ))}
     </Flex>
   );
