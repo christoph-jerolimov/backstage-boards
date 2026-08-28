@@ -211,7 +211,13 @@ describe('BoardView column menu', () => {
     await openColumnMenu('Todo');
     expect(
       screen.getAllByRole('menuitem').map(entry => entry.textContent),
-    ).toEqual(['Move right', 'Color', 'Delete column']);
+    ).toEqual([
+      'Insert column before',
+      'Insert column after',
+      'Move right',
+      'Color',
+      'Delete column',
+    ]);
   });
 
   it('offers both directions in the middle', async () => {
@@ -219,7 +225,14 @@ describe('BoardView column menu', () => {
     await openColumnMenu('Doing');
     expect(
       screen.getAllByRole('menuitem').map(entry => entry.textContent),
-    ).toEqual(['Move left', 'Move right', 'Color', 'Delete column']);
+    ).toEqual([
+      'Insert column before',
+      'Insert column after',
+      'Move left',
+      'Move right',
+      'Color',
+      'Delete column',
+    ]);
   });
 
   it('reorders a column', async () => {
@@ -293,7 +306,7 @@ describe('BoardView add column', () => {
       screen.getByRole('textbox', { name: 'New column title' }),
       'Backlog{Enter}',
     );
-    expect(actions.addColumn).toHaveBeenCalledWith('Backlog');
+    expect(actions.addColumn).toHaveBeenCalledWith('Backlog', undefined);
   });
 
   it('cancels adding the first column on Escape', async () => {
@@ -304,5 +317,63 @@ describe('BoardView add column', () => {
       'Backlog{Escape}',
     );
     expect(actions.addColumn).not.toHaveBeenCalled();
+  });
+});
+
+describe('BoardView insert column', () => {
+  async function insert(column: string, entry: 'before' | 'after') {
+    await userEvent.click(
+      screen.getByRole('button', { name: `Actions for column ${column}` }),
+    );
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: `Insert column ${entry}` }),
+    );
+    return screen.findByRole('textbox', { name: 'New column title' });
+  }
+
+  it('inserts between two columns without a follow-up reorder', async () => {
+    // Todo=1000, Doing=2000, so the gap after Todo is 1500
+    const { actions } = renderBoard();
+    await userEvent.type(await insert('Todo', 'after'), 'In Review{Enter}');
+    expect(actions.addColumn).toHaveBeenCalledTimes(1);
+    expect(actions.addColumn).toHaveBeenCalledWith('In Review', 1500);
+    // the column is created where it belongs, never appended and moved
+    expect(actions.reorderColumn).not.toHaveBeenCalled();
+  });
+
+  it('inserts before the leftmost column below its position', async () => {
+    const { actions } = renderBoard();
+    await userEvent.type(await insert('Todo', 'before'), 'Backlog{Enter}');
+    expect(actions.addColumn).toHaveBeenCalledWith('Backlog', 500);
+  });
+
+  it('leaves appending to the backend past the last column', async () => {
+    const { actions } = renderBoard();
+    await userEvent.type(await insert('Done', 'after'), 'Archive{Enter}');
+    expect(actions.addColumn).toHaveBeenCalledWith('Archive', undefined);
+  });
+
+  it('creates nothing when the insert is cancelled on Escape', async () => {
+    const { actions } = renderBoard();
+    await userEvent.type(await insert('Todo', 'after'), 'In Review{Escape}');
+    expect(actions.addColumn).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('textbox', { name: 'New column title' }),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
+  it('creates nothing when the title is left empty', async () => {
+    const { actions } = renderBoard();
+    await userEvent.type(await insert('Todo', 'after'), '   {Enter}');
+    expect(actions.addColumn).not.toHaveBeenCalled();
+  });
+
+  it('offers no insert entries to a read-only user', () => {
+    renderBoard({ canWrite: false });
+    expect(
+      screen.queryByRole('button', { name: /Actions for column/ }),
+    ).not.toBeInTheDocument();
   });
 });
