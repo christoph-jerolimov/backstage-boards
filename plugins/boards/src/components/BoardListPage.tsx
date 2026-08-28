@@ -4,7 +4,6 @@ import { useApi } from '@backstage/frontend-plugin-api';
 import { useSignal } from '@backstage/plugin-signals-react';
 import {
   Button,
-  ButtonIcon,
   Cell,
   Column,
   Dialog,
@@ -25,7 +24,7 @@ import {
   Text,
   TextField,
 } from '@backstage/ui';
-import { RiArrowRightLine, RiStarFill, RiStarLine } from '@remixicon/react';
+import { RiArrowRightLine } from '@remixicon/react';
 import { EntityRefLink } from '@backstage/plugin-catalog-react';
 import { BoardListEntry } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
@@ -33,26 +32,8 @@ import { useBoardsQuery, boardsQueryClient, queryKeys } from '../queries';
 import { MyItemsList } from './MyItemsPage';
 import { RowActionsMenu, RowContextMenu, useRowContextMenu } from './RowMenu';
 import { ErrorText } from './common';
+import { FavoriteButton, FavoriteStar } from './FavoriteButton';
 import { useAsyncAction } from './useAsyncAction';
-
-function StarIcon(props: { filled: boolean }) {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden>
-      <path
-        d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
-        fill={props.filled ? 'currentColor' : 'none'}
-        stroke="currentColor"
-        strokeWidth="1.5"
-      />
-    </svg>
-  );
-}
-
-function favoriteLabel(board: BoardListEntry): string {
-  return board.favorite
-    ? `Remove ${board.name} from favorites`
-    : `Add ${board.name} to favorites`;
-}
 
 /** The shared board actions menu: row button and right-click alike. */
 function BoardMenu(props: {
@@ -70,9 +51,7 @@ function BoardMenu(props: {
         Open board
       </MenuItem>
       <MenuItem
-        iconStart={
-          board.favorite ? <RiStarFill size={16} /> : <RiStarLine size={16} />
-        }
+        iconStart={<FavoriteStar favorite={board.favorite} />}
         onAction={() => onToggleFavorite(board)}
       >
         {board.favorite ? 'Remove from favorites' : 'Add to favorites'}
@@ -114,12 +93,10 @@ function BoardsTable(props: {
               }
             >
               <Cell>
-                <ButtonIcon
-                  aria-label={favoriteLabel(board)}
-                  variant="tertiary"
-                  size="small"
-                  icon={<StarIcon filled={board.favorite} />}
-                  onPress={() => onToggleFavorite(board)}
+                <FavoriteButton
+                  favorite={board.favorite}
+                  boardName={board.name}
+                  onToggle={() => onToggleFavorite(board)}
                 />
               </Cell>
               <Cell>{board.name}</Cell>
