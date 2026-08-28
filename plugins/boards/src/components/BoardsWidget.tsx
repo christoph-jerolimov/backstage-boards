@@ -8,7 +8,7 @@ import {
 } from '@internal/plugin-boards-common';
 import { useBoardListQuery, useBoardsSignal } from '../queries';
 import { rootRouteRef } from '../routes';
-import { ErrorText } from './common';
+import { AsyncList, ErrorText } from './common';
 
 export { BoardsWidgetProvider } from './widgetCommon';
 
@@ -109,47 +109,47 @@ export function BoardsContent(props: BoardsContentProps) {
 
   useBoardsSignal(refetch);
 
-  if (isLoading) {
-    return <Text>Loading boards…</Text>;
-  }
-  if (error) {
-    return (
-      <ErrorText>
-        Boards could not be loaded: {(error as Error).message}
-      </ErrorText>
-    );
-  }
-  if ((boards ?? []).length === 0) {
-    return (
-      <Flex direction="column" gap="2" align="start">
-        <Text color="secondary">
-          {scope === 'favorites'
-            ? 'You have not favorited any board yet.'
-            : 'You cannot access any board yet.'}
-        </Text>
-        <Button
-          variant="tertiary"
-          size="small"
-          onPress={() => navigate(basePath)}
-          aria-label="Open the boards page"
-        >
-          Go to boards
-        </Button>
-      </Flex>
-    );
-  }
   return (
     <div style={{ maxHeight: '100%', overflowY: 'auto' }}>
-      <Flex direction="column" gap="3">
-        {(boards ?? []).map(board => (
-          <BoardRow
-            key={board.id}
-            board={board}
-            showCounts={showCounts}
-            onOpen={() => navigate(`${basePath}/${board.id}`)}
-          />
-        ))}
-      </Flex>
+      <AsyncList
+        isLoading={isLoading}
+        error={error}
+        items={boards}
+        loading={<Text>Loading boards…</Text>}
+        renderError={message => (
+          <ErrorText>Boards could not be loaded: {message}</ErrorText>
+        )}
+        empty={
+          <Flex direction="column" gap="2" align="start">
+            <Text color="secondary">
+              {scope === 'favorites'
+                ? 'You have not favorited any board yet.'
+                : 'You cannot access any board yet.'}
+            </Text>
+            <Button
+              variant="tertiary"
+              size="small"
+              onPress={() => navigate(basePath)}
+              aria-label="Open the boards page"
+            >
+              Go to boards
+            </Button>
+          </Flex>
+        }
+      >
+        {found => (
+          <Flex direction="column" gap="3">
+            {found.map(board => (
+              <BoardRow
+                key={board.id}
+                board={board}
+                showCounts={showCounts}
+                onOpen={() => navigate(`${basePath}/${board.id}`)}
+              />
+            ))}
+          </Flex>
+        )}
+      </AsyncList>
     </div>
   );
 }

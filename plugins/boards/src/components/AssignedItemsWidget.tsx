@@ -5,7 +5,7 @@ import { Badge, Button, Flex, Text } from '@backstage/ui';
 import { MyBoardItem } from '@internal/plugin-boards-common';
 import { useBoardsSignal, useMyItemsQuery } from '../queries';
 import { rootRouteRef } from '../routes';
-import { ErrorText } from './common';
+import { AsyncList, ErrorText } from './common';
 import { DueDateBadge, formatDueDate } from './DueDate';
 import {
   filterDueEntries,
@@ -118,47 +118,47 @@ export function AssignedItemsContent(props: AssignedItemsContentProps) {
   const openItem = (entry: MyBoardItem) =>
     navigate(`${basePath}/${entry.boardId}?item=${entry.item.id}`);
 
-  if (isLoading) {
-    return <Text>Loading your items…</Text>;
-  }
-  if (error) {
-    return (
-      <ErrorText>
-        Your items could not be loaded: {(error as Error).message}
-      </ErrorText>
-    );
-  }
-  if (groups.length === 0) {
-    return (
-      <Text color="secondary">
-        {scope === 'due'
-          ? 'Nothing of yours is due.'
-          : 'Nothing is assigned to you on any board.'}
-      </Text>
-    );
-  }
   return (
     <div style={{ maxHeight: '100%', overflowY: 'auto' }}>
-      <Flex direction="column" gap="3">
-        {groups.map(group => (
-          <Flex direction="column" gap="1" key={group.key}>
-            <GroupHeading
-              group={group}
-              groupBy={groupBy}
-              onOpenBoard={openBoard}
-            />
-            {group.entries.map(entry => (
-              <ItemRow
-                key={`${entry.boardId}/${entry.item.id}`}
-                entry={entry}
-                // redundant when the group already names the status
-                showStatus={groupBy !== 'status'}
-                onOpenItem={openItem}
-              />
+      <AsyncList
+        isLoading={isLoading}
+        error={error}
+        items={groups}
+        loading={<Text>Loading your items…</Text>}
+        renderError={message => (
+          <ErrorText>Your items could not be loaded: {message}</ErrorText>
+        )}
+        empty={
+          <Text color="secondary">
+            {scope === 'due'
+              ? 'Nothing of yours is due.'
+              : 'Nothing is assigned to you on any board.'}
+          </Text>
+        }
+      >
+        {found => (
+          <Flex direction="column" gap="3">
+            {found.map(group => (
+              <Flex direction="column" gap="1" key={group.key}>
+                <GroupHeading
+                  group={group}
+                  groupBy={groupBy}
+                  onOpenBoard={openBoard}
+                />
+                {group.entries.map(entry => (
+                  <ItemRow
+                    key={`${entry.boardId}/${entry.item.id}`}
+                    entry={entry}
+                    // redundant when the group already names the status
+                    showStatus={groupBy !== 'status'}
+                    onOpenItem={openItem}
+                  />
+                ))}
+              </Flex>
             ))}
           </Flex>
-        ))}
-      </Flex>
+        )}
+      </AsyncList>
     </div>
   );
 }

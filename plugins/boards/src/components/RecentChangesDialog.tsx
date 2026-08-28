@@ -14,7 +14,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { boardsApiRef } from '../api';
 import { queryKeys } from '../queries';
-import { changeSummary, formatDate, RefDisplay } from './common';
+import { AsyncList, changeSummary, formatDate, RefDisplay } from './common';
 
 /** Board-wide feed of the most recent change records, newest first. */
 export function RecentChangesDialog(props: {
@@ -31,44 +31,45 @@ export function RecentChangesDialog(props: {
     queryFn: () => boardsApi.getBoardChanges(boardId, { limit: 50 }),
   });
 
-  let content;
-  if (loading || entries === undefined) {
-    content = <Text>Loading…</Text>;
-  } else if (entries.length === 0) {
-    content = <Text>No changes recorded yet.</Text>;
-  } else {
-    content = (
-      <TableRoot
-        aria-label="Recent changes"
-        onRowAction={key => {
-          const entry = entries.find(e => e.change.id === String(key));
-          if (entry) {
-            onOpenChange(false);
-            onOpenItem(entry.change.itemId);
-          }
-        }}
-      >
-        <TableHeader>
-          <Column isRowHeader>Item</Column>
-          <Column>Actor</Column>
-          <Column>Change</Column>
-          <Column>When</Column>
-        </TableHeader>
-        <TableBody>
-          {entries.map(entry => (
-            <Row key={entry.change.id} id={entry.change.id}>
-              <Cell>{entry.itemTitle}</Cell>
-              <Cell>
-                <RefDisplay refString={entry.change.actorRef} />
-              </Cell>
-              <Cell>{changeSummary(entry.change)}</Cell>
-              <Cell>{formatDate(entry.change.at)}</Cell>
-            </Row>
-          ))}
-        </TableBody>
-      </TableRoot>
-    );
-  }
+  const content = (
+    <AsyncList
+      isLoading={loading}
+      items={entries}
+      empty={<Text>No changes recorded yet.</Text>}
+    >
+      {changes => (
+        <TableRoot
+          aria-label="Recent changes"
+          onRowAction={key => {
+            const entry = changes.find(e => e.change.id === String(key));
+            if (entry) {
+              onOpenChange(false);
+              onOpenItem(entry.change.itemId);
+            }
+          }}
+        >
+          <TableHeader>
+            <Column isRowHeader>Item</Column>
+            <Column>Actor</Column>
+            <Column>Change</Column>
+            <Column>When</Column>
+          </TableHeader>
+          <TableBody>
+            {changes.map(entry => (
+              <Row key={entry.change.id} id={entry.change.id}>
+                <Cell>{entry.itemTitle}</Cell>
+                <Cell>
+                  <RefDisplay refString={entry.change.actorRef} />
+                </Cell>
+                <Cell>{changeSummary(entry.change)}</Cell>
+                <Cell>{formatDate(entry.change.at)}</Cell>
+              </Row>
+            ))}
+          </TableBody>
+        </TableRoot>
+      )}
+    </AsyncList>
+  );
 
   return (
     <Dialog isOpen={isOpen} onOpenChange={onOpenChange}>

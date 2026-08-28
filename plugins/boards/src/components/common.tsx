@@ -122,6 +122,42 @@ export function ErrorText(props: { children: React.ReactNode }) {
 }
 
 /**
+ * The loading → error → empty → content sequence every list in the plugin
+ * renders. The states are given as nodes rather than rendered here, so a
+ * menu can put them in menu items and a page in plain text.
+ *
+ * `items` is what emptiness is measured on: usually the query's rows, but
+ * a caller that groups or filters them first passes the derived list.
+ */
+export function AsyncList<T>(props: {
+  isLoading: boolean;
+  error?: unknown;
+  /** The rows to render, or undefined while they are not loaded yet. */
+  items?: T[];
+  loading?: React.ReactNode;
+  empty: React.ReactNode;
+  renderError?: (message: string) => React.ReactNode;
+  children: (items: T[]) => React.ReactNode;
+}): React.ReactNode {
+  const { isLoading, error, items, loading, empty, renderError } = props;
+  if (error) {
+    const message = (error as Error).message;
+    return renderError ? (
+      renderError(message)
+    ) : (
+      <ErrorText>{message}</ErrorText>
+    );
+  }
+  if (isLoading || items === undefined) {
+    return loading ?? <Text>Loading…</Text>;
+  }
+  if (items.length === 0) {
+    return empty;
+  }
+  return props.children(items);
+}
+
+/**
  * Click-to-edit text. Renders as text until clicked (when `canEdit`),
  * then as a text field; Enter or blur commits, Escape cancels.
  */

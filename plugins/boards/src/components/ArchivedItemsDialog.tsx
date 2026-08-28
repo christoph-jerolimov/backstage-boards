@@ -10,7 +10,7 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { boardsApiRef } from '../api';
 import { queryKeys } from '../queries';
-import { formatDate, RefDisplay } from './common';
+import { AsyncList, formatDate, RefDisplay } from './common';
 
 /**
  * Archived (soft-deleted) items of a board with restore. Items are
@@ -35,46 +35,47 @@ export function ArchivedItemsDialog(props: {
   const refresh = () =>
     queryClient.invalidateQueries({ queryKey: archivedKey });
 
-  let content;
-  if (loading || items === undefined) {
-    content = <Text>Loading…</Text>;
-  } else if (items.length === 0) {
-    content = <Text>No archived items.</Text>;
-  } else {
-    content = (
-      <Flex direction="column" gap="2">
-        <Text variant="body-small" color="secondary">
-          Archived items are removed permanently after 30 days.
-        </Text>
-        {items.map(item => (
-          <Flex key={item.id} align="center" gap="2" justify="between">
-            <div>
-              <Text variant="body-medium">{item.title}</Text>
-              <Text variant="body-x-small" color="secondary">
-                archived {item.archivedAt ? formatDate(item.archivedAt) : ''}{' '}
-                {item.archivedBy && (
-                  <>
-                    by <RefDisplay refString={item.archivedBy} />
-                  </>
-                )}
-              </Text>
-            </div>
-            <Button
-              variant="secondary"
-              size="small"
-              onPress={async () => {
-                await boardsApi.restoreItem(boardId, item.id);
-                await refresh();
-                await onChanged();
-              }}
-            >
-              Restore
-            </Button>
-          </Flex>
-        ))}
-      </Flex>
-    );
-  }
+  const content = (
+    <AsyncList
+      isLoading={loading}
+      items={items}
+      empty={<Text>No archived items.</Text>}
+    >
+      {archived => (
+        <Flex direction="column" gap="2">
+          <Text variant="body-small" color="secondary">
+            Archived items are removed permanently after 30 days.
+          </Text>
+          {archived.map(item => (
+            <Flex key={item.id} align="center" gap="2" justify="between">
+              <div>
+                <Text variant="body-medium">{item.title}</Text>
+                <Text variant="body-x-small" color="secondary">
+                  archived {item.archivedAt ? formatDate(item.archivedAt) : ''}{' '}
+                  {item.archivedBy && (
+                    <>
+                      by <RefDisplay refString={item.archivedBy} />
+                    </>
+                  )}
+                </Text>
+              </div>
+              <Button
+                variant="secondary"
+                size="small"
+                onPress={async () => {
+                  await boardsApi.restoreItem(boardId, item.id);
+                  await refresh();
+                  await onChanged();
+                }}
+              >
+                Restore
+              </Button>
+            </Flex>
+          ))}
+        </Flex>
+      )}
+    </AsyncList>
+  );
 
   return (
     <Dialog isOpen={isOpen} onOpenChange={onOpenChange}>

@@ -9,7 +9,7 @@ import {
   Text,
 } from '@backstage/ui';
 import { useQuery } from '@tanstack/react-query';
-import { RefDisplay } from './common';
+import { AsyncList, RefDisplay } from './common';
 
 /**
  * Combined watch control: the main segment toggles the current user's
@@ -33,26 +33,30 @@ export function WatchButton(props: {
     queryFn: () => loadWatchers(),
   });
 
-  let menuContent;
-  if (loading || watchers === undefined) {
-    menuContent = (
-      <MenuItem isDisabled>
-        <Text variant="body-small">Loading…</Text>
-      </MenuItem>
-    );
-  } else if (watchers.length === 0) {
-    menuContent = (
-      <MenuItem isDisabled>
-        <Text variant="body-small">Nobody is watching yet</Text>
-      </MenuItem>
-    );
-  } else {
-    menuContent = watchers.map(watcher => (
-      <MenuItem key={watcher} textValue={watcher}>
-        <RefDisplay refString={watcher} />
-      </MenuItem>
-    ));
-  }
+  const menuContent = (
+    <AsyncList
+      isLoading={loading}
+      items={watchers}
+      loading={
+        <MenuItem isDisabled>
+          <Text variant="body-small">Loading…</Text>
+        </MenuItem>
+      }
+      empty={
+        <MenuItem isDisabled>
+          <Text variant="body-small">Nobody is watching yet</Text>
+        </MenuItem>
+      }
+    >
+      {found =>
+        found.map(watcher => (
+          <MenuItem key={watcher} textValue={watcher}>
+            <RefDisplay refString={watcher} />
+          </MenuItem>
+        ))
+      }
+    </AsyncList>
+  );
 
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
