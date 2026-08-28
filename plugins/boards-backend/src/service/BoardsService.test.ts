@@ -684,9 +684,7 @@ describe('BoardsService', () => {
   describe('priorities', () => {
     it('seeds new boards with the default priorities', async () => {
       const board = await service.createBoard(alice, { name: 'B' });
-      expect(
-        board.priorities.map(p => [p.name, p.color, p.order]),
-      ).toEqual([
+      expect(board.priorities.map(p => [p.name, p.color, p.order])).toEqual([
         ['critical', 'red', 1],
         ['high', 'orange', 2],
         ['medium', undefined, 3],
@@ -966,9 +964,7 @@ describe('BoardsService', () => {
       expect(withPriority?.priority?.name).toBe('critical');
       expect(withPriority?.priority?.color).toBe('red');
       expect(withPriority?.priority?.order).toBe(1);
-      const without = mine.find(
-        entry => entry.item.title === 'Unprioritized',
-      );
+      const without = mine.find(entry => entry.item.title === 'Unprioritized');
       expect(without?.priority).toBeUndefined();
     });
 

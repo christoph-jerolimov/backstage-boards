@@ -137,7 +137,15 @@ export function useItemFilter(
         setPriorities([]);
       },
     };
-  }, [items, text, tags, assignees, priorities, assigneeOptions, priorityOptions]);
+  }, [
+    items,
+    text,
+    tags,
+    assignees,
+    priorities,
+    assigneeOptions,
+    priorityOptions,
+  ]);
 }
 
 /**

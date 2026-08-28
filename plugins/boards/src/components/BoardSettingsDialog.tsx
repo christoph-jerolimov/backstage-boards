@@ -274,7 +274,9 @@ function PrioritiesSection(props: {
       <Flex align="center" gap="2">
         <TextField
           aria-label="New priority name"
-          placeholder={full ? `At most ${MAX_PRIORITIES} priorities` : 'Add priority…'}
+          placeholder={
+            full ? `At most ${MAX_PRIORITIES} priorities` : 'Add priority…'
+          }
           value={newName}
           onChange={setNewName}
           isDisabled={full}

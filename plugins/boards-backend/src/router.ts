@@ -309,44 +309,38 @@ export async function createRouter(
     );
   });
 
-  router.patch(
-    '/boards/:boardId/priorities/:priorityId',
-    async (req, res) => {
-      const principal = await principalOf(req);
-      res.json(
-        await service.updatePriority(
-          principal,
-          req.params.boardId,
-          req.params.priorityId,
-          {
-            name: req.body.name,
-            color: req.body.color,
-            order: req.body.order,
-          },
-        ),
-      );
-    },
-  );
-
-  router.delete(
-    '/boards/:boardId/priorities/:priorityId',
-    async (req, res) => {
-      const principal = await principalOf(req);
-      await service.deletePriority(
+  router.patch('/boards/:boardId/priorities/:priorityId', async (req, res) => {
+    const principal = await principalOf(req);
+    res.json(
+      await service.updatePriority(
         principal,
         req.params.boardId,
         req.params.priorityId,
         {
-          reassignTo:
-            typeof req.query.reassignTo === 'string'
-              ? req.query.reassignTo
-              : undefined,
-          drop: req.query.drop === 'true',
+          name: req.body.name,
+          color: req.body.color,
+          order: req.body.order,
         },
-      );
-      res.status(204).end();
-    },
-  );
+      ),
+    );
+  });
+
+  router.delete('/boards/:boardId/priorities/:priorityId', async (req, res) => {
+    const principal = await principalOf(req);
+    await service.deletePriority(
+      principal,
+      req.params.boardId,
+      req.params.priorityId,
+      {
+        reassignTo:
+          typeof req.query.reassignTo === 'string'
+            ? req.query.reassignTo
+            : undefined,
+        drop: req.query.drop === 'true',
+      },
+    );
+    res.status(204).end();
+  });
 
   // ---- items
 

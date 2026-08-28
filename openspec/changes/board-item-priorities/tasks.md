@@ -29,23 +29,23 @@
 
 ## 5. Display, filter, grouping
 
-- [ ] 5.1 Add a `PriorityChip` (name + `colorHex`, neutral fallback) and show it on kanban cards (`BoardView.tsx`) and in the item drawer; verify with `BoardView.test.tsx` asserting chip presence/absence.
-- [ ] 5.2 Show a priority column in `TableView.tsx` and `MyItemsPage.tsx` only when at least one listed item has a priority; verify with table tests for both states.
-- [ ] 5.3 Add the priority filter to `ItemFilterBar.tsx`/`useItemFilter` — offered only when ≥1 item has a priority, ordered by `order`, entries showing color dot and item count, ANY-of matching, cleared by the bar's clear action; verify with `ItemFilterBar.test.tsx`.
-- [ ] 5.4 Add the `'priority'` group mode to `grouping.ts` and the board group-by select — groups ordered by `order` with a trailing "No priority" group, labels with name, color, and count; verify with grouping unit tests and a `BoardPage`/`BoardView` grouping test.
+- [x] 5.1 Add a `PriorityChip` (name + `colorHex`, neutral fallback) and show it on kanban cards (`BoardView.tsx`) and in the item drawer; verify with `BoardView.test.tsx` asserting chip presence/absence.
+- [x] 5.2 Show a priority column in `TableView.tsx` and `MyItemsPage.tsx` only when at least one listed item has a priority; verify with table tests for both states.
+- [x] 5.3 Add the priority filter to `ItemFilterBar.tsx`/`useItemFilter` — offered only when ≥1 item has a priority, ordered by `order`, entries showing color dot and item count, ANY-of matching, cleared by the bar's clear action; verify with `ItemFilterBar.test.tsx`.
+- [x] 5.4 Add the `'priority'` group mode to `grouping.ts` and the board group-by select — groups ordered by `order` with a trailing "No priority" group, labels with name, color, and count; verify with grouping unit tests and a `BoardPage`/`BoardView` grouping test.
 
 ## 6. Editing surfaces
 
-- [ ] 6.1 Add a priority `Select` (order-sorted + "None") to `ItemDrawerFields.tsx`, write-access gated and read-only for externally managed items; verify with an `ItemDrawer` test.
-- [ ] 6.2 Add a "Priority" submenu (board's priorities + clear) to `ItemMenu.tsx`, resolving options from the item's own board in the my-items rows; verify with `ItemMenu.test.tsx` and a `MyItemsPage.test.tsx` case.
+- [x] 6.1 Add a priority `Select` (order-sorted + "None") to `ItemDrawerFields.tsx`, write-access gated and read-only for externally managed items; verify with an `ItemDrawer` test.
+- [x] 6.2 Add a "Priority" submenu (board's priorities + clear) to `ItemMenu.tsx`, resolving options from the item's own board in the my-items rows; verify with `ItemMenu.test.tsx` and a `MyItemsPage.test.tsx` case.
 
 ## 7. Home page widget
 
-- [ ] 7.1 Show each item's resolved priority in `AssignedItemsWidget.tsx` when set; verify with `AssignedItemsWidget.test.tsx`.
+- [x] 7.1 Show each item's resolved priority in `AssignedItemsWidget.tsx` when set; verify with `AssignedItemsWidget.test.tsx`.
 
 ## 8. Matrix dialog
 
-- [ ] 8.1 Add a `'matrix'` `BoardDialogKind`, a board-menu entry in `BoardHeader.tsx` hidden when the board defines no priorities, and a `PriorityMatrixDialog` rendering columns × priorities (+ "No priority" row when needed) from the loaded, filtered items, opening item details on click; verify with a new dialog test covering cell placement and the no-priorities case.
+- [x] 8.1 Add a `'matrix'` `BoardDialogKind`, a board-menu entry in `BoardHeader.tsx` hidden when the board defines no priorities, and a `PriorityMatrixDialog` rendering columns × priorities (+ "No priority" row when needed) from the loaded, filtered items, opening item details on click; verify with a new dialog test covering cell placement and the no-priorities case.
 
 ## 9. Verification
 

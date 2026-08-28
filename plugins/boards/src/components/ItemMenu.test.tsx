@@ -188,10 +188,7 @@ describe('ItemMenu', () => {
       screen.queryByRole('menuitem', { name: 'Remove priority' }),
     ).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('menuitem', { name: 'critical' }));
-    expect(actions.setItemPriority).toHaveBeenCalledWith(
-      item.id,
-      'priority-1',
-    );
+    expect(actions.setItemPriority).toHaveBeenCalledWith(item.id, 'priority-1');
   });
 
   it('marks the current priority and can remove it', async () => {

@@ -155,7 +155,12 @@ export function testPriorities(): BoardPriority[] {
   return [
     testPriority(),
     testPriority({ id: 'priority-2', name: 'high', color: 'orange', order: 2 }),
-    testPriority({ id: 'priority-3', name: 'medium', color: undefined, order: 3 }),
+    testPriority({
+      id: 'priority-3',
+      name: 'medium',
+      color: undefined,
+      order: 3,
+    }),
     testPriority({ id: 'priority-4', name: 'low', color: undefined, order: 4 }),
   ];
 }

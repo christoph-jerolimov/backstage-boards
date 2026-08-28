@@ -5,12 +5,13 @@ import {
   groupItems,
   groupMyItems,
   NO_DUE_DATE,
+  NO_PRIORITY,
   positionBefore,
   sortItems,
   UNASSIGNED,
   UNTAGGED,
 } from './grouping';
-import { testMyItem } from './__testUtils__/testHelpers';
+import { testMyItem, testPriorities } from './__testUtils__/testHelpers';
 
 function item(id: string, assignees: string[]): BoardItem {
   return {
@@ -172,6 +173,26 @@ describe('groupItems', () => {
 
   it('none returns a single group', () => {
     expect(groupItems([mk({ id: '1' })], 'none')).toHaveLength(1);
+  });
+
+  it('groups by priority in board order with the no-priority group last', () => {
+    const groups = groupItems(
+      [
+        mk({ id: '1', priorityId: 'priority-4' }),
+        mk({ id: '2' }),
+        mk({ id: '3', priorityId: 'priority-1' }),
+        mk({ id: '4', priorityId: 'priority-1' }),
+      ],
+      'priority',
+      testPriorities(),
+    );
+    expect(groups.map(group => group.key)).toEqual([
+      'priority-1',
+      'priority-4',
+      NO_PRIORITY,
+    ]);
+    expect(groups[0].items.map(entry => entry.id)).toEqual(['3', '4']);
+    expect(groups[2].items.map(entry => entry.id)).toEqual(['2']);
   });
 });
 

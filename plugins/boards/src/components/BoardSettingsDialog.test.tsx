@@ -188,7 +188,9 @@ describe('BoardSettingsDialog', () => {
     await userEvent.click(
       screen.getByRole('button', { name: 'Color of priority medium' }),
     );
-    await userEvent.click(await screen.findByRole('menuitem', { name: 'purple' }));
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'purple' }),
+    );
     expect(boardsApi.updatePriority).toHaveBeenCalledWith(
       'board-1',
       'priority-3',
@@ -216,9 +218,7 @@ describe('BoardSettingsDialog', () => {
       'board-1',
       'priority-4',
     );
-    expect(
-      screen.queryByText(/still used by items/),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/still used by items/)).not.toBeInTheDocument();
   });
 
   it('offers reassign for a used priority and deletes with the target', async () => {

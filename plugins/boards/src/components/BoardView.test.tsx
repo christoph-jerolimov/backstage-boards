@@ -9,6 +9,7 @@ import {
   testBoard,
   testColumn,
   testItem,
+  testPriorities,
 } from './__testUtils__/testHelpers';
 
 const identityApi = {
@@ -54,12 +55,16 @@ function renderBoard(
   over: {
     columns?: typeof columns;
     items?: typeof items;
+    priorities?: ReturnType<typeof testPriorities>;
     canWrite?: boolean;
-    groupBy?: 'none' | 'assignee' | 'dueDate' | 'tags';
+    groupBy?: 'none' | 'assignee' | 'priority' | 'dueDate' | 'tags';
   } = {},
 ) {
   const actions = testActions();
-  const board = testBoard({ columns: over.columns ?? columns });
+  const board = testBoard({
+    columns: over.columns ?? columns,
+    priorities: over.priorities ?? [],
+  });
   renderWithProviders(
     <BoardView
       board={board}
@@ -155,6 +160,64 @@ describe('BoardView lanes', () => {
     // the group heading of the Done lane plus the tag line of its card
     expect(screen.getAllByText('docs')).toHaveLength(2);
     expect(screen.getAllByText('Untagged').length).toBeGreaterThan(0);
+  });
+
+  it('shows the priority on cards that have one', () => {
+    renderBoard({
+      priorities: testPriorities(),
+      items: [
+        testItem({
+          id: 'item-1',
+          title: 'Urgent',
+          columnId: 'column-1',
+          priorityId: 'priority-1',
+        }),
+        testItem({ id: 'item-2', title: 'Plain', columnId: 'column-1' }),
+      ],
+    });
+    expect(screen.getByText('critical')).toBeInTheDocument();
+  });
+
+  it('shows no priority chip without priorities', () => {
+    renderBoard();
+    expect(screen.queryByText('critical')).not.toBeInTheDocument();
+  });
+
+  it('groups by priority with counts, highest first, rest last', () => {
+    renderBoard({
+      groupBy: 'priority',
+      priorities: testPriorities(),
+      items: [
+        testItem({
+          id: 'item-1',
+          title: 'Low one',
+          columnId: 'column-1',
+          position: 1000,
+          priorityId: 'priority-4',
+        }),
+        testItem({
+          id: 'item-2',
+          title: 'Critical one',
+          columnId: 'column-1',
+          position: 2000,
+          priorityId: 'priority-1',
+        }),
+        testItem({
+          id: 'item-3',
+          title: 'Plain',
+          columnId: 'column-1',
+          position: 3000,
+        }),
+      ],
+    });
+    const headings = screen.getAllByText(
+      /critical \(1\)|low \(1\)|No priority \(1\)/,
+    );
+    expect(headings.map(node => node.textContent)).toEqual([
+      'critical (1)',
+      'low (1)',
+      'No priority (1)',
+    ]);
   });
 });
 
