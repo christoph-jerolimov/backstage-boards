@@ -8,7 +8,8 @@ import {
   MenuTrigger,
   Text,
 } from '@backstage/ui';
-import { RefDisplay, useAsyncData } from './common';
+import { useQuery } from '@tanstack/react-query';
+import { RefDisplay } from './common';
 
 /**
  * Combined watch control: the main segment toggles the current user's
@@ -19,15 +20,18 @@ export function WatchButton(props: {
   watching: boolean;
   onToggle: (watching: boolean) => Promise<void> | void;
   loadWatchers: () => Promise<string[]>;
+  /** Cache key for the watcher list, e.g. `queryKeys.boardWatchers(id)`. */
+  watchersKey: readonly unknown[];
   targetLabel: string;
 }) {
   const { watching, onToggle, loadWatchers, targetLabel } = props;
   const [menuOpen, setMenuOpen] = useState(false);
-  const { data: watchers, loading } = useAsyncData(
-    () => (menuOpen ? loadWatchers() : Promise.resolve(undefined)),
-    // reload when the menu opens or the user's own state changed
-    [menuOpen, watching, loadWatchers],
-  );
+  const { data: watchers, isLoading: loading } = useQuery({
+    // the own watch state is part of the key: toggling it changes the list
+    queryKey: [...props.watchersKey, watching],
+    enabled: menuOpen,
+    queryFn: () => loadWatchers(),
+  });
 
   let menuContent;
   if (loading || watchers === undefined) {

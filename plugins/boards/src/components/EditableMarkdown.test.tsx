@@ -11,6 +11,7 @@ function renderBlock(
     canEdit: true,
     versionCount: 1,
     loadVersions: jest.fn().mockResolvedValue([]),
+    versionsKey: ['test', 'versions'],
     onSave: jest.fn().mockResolvedValue(undefined),
     editAriaLabel: 'Description',
     ...over,

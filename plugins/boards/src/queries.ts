@@ -27,6 +27,23 @@ export const queryKeys = {
   board: (boardId: string) => ['boards', boardId] as const,
   items: (boardId: string) => ['items', boardId] as const,
   myItems: ['boards', 'my-items'] as const,
+  permissions: (boardId: string) => ['boards', boardId, 'permissions'] as const,
+  archivedItems: (boardId: string) =>
+    ['boards', boardId, 'archived-items'] as const,
+  changes: (boardId: string) => ['boards', boardId, 'changes'] as const,
+  boardWatchers: (boardId: string) => ['boards', boardId, 'watchers'] as const,
+  itemWatchers: (boardId: string, itemId: string) =>
+    ['boards', boardId, 'items', itemId, 'watchers'] as const,
+  timeline: (boardId: string, itemId: string) =>
+    ['boards', boardId, 'items', itemId, 'timeline'] as const,
+  descriptionVersions: (boardId: string, itemId: string) =>
+    ['boards', boardId, 'items', itemId, 'description-versions'] as const,
+  commentVersions: (boardId: string, itemId: string, commentId: string) =>
+    ['boards', boardId, 'items', itemId, 'comments', commentId] as const,
+  /** Catalog lookups, which belong to no single board. */
+  catalogEntities: (kinds?: string[]) =>
+    ['boards', 'catalog-entities', kinds?.join(',') ?? 'all'] as const,
+  identity: ['boards', 'identity'] as const,
 };
 
 export function useBoardsQuery() {

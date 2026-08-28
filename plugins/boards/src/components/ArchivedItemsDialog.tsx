@@ -7,8 +7,10 @@ import {
   Flex,
   Text,
 } from '@backstage/ui';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { boardsApiRef } from '../api';
-import { formatDate, RefDisplay, useAsyncData } from './common';
+import { queryKeys } from '../queries';
+import { formatDate, RefDisplay } from './common';
 
 /**
  * Archived (soft-deleted) items of a board with restore. Items are
@@ -23,17 +25,15 @@ export function ArchivedItemsDialog(props: {
 }) {
   const { boardId, canWrite, isOpen, onOpenChange, onChanged } = props;
   const boardsApi = useApi(boardsApiRef);
-  const {
-    data: items,
-    loading,
-    refresh,
-  } = useAsyncData(
-    () =>
-      isOpen && canWrite
-        ? boardsApi.listArchivedItems(boardId)
-        : Promise.resolve(undefined),
-    [boardsApi, boardId, isOpen, canWrite],
-  );
+  const queryClient = useQueryClient();
+  const archivedKey = queryKeys.archivedItems(boardId);
+  const { data: items, isLoading: loading } = useQuery({
+    queryKey: archivedKey,
+    enabled: isOpen && canWrite,
+    queryFn: () => boardsApi.listArchivedItems(boardId),
+  });
+  const refresh = () =>
+    queryClient.invalidateQueries({ queryKey: archivedKey });
 
   let content;
   if (loading || items === undefined) {

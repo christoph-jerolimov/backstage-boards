@@ -11,7 +11,8 @@ import {
   todayISO,
   tomorrowISO,
 } from '@internal/plugin-boards-common';
-import { useAsyncData } from './common';
+import { useQuery } from '@tanstack/react-query';
+import { queryKeys } from '../queries';
 import { RowContextMenu, RowContextMenuState } from './RowMenu';
 
 /**
@@ -57,10 +58,11 @@ export function ItemMenu(props: {
 }) {
   const { item, columns, readonly, actions, assigneePool, extraItems } = props;
   const identityApi = useApi(identityApiRef);
-  const { data: identity } = useAsyncData(
-    () => identityApi.getBackstageIdentity(),
-    [identityApi],
-  );
+  const { data: identity } = useQuery({
+    queryKey: queryKeys.identity,
+    staleTime: Infinity,
+    queryFn: () => identityApi.getBackstageIdentity(),
+  });
   const meRef = identity?.userEntityRef;
   const others = [...new Set(assigneePool)]
     .filter(ref => ref !== meRef)

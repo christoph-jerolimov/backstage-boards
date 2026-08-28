@@ -1,12 +1,8 @@
 import { useState } from 'react';
 import { Button, Flex, Text, TextAreaField } from '@backstage/ui';
+import { useQuery } from '@tanstack/react-query';
 import { CommentVersion } from '@internal/plugin-boards-common';
-import {
-  formatDate,
-  MarkdownContent,
-  RefDisplay,
-  useAsyncData,
-} from './common';
+import { formatDate, MarkdownContent, RefDisplay } from './common';
 
 /**
  * Shared markdown display/edit block with retained version history.
@@ -18,6 +14,8 @@ export function EditableMarkdown(props: {
   /** Number of stored versions; history is offered when > 1. */
   versionCount: number;
   loadVersions: () => Promise<CommentVersion[]>;
+  /** Cache key for the version list, e.g. `queryKeys.commentVersions(…)`. */
+  versionsKey: readonly unknown[];
   onSave: (text: string) => Promise<void>;
   /** Allow saving an empty text (clears the content). */
   allowEmpty?: boolean;
@@ -37,10 +35,12 @@ export function EditableMarkdown(props: {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(text);
   const [showVersions, setShowVersions] = useState(false);
-  const { data: versions } = useAsyncData(
-    () => (showVersions ? loadVersions() : Promise.resolve(undefined)),
-    [showVersions, versionCount, loadVersions],
-  );
+  const { data: versions } = useQuery({
+    // a new version invalidates the list without an explicit refresh
+    queryKey: [...props.versionsKey, versionCount],
+    enabled: showVersions,
+    queryFn: () => loadVersions(),
+  });
 
   const save = async () => {
     const next = draft.trim();
