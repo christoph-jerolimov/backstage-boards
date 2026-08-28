@@ -19,13 +19,13 @@
 
 ## 3. Frontend API layer
 
-- [ ] 3.1 Add `addPriority`/`updatePriority`/`deletePriority` to `BoardsApi`/`BoardsClient` in `plugins/boards/src/api.ts`, pass the items `priority` filter through, and extend `testBoardsApi()`/test factories (`testBoard`, `testItem`, `testMyItem`, a new `testPriority`) in `components/__testUtils__/testHelpers.tsx`; verify with `api.test.ts`.
-- [ ] 3.2 Add `setItemPriority` to `ItemActions`/`BoardActions` in `useBoardActions.ts` (guarded, invalidating board + my-items) and priority management actions for the settings dialog; verify with `queries.test.tsx`/hook coverage and `yarn tsc`.
+- [x] 3.1 Add `addPriority`/`updatePriority`/`deletePriority` to `BoardsApi`/`BoardsClient` in `plugins/boards/src/api.ts`, pass the items `priority` filter through, and extend `testBoardsApi()`/test factories (`testBoard`, `testItem`, `testMyItem`, a new `testPriority`) in `components/__testUtils__/testHelpers.tsx`; verify with `api.test.ts`.
+- [x] 3.2 Add `setItemPriority` to `ItemActions`/`BoardActions` in `useBoardActions.ts` (guarded, invalidating board + my-items) and priority management actions for the settings dialog; verify with `queries.test.tsx`/hook coverage and `yarn tsc`.
 
 ## 4. Priority configuration UI
 
-- [ ] 4.1 Add a "Priorities" section to `BoardSettingsDialog.tsx`: ordered list with inline rename, color select over the palette (incl. none), up/down reorder, add (disabled at 10), delete; verify with `BoardSettingsDialog.test.tsx` covering add, rename, reorder renumbering, and the 10 cap.
-- [ ] 4.2 Implement the delete-used-priority step offering reassign-to-another or drop, wired to `deletePriority`; verify with a dialog test for both choices and for plain deletion when unused.
+- [x] 4.1 Add a "Priorities" section to `BoardSettingsDialog.tsx`: ordered list with inline rename, color select over the palette (incl. none), up/down reorder, add (disabled at 10), delete; verify with `BoardSettingsDialog.test.tsx` covering add, rename, reorder renumbering, and the 10 cap.
+- [x] 4.2 Implement the delete-used-priority step offering reassign-to-another or drop, wired to `deletePriority`; verify with a dialog test for both choices and for plain deletion when unused.
 
 ## 5. Display, filter, grouping
 

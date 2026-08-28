@@ -37,6 +37,7 @@ const board = {
     testColumn({ id: 'column-1', title: 'Todo' }),
     testColumn({ id: 'column-2', title: 'Done', position: 2000 }),
   ],
+  priorities: [],
 };
 
 const items = [

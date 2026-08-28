@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import {
   BoardColumn,
+  BoardPriority,
   COLUMN_COLORS,
   ColumnColor,
 } from '@internal/plugin-boards-common';
@@ -89,6 +90,24 @@ export function StatusBadge(props: { column?: BoardColumn }) {
   return (
     <StatusChip color={props.column?.color}>
       {props.column?.title ?? '?'}
+    </StatusChip>
+  );
+}
+
+/**
+ * A pill naming an item's priority in the priority's color (neutral when
+ * it has none); renders nothing without a priority.
+ */
+export function PriorityChip(props: {
+  priority?: BoardPriority;
+  size?: StatusChipSize;
+}) {
+  if (!props.priority) {
+    return null;
+  }
+  return (
+    <StatusChip color={props.priority.color} size={props.size}>
+      {props.priority.name}
     </StatusChip>
   );
 }

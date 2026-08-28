@@ -24,19 +24,24 @@ import type { BoardActions } from './BoardView';
 import { formatDate, RefDisplay } from './common';
 import { AssigneeAvatars } from './AssigneeAvatars';
 import { DueDateBadge } from './DueDate';
-import { StatusBadge } from './StatusBadge';
+import { PriorityChip, StatusBadge } from './StatusBadge';
 
 function ItemsTable(props: {
   board: BoardWithContext;
   items: BoardItem[];
+  /** Render the priority column; on when any listed item has one. */
+  showPriority: boolean;
   openItem: (itemId: string) => void;
   rowMenu: RowMenuHandle<BoardItem>;
   sort: ItemSortDescriptor | undefined;
   onSortChange: (descriptor: ItemSortDescriptor) => void;
 }) {
-  const { board, items, openItem, rowMenu, sort, onSortChange } = props;
+  const { board, items, showPriority, openItem, rowMenu, sort, onSortChange } =
+    props;
   const columnOf = (columnId: string) =>
     board.columns.find(column => column.id === columnId);
+  const priorityOf = (item: BoardItem) =>
+    board.priorities.find(priority => priority.id === item.priorityId);
   const sorted = sortItems(items, sort, board.columns);
   return (
     <TableRoot
@@ -57,6 +62,7 @@ function ItemsTable(props: {
         <Column id="status" allowsSorting>
           Status
         </Column>
+        {showPriority ? <Column>Priority</Column> : null}
         <Column id="dueDate" allowsSorting>
           Due
         </Column>
@@ -86,6 +92,11 @@ function ItemsTable(props: {
             <Cell>
               <StatusBadge column={columnOf(item.columnId)} />
             </Cell>
+            {showPriority ? (
+              <Cell>
+                <PriorityChip priority={priorityOf(item)} />
+              </Cell>
+            ) : null}
             <Cell>
               <DueDateBadge dueDate={item.dueDate} />
             </Cell>
@@ -122,18 +133,22 @@ export function TableView(props: {
       <ItemMenu
         item={item}
         columns={board.columns}
+        priorities={board.priorities}
         readonly={!canWrite || !!item.externalManager}
         actions={actions}
         assigneePool={pool}
       />
     ),
   });
+  // one decision for the whole view, so every group shows the same columns
+  const showPriority = items.some(item => item.priorityId);
   if (groupBy === 'none') {
     return (
       <>
         <ItemsTable
           board={board}
           items={items}
+          showPriority={showPriority}
           openItem={openItem}
           rowMenu={rowMenu}
           sort={sort}
@@ -145,14 +160,20 @@ export function TableView(props: {
   }
   return (
     <>
-      {groupItems(items, groupBy).map(group => (
+      {groupItems(items, groupBy, board.priorities).map(group => (
         <Fragment key={group.key}>
           <Text variant="body-medium" weight="bold" as="h3">
-            <GroupLabel mode={groupBy} groupKey={group.key} />
+            <GroupLabel
+              mode={groupBy}
+              groupKey={group.key}
+              priorities={board.priorities}
+              count={groupBy === 'priority' ? group.items.length : undefined}
+            />
           </Text>
           <ItemsTable
             board={board}
             items={group.items}
+            showPriority={showPriority}
             openItem={openItem}
             rowMenu={rowMenu}
             sort={sort}

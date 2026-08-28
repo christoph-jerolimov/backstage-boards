@@ -5,13 +5,14 @@ import { identityApiRef } from '@backstage/frontend-plugin-api';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
 import { Entity } from '@backstage/catalog-model';
 import { Button, MenuItem, MenuTrigger } from '@backstage/ui';
-import { BoardItem } from '@internal/plugin-boards-common';
+import { BoardItem, BoardPriority } from '@internal/plugin-boards-common';
 import { ItemMenu } from './ItemMenu';
 import {
   renderWithProviders,
   testActions,
   testColumn,
   testItem,
+  testPriorities,
 } from './__testUtils__/testHelpers';
 
 const identityApi = {
@@ -49,6 +50,7 @@ async function openMenu(options: {
   item?: BoardItem;
   readonly?: boolean;
   assigneePool?: string[];
+  priorities?: BoardPriority[];
   extraItems?: ReactNode;
   catalogApi?: unknown;
 }) {
@@ -60,6 +62,7 @@ async function openMenu(options: {
       <ItemMenu
         item={item}
         columns={columns}
+        priorities={options.priorities ?? []}
         readonly={options.readonly ?? false}
         actions={actions}
         assigneePool={options.assigneePool ?? []}
@@ -159,6 +162,49 @@ describe('ItemMenu', () => {
     });
     await userEvent.click(remove);
     expect(actions.setItemDueDate).toHaveBeenCalledWith(item.id, null);
+  });
+
+  it('hides the priority submenu on boards without priorities', async () => {
+    await openMenu({});
+    expect(
+      screen.queryByRole('menuitem', { name: 'Priority' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('sets a priority from the submenu, highest order first', async () => {
+    const { actions, item } = await openMenu({
+      priorities: testPriorities(),
+    });
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Priority' }));
+    await screen.findByRole('menuitem', { name: 'critical' });
+    const entries = screen
+      .getAllByRole('menuitem')
+      .map(entry => entry.textContent)
+      .filter(text =>
+        ['critical', 'high', 'medium', 'low'].includes(text ?? ''),
+      );
+    expect(entries).toEqual(['critical', 'high', 'medium', 'low']);
+    expect(
+      screen.queryByRole('menuitem', { name: 'Remove priority' }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('menuitem', { name: 'critical' }));
+    expect(actions.setItemPriority).toHaveBeenCalledWith(
+      item.id,
+      'priority-1',
+    );
+  });
+
+  it('marks the current priority and can remove it', async () => {
+    const { actions, item } = await openMenu({
+      item: testItem({ priorityId: 'priority-2' }),
+      priorities: testPriorities(),
+    });
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Priority' }));
+    await screen.findByRole('menuitem', { name: '✓ high' });
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: 'Remove priority' }),
+    );
+    expect(actions.setItemPriority).toHaveBeenCalledWith(item.id, null);
   });
 
   it('lists Me first, then the board assignees, deduplicated', async () => {
