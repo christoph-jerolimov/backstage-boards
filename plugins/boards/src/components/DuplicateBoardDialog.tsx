@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useApi, useRouteRef } from '@backstage/frontend-plugin-api';
+import { useApi } from '@backstage/frontend-plugin-api';
 import {
   Button,
   Checkbox,
@@ -17,7 +17,7 @@ import {
   levelIncludes,
 } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
-import { rootRouteRef } from '../routes';
+import { useBoardsBasePath } from '../routes';
 import { ErrorText } from './common';
 import { useAsyncAction } from './useAsyncAction';
 
@@ -30,7 +30,7 @@ export function DuplicateBoardDialog(props: {
   const { board, isOpen, onOpenChange } = props;
   const boardsApi = useApi(boardsApiRef);
   const navigate = useNavigate();
-  const rootLink = useRouteRef(rootRouteRef);
+  const basePath = useBoardsBasePath();
   const isAdmin = levelIncludes(board.access, 'admin');
   const [name, setName] = useState(`${board.name} (copy)`);
   const [copyColumns, setCopyColumnsState] = useState(true);
@@ -57,7 +57,7 @@ export function DuplicateBoardDialog(props: {
         copyPermissions: isAdmin && copyPermissions,
       });
       onOpenChange(false);
-      navigate(`${rootLink?.() ?? '/boards'}/${copy.id}`);
+      navigate(`${basePath}/${copy.id}`);
     });
 
   return (

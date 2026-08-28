@@ -10,9 +10,12 @@ import {
 } from '@backstage/ui';
 import { useApi } from '@backstage/frontend-plugin-api';
 import { catalogApiRef, EntityRefLink } from '@backstage/plugin-catalog-react';
-import { parseEntityRef } from '@backstage/catalog-model';
 import { useQuery } from '@tanstack/react-query';
-import { isTextRef, textRefDisplay } from '@internal/plugin-boards-common';
+import {
+  isTextRef,
+  refDisplayName,
+  textRefDisplay,
+} from '@internal/plugin-boards-common';
 
 const STACK_CLASS = 'boards-avatar-stack';
 
@@ -58,14 +61,6 @@ interface Profile {
   picture?: string;
 }
 
-function refFallbackName(ref: string): string {
-  try {
-    return parseEntityRef(ref).name;
-  } catch {
-    return ref;
-  }
-}
-
 /** Batch-resolves display names and pictures for catalog assignee refs. */
 function useProfiles(entityRefs: string[]): Map<string, Profile> {
   const catalogApi = useApi(catalogApiRef);
@@ -92,7 +87,7 @@ function useProfiles(entityRefs: string[]): Map<string, Profile> {
           profile?.displayName ??
           entity?.metadata.title ??
           entity?.metadata.name ??
-          refFallbackName(ref),
+          refDisplayName(ref),
         picture: profile?.picture,
       });
     });
@@ -159,7 +154,7 @@ export function AssigneeAvatars(props: { refs: string[] }) {
               key={ref}
               entityRef={ref}
               profile={
-                profiles.get(ref) ?? { displayName: refFallbackName(ref) }
+                profiles.get(ref) ?? { displayName: refDisplayName(ref) }
               }
               withTooltip={stacked}
             />
@@ -173,7 +168,7 @@ export function AssigneeAvatars(props: { refs: string[] }) {
           <Text variant="body-x-small">
             <EntityRefLink entityRef={entityRefs[0]} hideIcon disableTooltip>
               {profiles.get(entityRefs[0])?.displayName ??
-                refFallbackName(entityRefs[0])}
+                refDisplayName(entityRefs[0])}
             </EntityRefLink>
           </Text>
         </span>

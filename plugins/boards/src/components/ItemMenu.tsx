@@ -1,13 +1,11 @@
 import type { ReactNode } from 'react';
 import { Menu, MenuItem, SubmenuTrigger } from '@backstage/ui';
 import { useApi, identityApiRef } from '@backstage/frontend-plugin-api';
-import { parseEntityRef } from '@backstage/catalog-model';
 import {
   BoardColumn,
   BoardItem,
   fridayISO,
-  isTextRef,
-  textRefDisplay,
+  refDisplayName,
   todayISO,
   tomorrowISO,
 } from '@internal/plugin-boards-common';
@@ -28,17 +26,6 @@ export interface ItemActions {
   setItemDueDate: (itemId: string, dueDate: string | null) => Promise<void>;
   setAssignees: (itemId: string, assignees: string[]) => Promise<void>;
   deleteItem: (itemId: string) => Promise<void>;
-}
-
-function assigneeLabel(ref: string): string {
-  if (isTextRef(ref)) {
-    return textRefDisplay(ref) ?? ref;
-  }
-  try {
-    return parseEntityRef(ref).name;
-  } catch {
-    return ref;
-  }
 }
 
 /**
@@ -65,7 +52,7 @@ export function ItemMenu(props: {
   const meRef = identity?.userEntityRef;
   const others = [...new Set(assigneePool)]
     .filter(ref => ref !== meRef)
-    .sort((a, b) => assigneeLabel(a).localeCompare(assigneeLabel(b)));
+    .sort((a, b) => refDisplayName(a).localeCompare(refDisplayName(b)));
   const toggle = (ref: string) => {
     const next = item.assignees.includes(ref)
       ? item.assignees.filter(entry => entry !== ref)
@@ -140,7 +127,7 @@ export function ItemMenu(props: {
             )}
             {others.map(ref => (
               <MenuItem key={ref} onAction={() => toggle(ref)}>
-                {mark(ref, assigneeLabel(ref))}
+                {mark(ref, refDisplayName(ref))}
               </MenuItem>
             ))}
           </Menu>

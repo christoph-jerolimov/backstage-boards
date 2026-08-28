@@ -177,6 +177,17 @@ export class BoardsClient implements BoardsApi {
     return (await response.json()) as T;
   }
 
+  /** A list endpoint's payload is always the rows under one key. */
+  private async requestList<T>(path: string, key: string): Promise<T[]> {
+    const result = await this.request<Record<string, T[]>>('GET', path);
+    return result[key];
+  }
+
+  /** Endpoints where PUT adds the current user and DELETE removes them. */
+  private toggle(on: boolean, path: string): Promise<void> {
+    return this.request(on ? 'PUT' : 'DELETE', path);
+  }
+
   async listBoards(options?: {
     favoritesOnly?: boolean;
     entityRef?: string;
@@ -193,19 +204,11 @@ export class BoardsClient implements BoardsApi {
       params.set('counts', 'true');
     }
     const query = params.toString() ? `?${params.toString()}` : '';
-    const result = await this.request<{ boards: BoardListEntry[] }>(
-      'GET',
-      `/boards${query}`,
-    );
-    return result.boards;
+    return this.requestList<BoardListEntry>(`/boards${query}`, 'boards');
   }
 
-  async listMyItems(): Promise<MyBoardItem[]> {
-    const result = await this.request<{ items: MyBoardItem[] }>(
-      'GET',
-      '/my-items',
-    );
-    return result.items;
+  listMyItems(): Promise<MyBoardItem[]> {
+    return this.requestList<MyBoardItem>('/my-items', 'items');
   }
 
   createBoard(options: {
@@ -250,25 +253,18 @@ export class BoardsClient implements BoardsApi {
   }
 
   setFavorite(boardId: string, favorite: boolean): Promise<void> {
-    return this.request(
-      favorite ? 'PUT' : 'DELETE',
-      `/boards/${boardId}/favorite`,
-    );
+    return this.toggle(favorite, `/boards/${boardId}/favorite`);
   }
 
   setWatchBoard(boardId: string, watching: boolean): Promise<void> {
-    return this.request(
-      watching ? 'PUT' : 'DELETE',
-      `/boards/${boardId}/watch`,
-    );
+    return this.toggle(watching, `/boards/${boardId}/watch`);
   }
 
-  async listPermissions(boardId: string): Promise<BoardPermissionEntry[]> {
-    const result = await this.request<{ permissions: BoardPermissionEntry[] }>(
-      'GET',
+  listPermissions(boardId: string): Promise<BoardPermissionEntry[]> {
+    return this.requestList<BoardPermissionEntry>(
       `/boards/${boardId}/permissions`,
+      'permissions',
     );
-    return result.permissions;
   }
 
   addPermission(
@@ -330,12 +326,8 @@ export class BoardsClient implements BoardsApi {
     );
   }
 
-  async listItems(boardId: string): Promise<BoardItem[]> {
-    const result = await this.request<{ items: BoardItem[] }>(
-      'GET',
-      `/boards/${boardId}/items`,
-    );
-    return result.items;
+  listItems(boardId: string): Promise<BoardItem[]> {
+    return this.requestList<BoardItem>(`/boards/${boardId}/items`, 'items');
   }
 
   createItem(boardId: string, item: NewItem): Promise<BoardItem> {
@@ -366,12 +358,11 @@ export class BoardsClient implements BoardsApi {
     return this.request('DELETE', `/boards/${boardId}/items/${itemId}`);
   }
 
-  async listArchivedItems(boardId: string): Promise<BoardItem[]> {
-    const result = await this.request<{ items: BoardItem[] }>(
-      'GET',
+  listArchivedItems(boardId: string): Promise<BoardItem[]> {
+    return this.requestList<BoardItem>(
       `/boards/${boardId}/items/archived`,
+      'items',
     );
-    return result.items;
   }
 
   restoreItem(boardId: string, itemId: string): Promise<BoardItem> {
@@ -383,10 +374,7 @@ export class BoardsClient implements BoardsApi {
     itemId: string,
     watching: boolean,
   ): Promise<void> {
-    return this.request(
-      watching ? 'PUT' : 'DELETE',
-      `/boards/${boardId}/items/${itemId}/watch`,
-    );
+    return this.toggle(watching, `/boards/${boardId}/items/${itemId}/watch`);
   }
 
   async getBoardChanges(
@@ -394,27 +382,21 @@ export class BoardsClient implements BoardsApi {
     options?: { limit?: number },
   ): Promise<BoardChangeEntry[]> {
     const query = options?.limit ? `?limit=${options.limit}` : '';
-    const result = await this.request<{ changes: BoardChangeEntry[] }>(
-      'GET',
+    return this.requestList<BoardChangeEntry>(
       `/boards/${boardId}/changes${query}`,
+      'changes',
     );
-    return result.changes;
   }
 
-  async listBoardWatchers(boardId: string): Promise<string[]> {
-    const result = await this.request<{ watchers: string[] }>(
-      'GET',
-      `/boards/${boardId}/watchers`,
-    );
-    return result.watchers;
+  listBoardWatchers(boardId: string): Promise<string[]> {
+    return this.requestList<string>(`/boards/${boardId}/watchers`, 'watchers');
   }
 
-  async listItemWatchers(boardId: string, itemId: string): Promise<string[]> {
-    const result = await this.request<{ watchers: string[] }>(
-      'GET',
+  listItemWatchers(boardId: string, itemId: string): Promise<string[]> {
+    return this.requestList<string>(
       `/boards/${boardId}/items/${itemId}/watchers`,
+      'watchers',
     );
-    return result.watchers;
   }
 
   addComment(
@@ -451,35 +433,32 @@ export class BoardsClient implements BoardsApi {
     );
   }
 
-  async listCommentVersions(
+  listCommentVersions(
     boardId: string,
     itemId: string,
     commentId: string,
   ): Promise<CommentVersion[]> {
-    const result = await this.request<{ versions: CommentVersion[] }>(
-      'GET',
+    return this.requestList<CommentVersion>(
       `/boards/${boardId}/items/${itemId}/comments/${commentId}/versions`,
+      'versions',
     );
-    return result.versions;
   }
 
-  async listDescriptionVersions(
+  listDescriptionVersions(
     boardId: string,
     itemId: string,
   ): Promise<CommentVersion[]> {
-    const result = await this.request<{ versions: CommentVersion[] }>(
-      'GET',
+    return this.requestList<CommentVersion>(
       `/boards/${boardId}/items/${itemId}/description/versions`,
+      'versions',
     );
-    return result.versions;
   }
 
-  async getTimeline(boardId: string, itemId: string): Promise<TimelineEntry[]> {
-    const result = await this.request<{ timeline: TimelineEntry[] }>(
-      'GET',
+  getTimeline(boardId: string, itemId: string): Promise<TimelineEntry[]> {
+    return this.requestList<TimelineEntry>(
       `/boards/${boardId}/items/${itemId}/timeline`,
+      'timeline',
     );
-    return result.timeline;
   }
 }
 

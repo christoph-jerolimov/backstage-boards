@@ -1,5 +1,4 @@
 import { useNavigate } from 'react-router-dom';
-import { useRouteRef } from '@backstage/frontend-plugin-api';
 import { Button, Flex, Text } from '@backstage/ui';
 import {
   BoardListEntry,
@@ -7,7 +6,7 @@ import {
   COLUMN_COLORS,
 } from '@internal/plugin-boards-common';
 import { useBoardListQuery, useBoardsSignal } from '../queries';
-import { rootRouteRef } from '../routes';
+import { useBoardsBasePath } from '../routes';
 import { AsyncList, ErrorText } from './common';
 
 export { BoardsWidgetProvider } from './widgetCommon';
@@ -94,8 +93,7 @@ function BoardRow(props: {
 export function BoardsContent(props: BoardsContentProps) {
   const { scope = 'favorites', showCounts = false } = props;
   const navigate = useNavigate();
-  const rootLink = useRouteRef(rootRouteRef);
-  const basePath = rootLink?.() ?? '/boards';
+  const basePath = useBoardsBasePath();
 
   const {
     data: boards,

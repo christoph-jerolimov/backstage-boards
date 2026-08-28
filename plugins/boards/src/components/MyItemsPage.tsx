@@ -1,11 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  BreadcrumbEntry,
-  useApi,
-  useRouteRef,
-} from '@backstage/frontend-plugin-api';
+import { BreadcrumbEntry, useApi } from '@backstage/frontend-plugin-api';
 import {
   Badge,
   Button,
@@ -33,8 +29,9 @@ import {
   useBoardsSignal,
   useMyItemsQuery,
 } from '../queries';
-import { rootRouteRef } from '../routes';
+import { useBoardsBasePath } from '../routes';
 import { DueDateBadge } from './DueDate';
+import { assigneePool } from './grouping';
 import { ItemActions, ItemMenu } from './ItemMenu';
 import { useRowMenu } from './RowMenu';
 import { AsyncList, ErrorText } from './common';
@@ -86,9 +83,7 @@ function BoardGroupTable(props: {
     !!board && levelIncludes(board.access, 'write') && !board.archivedAt;
   // only the user's own items are listed, so the quick-assign shortcuts
   // are whoever shares them; the drawer offers the full picker
-  const assigneePool = [
-    ...new Set(group.entries.flatMap(entry => entry.item.assignees)),
-  ];
+  const pool = assigneePool(group.entries.map(entry => entry.item));
 
   const guarded = async (action: () => Promise<unknown>) => {
     onError(await run(action));
@@ -123,7 +118,7 @@ function BoardGroupTable(props: {
         columns={board?.columns ?? []}
         readonly={!canWrite || !!item.externalManager}
         actions={actions}
-        assigneePool={assigneePool}
+        assigneePool={pool}
         extraItems={openBoardItem}
       />
     ),
@@ -185,8 +180,7 @@ function BoardGroupTable(props: {
 
 /** The current user's items grouped by board; reused by the Boards tab. */
 export function MyItemsList() {
-  const rootLink = useRouteRef(rootRouteRef);
-  const basePath = rootLink?.() ?? '/boards';
+  const basePath = useBoardsBasePath();
   const [actionError, setActionError] = useState<string | undefined>();
 
   const { data: entries, isLoading, error, refetch } = useMyItemsQuery();
@@ -228,8 +222,7 @@ export function MyItemsList() {
 }
 
 export function MyItemsPage() {
-  const rootLink = useRouteRef(rootRouteRef);
-  const basePath = rootLink?.() ?? '/boards';
+  const basePath = useBoardsBasePath();
   return (
     <BreadcrumbEntry
       entry={{ href: `${basePath}/my-items`, label: 'My items' }}
