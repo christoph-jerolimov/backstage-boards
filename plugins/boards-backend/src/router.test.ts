@@ -261,6 +261,40 @@ describe('createRouter', () => {
     await request(app).delete(`/boards/${board.id}`).expect(403);
   });
 
+  it('returns per-status counts only when asked for', async () => {
+    const board = await service.createBoard(alice, {
+      name: 'Counted',
+      visibility: 'logged-in-read',
+    });
+    const [todo] = (await service.getBoard(alice, board.id)).columns;
+    await service.createItem(alice, board.id, {
+      columnId: todo.id,
+      title: 'One',
+    });
+
+    const plain = await request(app)
+      .get('/boards')
+      .set('x-test-user', 'alice')
+      .expect(200);
+    expect(plain.body.boards[0].statusCounts).toBeUndefined();
+
+    const counted = await request(app)
+      .get('/boards?counts=true')
+      .set('x-test-user', 'alice')
+      .expect(200);
+    expect(counted.body.boards[0].statusCounts).toEqual([
+      { columnId: todo.id, title: todo.title, count: 1 },
+      expect.objectContaining({ count: 0 }),
+      expect.objectContaining({ count: 0 }),
+    ]);
+
+    // the flag changes nothing but the added field
+    expect({ ...counted.body.boards[0], statusCounts: undefined }).toEqual({
+      ...plain.body.boards[0],
+      statusCounts: undefined,
+    });
+  });
+
   it('hides private boards from anonymous requests entirely', async () => {
     const board = await service.createBoard(alice, { name: 'Secret' });
     await request(app).get(`/boards/${board.id}`).expect(404);

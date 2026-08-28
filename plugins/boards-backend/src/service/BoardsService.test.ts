@@ -92,6 +92,85 @@ describe('BoardsService', () => {
       expect(filtered.map(board => board.id)).toEqual([mine.id]);
     });
 
+    it('omits per-status counts unless they are asked for', async () => {
+      const board = await service.createBoard(alice, { name: 'Counted' });
+      await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'One',
+      });
+
+      const [plain] = await service.listBoards(alice);
+      expect(plain.statusCounts).toBeUndefined();
+      expect(Object.keys(plain)).not.toContain('statusCounts');
+    });
+
+    it('counts items per column, including empty columns, on request', async () => {
+      const board = await service.createBoard(alice, { name: 'Counted' });
+      const [todo, doing] = board.columns;
+      await service.createItem(alice, board.id, {
+        columnId: todo.id,
+        title: 'One',
+      });
+      await service.createItem(alice, board.id, {
+        columnId: todo.id,
+        title: 'Two',
+      });
+      await service.createItem(alice, board.id, {
+        columnId: doing.id,
+        title: 'Three',
+      });
+
+      const [entry] = await service.listBoards(alice, { withCounts: true });
+      expect(entry.statusCounts).toEqual(
+        board.columns.map(column => ({
+          columnId: column.id,
+          title: column.title,
+          color: undefined,
+          count: { [todo.id]: 2, [doing.id]: 1 }[column.id] ?? 0,
+        })),
+      );
+    });
+
+    it('excludes archived items from the counts', async () => {
+      const board = await service.createBoard(alice, { name: 'Counted' });
+      const column = board.columns[0];
+      await service.createItem(alice, board.id, {
+        columnId: column.id,
+        title: 'Kept',
+      });
+      const gone = await service.createItem(alice, board.id, {
+        columnId: column.id,
+        title: 'Archived',
+      });
+      await service.deleteItem(alice, board.id, gone.id);
+
+      const [entry] = await service.listBoards(alice, { withCounts: true });
+      expect(entry.statusCounts?.[0]).toMatchObject({
+        columnId: column.id,
+        count: 1,
+      });
+    });
+
+    it('never counts a board the caller cannot read', async () => {
+      const secret = await service.createBoard(bob, { name: 'Secret' });
+      await service.createItem(bob, secret.id, {
+        columnId: secret.columns[0].id,
+        title: 'Hidden',
+      });
+      const mine = await service.createBoard(alice, { name: 'Mine' });
+
+      const list = await service.listBoards(alice, { withCounts: true });
+      expect(list.map(board => board.id)).toEqual([mine.id]);
+      expect(JSON.stringify(list)).not.toContain(secret.columns[0].id);
+    });
+
+    it('reports a board with no items as all-zero counts', async () => {
+      const board = await service.createBoard(alice, { name: 'Empty' });
+      const [entry] = await service.listBoards(alice, { withCounts: true });
+      expect(entry.statusCounts).toHaveLength(board.columns.length);
+      expect(entry.statusCounts?.every(count => count.count === 0)).toBe(true);
+    });
+
     it('effective level is the highest grant', async () => {
       const board = await service.createBoard(bob, { name: 'B' });
       await service.addPermission(bob, board.id, {

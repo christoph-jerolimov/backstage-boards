@@ -36,6 +36,27 @@ export function useBoardsQuery() {
   });
 }
 
+/**
+ * The board listing behind the home page widget. Keyed by its options so
+ * the four setting combinations stay cached side by side; freshness comes
+ * from the `boards` signal channel rather than `invalidateBoard`, which
+ * only invalidates the exact `queryKeys.boards` entry.
+ */
+export function useBoardListQuery(options: {
+  favoritesOnly: boolean;
+  withCounts: boolean;
+}) {
+  const boardsApi = useApi(boardsApiRef);
+  return useQuery({
+    queryKey: ['boards', 'list', options] as const,
+    queryFn: () =>
+      boardsApi.listBoards({
+        favoritesOnly: options.favoritesOnly,
+        withCounts: options.withCounts,
+      }),
+  });
+}
+
 export function useBoardsByEntityQuery(entityRef: string) {
   const boardsApi = useApi(boardsApiRef);
   return useQuery({

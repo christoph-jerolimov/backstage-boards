@@ -15,6 +15,7 @@ import {
   ColumnColor,
   BoardItem,
   BoardListEntry,
+  BoardStatusCount,
   BoardPermissionEntry,
   BoardPermissionLevel,
   BoardUpdate,
@@ -473,7 +474,11 @@ export class BoardsService {
 
   async listBoards(
     principal: BoardsPrincipal,
-    options?: { favoritesOnly?: boolean; entityRef?: string },
+    options?: {
+      favoritesOnly?: boolean;
+      entityRef?: string;
+      withCounts?: boolean;
+    },
   ): Promise<BoardListEntry[]> {
     const query = this.knex<BoardRow>('boards')
       .whereNull('archived_at')
@@ -515,7 +520,60 @@ export class BoardsService {
         favorite: favoriteIds.has(row.id),
       });
     }
+    if (options?.withCounts) {
+      // Counted only over the boards that survived the access filter
+      // above, so a board the caller cannot read contributes nothing.
+      const countsByBoard = await this.statusCountsByBoard(
+        result.map(entry => entry.id),
+      );
+      for (const entry of result) {
+        entry.statusCounts = countsByBoard.get(entry.id) ?? [];
+      }
+    }
     return result;
+  }
+
+  /**
+   * Batch-loads per-column item counts for a set of boards. Columns
+   * without items are reported with a count of 0 so a board's shape stays
+   * readable; archived items are not counted.
+   */
+  private async statusCountsByBoard(
+    boardIds: string[],
+  ): Promise<Map<string, BoardStatusCount[]>> {
+    const map = new Map<string, BoardStatusCount[]>();
+    if (boardIds.length === 0) {
+      return map;
+    }
+    const columns = await this.knex<ColumnRow>('board_columns')
+      .whereIn('board_id', boardIds)
+      .orderBy(['board_id', 'position']);
+    // knex types an aggregate query's rows as the aggregate alone, so the
+    // grouped column has to be reintroduced here
+    const countRows = (await this.knex('items')
+      .whereIn('board_id', boardIds)
+      .whereNull('archived_at')
+      .groupBy('column_id')
+      .select('column_id')
+      .count({ total: '*' })) as unknown as Array<{
+      column_id: string;
+      total: string | number;
+    }>;
+    const counts = new Map<string, number>(
+      countRows.map(row => [row.column_id, Number(row.total)]),
+    );
+    for (const column of columns) {
+      map.set(column.board_id, [
+        ...(map.get(column.board_id) ?? []),
+        {
+          columnId: column.id,
+          title: column.title,
+          color: (column.color as ColumnColor) ?? undefined,
+          count: counts.get(column.id) ?? 0,
+        },
+      ]);
+    }
+    return map;
   }
 
   async updateBoard(

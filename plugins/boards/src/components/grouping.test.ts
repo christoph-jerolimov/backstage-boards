@@ -1,13 +1,16 @@
 import { BoardItem } from '@internal/plugin-boards-common';
 import {
+  filterDueEntries,
   groupByAssignee,
   groupItems,
+  groupMyItems,
   NO_DUE_DATE,
   positionBefore,
   sortItems,
   UNASSIGNED,
   UNTAGGED,
 } from './grouping';
+import { testMyItem } from './__testUtils__/testHelpers';
 
 function item(id: string, assignees: string[]): BoardItem {
   return {
@@ -170,5 +173,95 @@ describe('groupItems', () => {
 
   it('none returns a single group', () => {
     expect(groupItems([mk({ id: '1' })], 'none')).toHaveLength(1);
+  });
+});
+
+describe('filterDueEntries', () => {
+  const now = new Date(2026, 7, 27); // 2026-08-27, local
+
+  it('keeps overdue and due-today entries, drops future and undated ones', () => {
+    const overdue = testMyItem({ item: { id: 'a', dueDate: '2026-08-26' } });
+    const today = testMyItem({ item: { id: 'b', dueDate: '2026-08-27' } });
+    const future = testMyItem({ item: { id: 'c', dueDate: '2026-09-03' } });
+    const undated = testMyItem({ item: { id: 'd' } });
+
+    expect(
+      filterDueEntries([overdue, today, future, undated], now).map(
+        entry => entry.item.id,
+      ),
+    ).toEqual(['a', 'b']);
+  });
+
+  it('keeps nothing when nothing is due', () => {
+    const future = testMyItem({ item: { dueDate: '2026-12-24' } });
+    expect(filterDueEntries([future], now)).toEqual([]);
+  });
+});
+
+describe('groupMyItems', () => {
+  it('groups by board, ordered alphabetically by board name', () => {
+    const entries = [
+      testMyItem({ boardId: 'b-2', boardName: 'Zebra', item: { id: '1' } }),
+      testMyItem({ boardId: 'b-1', boardName: 'Alpha', item: { id: '2' } }),
+      testMyItem({ boardId: 'b-2', boardName: 'Zebra', item: { id: '3' } }),
+    ];
+    expect(
+      groupMyItems(entries, 'board').map(group => [
+        group.key,
+        group.label,
+        group.entries.length,
+      ]),
+    ).toEqual([
+      ['b-1', 'Alpha', 1],
+      ['b-2', 'Zebra', 2],
+    ]);
+  });
+
+  it('groups the same status from different boards together', () => {
+    const entries = [
+      testMyItem({ boardId: 'b-1', columnTitle: 'Todo', item: { id: '1' } }),
+      testMyItem({ boardId: 'b-2', columnTitle: 'Todo', item: { id: '2' } }),
+      testMyItem({ boardId: 'b-2', columnTitle: 'Done', item: { id: '3' } }),
+    ];
+    expect(
+      groupMyItems(entries, 'status').map(group => [
+        group.label,
+        group.entries.map(entry => entry.item.id),
+      ]),
+    ).toEqual([
+      ['Done', ['3']],
+      ['Todo', ['1', '2']],
+    ]);
+  });
+
+  it('groups by due date chronologically with undated entries last', () => {
+    const entries = [
+      testMyItem({ item: { id: '1' } }),
+      testMyItem({ item: { id: '2', dueDate: '2026-09-01' } }),
+      testMyItem({ item: { id: '3', dueDate: '2026-08-05' } }),
+      testMyItem({ item: { id: '4', dueDate: '2026-09-01' } }),
+    ];
+    expect(
+      groupMyItems(entries, 'dueDate').map(group => [
+        group.key,
+        group.entries.map(entry => entry.item.id),
+      ]),
+    ).toEqual([
+      ['2026-08-05', ['3']],
+      ['2026-09-01', ['2', '4']],
+      [NO_DUE_DATE, ['1']],
+    ]);
+  });
+
+  it('labels the undated due-date group', () => {
+    const groups = groupMyItems([testMyItem()], 'dueDate');
+    expect(groups).toEqual([
+      expect.objectContaining({ key: NO_DUE_DATE, label: 'No due date' }),
+    ]);
+  });
+
+  it('returns no groups for no entries', () => {
+    expect(groupMyItems([], 'board')).toEqual([]);
+    expect(groupMyItems([], 'dueDate')).toEqual([]);
   });
 });

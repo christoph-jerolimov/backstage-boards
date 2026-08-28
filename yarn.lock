@@ -5204,6 +5204,7 @@ __metadata:
     "@backstage/frontend-plugin-api": "npm:^0.18.0"
     "@backstage/frontend-test-utils": "npm:^0.6.0"
     "@backstage/plugin-catalog-react": "npm:^3.2.1"
+    "@backstage/plugin-home-react": "npm:^0.1.41"
     "@backstage/plugin-signals-react": "npm:^0.0.25"
     "@backstage/ui": "npm:^0.17.1"
     "@internal/plugin-boards-common": "workspace:^"
