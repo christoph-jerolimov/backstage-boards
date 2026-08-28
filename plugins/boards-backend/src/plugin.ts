@@ -7,6 +7,7 @@ import { actionsRegistryServiceRef } from '@backstage/backend-plugin-api/alpha';
 import { catalogServiceRef } from '@backstage/plugin-catalog-node';
 import { notificationService } from '@backstage/plugin-notifications-node';
 import { signalsServiceRef } from '@backstage/plugin-signals-node';
+import { RETENTION_DAYS } from '@internal/plugin-boards-common';
 import { applyDatabaseMigrations } from './database/migrations';
 import { BoardsService } from './service/BoardsService';
 import { createRouter } from './router';
@@ -94,7 +95,6 @@ export const boardsPlugin = createBackendPlugin({
 
         registerActions({ actionsRegistry, service, auth, userInfo });
 
-        const RETENTION_DAYS = 30;
         await scheduler.scheduleTask({
           id: 'boards-purge-archived',
           frequency: { hours: 6 },
