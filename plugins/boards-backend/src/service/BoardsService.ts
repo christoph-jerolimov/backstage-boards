@@ -1156,6 +1156,17 @@ export class BoardsService {
           .where('item_tags.tag', tag),
       );
     }
+    // one whereExists over all of them: tags are all-of, assignees any-of
+    const assignees = filter?.assignees ?? [];
+    if (assignees.length > 0) {
+      query.whereExists(builder =>
+        builder
+          .select('*')
+          .from('item_assignees')
+          .whereRaw('item_assignees.item_id = items.id')
+          .whereIn('item_assignees.assignee_ref', assignees),
+      );
+    }
     const rows = await query;
     return this.hydrateItems(
       rows,

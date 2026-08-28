@@ -2,6 +2,8 @@ import type { ReactNode } from 'react';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { identityApiRef } from '@backstage/frontend-plugin-api';
+import { catalogApiRef } from '@backstage/plugin-catalog-react';
+import { Entity } from '@backstage/catalog-model';
 import { Button, MenuItem, MenuTrigger } from '@backstage/ui';
 import { BoardItem } from '@internal/plugin-boards-common';
 import { ItemMenu } from './ItemMenu';
@@ -20,6 +22,24 @@ const identityApi = {
   }),
 };
 
+/** Catalog stub resolving refs in the order they were requested. */
+function stubCatalog(byRef: Record<string, Entity> = {}) {
+  return {
+    getEntitiesByRefs: jest.fn(async (request: { entityRefs: string[] }) => ({
+      items: request.entityRefs.map(ref => byRef[ref]),
+    })),
+  };
+}
+
+function userEntity(name: string, displayName: string): Entity {
+  return {
+    apiVersion: 'backstage.io/v1alpha1',
+    kind: 'User',
+    metadata: { name, namespace: 'default' },
+    spec: { profile: { displayName } },
+  };
+}
+
 const columns = [
   testColumn({ id: 'column-1', title: 'Todo' }),
   testColumn({ id: 'column-2', title: 'In progress' }),
@@ -30,6 +50,7 @@ async function openMenu(options: {
   readonly?: boolean;
   assigneePool?: string[];
   extraItems?: ReactNode;
+  catalogApi?: unknown;
 }) {
   const actions = testActions();
   const item = options.item ?? testItem();
@@ -45,7 +66,12 @@ async function openMenu(options: {
         extraItems={options.extraItems}
       />
     </MenuTrigger>,
-    { apis: [[identityApiRef, identityApi]] },
+    {
+      apis: [
+        [identityApiRef, identityApi],
+        [catalogApiRef, options.catalogApi ?? stubCatalog()],
+      ],
+    },
   );
   await userEvent.click(screen.getByRole('button', { name: 'Actions' }));
   await screen.findByRole('menuitem', { name: 'Open details' });
@@ -161,6 +187,58 @@ describe('ItemMenu', () => {
       );
     // "Me" replaces alice; the rest are sorted by display name
     expect(entries).toEqual(['Me', 'bob', 'carol', 'Contractor']);
+  });
+
+  it('lists the assignees by their catalog display name, in that order', async () => {
+    await openMenu({
+      assigneePool: ['user:default/zoe', 'user:default/bob'],
+      catalogApi: stubCatalog({
+        // display names sort opposite to the ref names
+        'user:default/zoe': userEntity('zoe', 'Anna Zander'),
+        'user:default/bob': userEntity('bob', 'Yuri Bobrov'),
+      }),
+    });
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Assignee' }));
+    await screen.findByRole('menuitem', { name: 'Anna Zander' });
+    const entries = screen
+      .getAllByRole('menuitem')
+      .map(entry => entry.textContent)
+      .filter(text => text === 'Anna Zander' || text === 'Yuri Bobrov');
+    expect(entries).toEqual(['Anna Zander', 'Yuri Bobrov']);
+  });
+
+  it('falls back to the ref names when the catalog resolves nothing', async () => {
+    await openMenu({
+      assigneePool: ['user:default/zoe', 'user:default/bob'],
+      catalogApi: stubCatalog(),
+    });
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Assignee' }));
+    expect(
+      await screen.findByRole('menuitem', { name: 'bob' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'zoe' })).toBeInTheDocument();
+  });
+
+  it('carries the full ref on catalog entries, but not on text ones', async () => {
+    await openMenu({
+      assigneePool: ['user:default/bob', 'text:Contractor'],
+      catalogApi: stubCatalog({
+        'user:default/bob': userEntity('bob', 'Bob Builder'),
+      }),
+    });
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Assignee' }));
+    // the ref is a tooltip, not part of the entry's accessible name
+    const bob = await screen.findByRole('menuitem', { name: 'Bob Builder' });
+    expect(bob.querySelector('[title]')).toHaveAttribute(
+      'title',
+      'user:default/bob',
+    );
+    const contractor = screen.getByRole('menuitem', { name: 'Contractor' });
+    expect(contractor.querySelector('[title]')).toBeNull();
+    // "Me" names the signed-in user, so it carries their ref too
+    expect(
+      screen.getByRole('menuitem', { name: 'Me' }).querySelector('[title]'),
+    ).toHaveAttribute('title', 'user:default/alice');
   });
 
   it('adds an assignee and marks the ones already set', async () => {

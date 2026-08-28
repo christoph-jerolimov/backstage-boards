@@ -238,6 +238,48 @@ describe('createRouter', () => {
     await request(app).get('/my-items').expect(403);
   });
 
+  it('filters items by assignee on GET /boards/:boardId/items', async () => {
+    const board = (
+      await request(app)
+        .post('/boards')
+        .set('x-test-user', 'alice')
+        .send({ name: 'B' })
+        .expect(201)
+    ).body;
+    const columnId = board.columns[0].id;
+    const add = (title: string, assignees: string[], tags: string[] = []) =>
+      request(app)
+        .post(`/boards/${board.id}/items`)
+        .set('x-test-user', 'alice')
+        .send({ columnId, title, assignees, tags })
+        .expect(201);
+    await add('Alices', ['user:default/alice'], ['bug']);
+    await add('Bobs', ['user:default/bob']);
+    await add('Nobodys', []);
+
+    const titles = async (query: string) =>
+      (
+        await request(app)
+          .get(`/boards/${board.id}/items${query}`)
+          .set('x-test-user', 'alice')
+          .expect(200)
+      ).body.items
+        .map((item: any) => item.title)
+        .sort();
+
+    expect(await titles('')).toEqual(['Alices', 'Bobs', 'Nobodys']);
+    expect(await titles('?assignee=user:default/bob')).toEqual(['Bobs']);
+    expect(
+      await titles('?assignee=user:default/alice&assignee=user:default/bob'),
+    ).toEqual(['Alices', 'Bobs']);
+    // assignees intersect the other filters
+    expect(
+      await titles(
+        '?assignee=user:default/alice&assignee=user:default/bob&tag=bug',
+      ),
+    ).toEqual(['Alices']);
+  });
+
   it('rejects board creation without a name', async () => {
     await request(app)
       .post('/boards')

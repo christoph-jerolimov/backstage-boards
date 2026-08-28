@@ -23,6 +23,8 @@ describe('itemMatchesFilter', () => {
     expect(isEmptyFilter({})).toBe(true);
     expect(isEmptyFilter({ text: '  ' })).toBe(true);
     expect(isEmptyFilter({ tags: ['x'] })).toBe(false);
+    expect(isEmptyFilter({ assignees: [] })).toBe(true);
+    expect(isEmptyFilter({ assignees: ['user:default/bob'] })).toBe(false);
   });
 
   it('searches title and description case-insensitively', () => {
@@ -37,6 +39,31 @@ describe('itemMatchesFilter', () => {
     expect(itemMatchesFilter(item, { tags: ['bug', 'missing'] })).toBe(false);
   });
 
+  it('matches any of the listed assignees', () => {
+    const assigned = { ...item, assignees: ['user:default/bob', 'text:Jane'] };
+    expect(itemMatchesFilter(assigned, { assignees: [] })).toBe(true);
+    expect(
+      itemMatchesFilter(assigned, { assignees: ['user:default/bob'] }),
+    ).toBe(true);
+    expect(itemMatchesFilter(assigned, { assignees: ['text:Jane'] })).toBe(
+      true,
+    );
+    expect(
+      itemMatchesFilter(assigned, {
+        assignees: ['user:default/carol', 'text:Jane'],
+      }),
+    ).toBe(true);
+    expect(
+      itemMatchesFilter(assigned, { assignees: ['user:default/carol'] }),
+    ).toBe(false);
+  });
+
+  it('never matches an unassigned item on an assignee filter', () => {
+    expect(itemMatchesFilter(item, { assignees: ['user:default/bob'] })).toBe(
+      false,
+    );
+  });
+
   it('combines filters with AND', () => {
     expect(
       itemMatchesFilter(item, {
@@ -47,6 +74,21 @@ describe('itemMatchesFilter', () => {
     expect(itemMatchesFilter(item, { text: 'login', tags: ['missing'] })).toBe(
       false,
     );
+    const assigned = { ...item, assignees: ['user:default/bob'] };
+    expect(
+      itemMatchesFilter(assigned, {
+        text: 'login',
+        tags: ['bug'],
+        assignees: ['user:default/bob'],
+      }),
+    ).toBe(true);
+    expect(
+      itemMatchesFilter(assigned, {
+        text: 'login',
+        tags: ['bug'],
+        assignees: ['user:default/carol'],
+      }),
+    ).toBe(false);
   });
 });
 

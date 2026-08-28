@@ -23,6 +23,24 @@ export function selectedOption<T extends string>(
   return options.find(option => option === key);
 }
 
+/**
+ * A ref's resolved display name with the ref itself as a native tooltip,
+ * so the identity behind the name stays reachable. `text:` refs carry no
+ * tooltip: their label already is their whole value. The `title` sits on
+ * a span rather than a design-system `Tooltip` because these labels live
+ * inside menu items, whose focus is react-aria's to manage.
+ */
+export function RefLabel(props: {
+  entityRef: string;
+  children: React.ReactNode;
+}) {
+  const { entityRef, children } = props;
+  if (isTextRef(entityRef)) {
+    return <>{children}</>;
+  }
+  return <span title={entityRef}>{children}</span>;
+}
+
 /** Renders a creator/assignee/actor ref: catalog refs link, `text:` refs don't. */
 export function RefDisplay(props: { refString: string }) {
   const { refString } = props;

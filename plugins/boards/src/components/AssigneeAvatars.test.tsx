@@ -1,4 +1,5 @@
 import { screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
 import { Entity } from '@backstage/catalog-model';
 import { AssigneeAvatars } from './AssigneeAvatars';
@@ -86,10 +87,65 @@ describe('AssigneeAvatars', () => {
     expect(document.querySelector('[data-stacked]')).toBeInTheDocument();
   });
 
+  it('prefers a group’s profile display name over its title', async () => {
+    renderAvatars(
+      ['group:default/team-a'],
+      stubCatalog({
+        'group:default/team-a': {
+          apiVersion: 'backstage.io/v1alpha1',
+          kind: 'Group',
+          metadata: { name: 'team-a', namespace: 'default', title: 'Team A' },
+          spec: { profile: { displayName: 'Team Alpha' } },
+        },
+      }),
+    );
+    expect(await screen.findByText('Team Alpha')).toBeInTheDocument();
+    expect(screen.queryByText('Team A')).not.toBeInTheDocument();
+  });
+
   it('renders text assignees as plain badges, not avatars', async () => {
     renderAvatars(['text:External Person'], stubCatalog({}));
     expect(await screen.findByText('External Person')).toBeInTheDocument();
     expect(avatars()).toHaveLength(0);
+  });
+
+  it('carries the full ref on the single assignee name', async () => {
+    renderAvatars(
+      ['user:default/jane'],
+      stubCatalog({
+        'user:default/jane': userEntity('jane', { displayName: 'Jane Doe' }),
+      }),
+    );
+    const name = await screen.findByText('Jane Doe');
+    expect(name.closest('[title]')).toHaveAttribute(
+      'title',
+      'user:default/jane',
+    );
+  });
+
+  it('shows the name with the ref on a stacked avatar', async () => {
+    renderAvatars(
+      ['user:default/jane', 'group:default/team-a'],
+      stubCatalog({
+        'user:default/jane': userEntity('jane', { displayName: 'Jane Doe' }),
+      }),
+    );
+    await screen.findByRole('img', { name: 'Jane Doe' });
+    // focus opens the tooltip at once; hover waits out react-aria's warm-up
+    await userEvent.tab();
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip).toHaveTextContent('Jane Doe');
+    expect(tooltip).toHaveTextContent('user:default/jane');
+  });
+
+  it('offers no ref on a text assignee', async () => {
+    renderAvatars(['text:External Person'], stubCatalog({}));
+    const badge = await screen.findByText('External Person');
+    expect(badge.closest('[title]')).toBeNull();
+    await userEvent.hover(badge);
+    // long enough that a warmed-up tooltip would have opened
+    await new Promise(resolve => setTimeout(resolve, 100));
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
 
   it('requests only the catalog refs, sorted and deduplicated', async () => {

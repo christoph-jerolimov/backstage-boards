@@ -1,15 +1,38 @@
+import { Entity } from '@backstage/catalog-model';
 import {
   ALL_LEVELS,
   ALL_VISIBILITIES,
+  entityDisplayName,
   isTextRef,
   isValidActorRef,
   isValidEntityRef,
   isValidPrincipalRef,
   levelIncludes,
   maxLevel,
+  refDisplayName,
   TEXT_REF_PREFIX,
   textRefDisplay,
 } from './refs';
+
+function entity(over: {
+  kind?: string;
+  name?: string;
+  title?: string;
+  displayName?: string;
+}): Entity {
+  return {
+    apiVersion: 'backstage.io/v1alpha1',
+    kind: over.kind ?? 'User',
+    metadata: {
+      name: over.name ?? 'csmith',
+      namespace: 'default',
+      ...(over.title ? { title: over.title } : {}),
+    },
+    spec: over.displayName
+      ? { profile: { displayName: over.displayName } }
+      : {},
+  };
+}
 
 describe('text refs', () => {
   it('detects the text prefix', () => {
@@ -98,5 +121,66 @@ describe('permission levels', () => {
     expect(ALL_LEVELS).toEqual(['read', 'write', 'admin']);
     expect(ALL_VISIBILITIES).toContain('private');
     expect(ALL_VISIBILITIES).toHaveLength(5);
+  });
+});
+
+describe('entityDisplayName', () => {
+  const ref = 'user:default/csmith';
+
+  it('prefers the profile display name of users and groups', () => {
+    expect(
+      entityDisplayName(ref, entity({ displayName: 'Christoph Smith' })),
+    ).toBe('Christoph Smith');
+    expect(
+      entityDisplayName('group:default/team-a', {
+        ...entity({
+          kind: 'Group',
+          name: 'team-a',
+          title: 'Team A (title)',
+          displayName: 'Team Alpha',
+        }),
+      }),
+    ).toBe('Team Alpha');
+  });
+
+  it('compares the kind case-insensitively', () => {
+    for (const kind of ['User', 'user', 'GROUP', 'group']) {
+      expect(
+        entityDisplayName(ref, entity({ kind, displayName: 'Chris' })),
+      ).toBe('Chris');
+    }
+  });
+
+  it('uses the title for every other kind, profile or not', () => {
+    expect(
+      entityDisplayName('component:default/www', {
+        ...entity({ kind: 'Component', name: 'www', title: 'Web front end' }),
+      }),
+    ).toBe('Web front end');
+    // a non-profile kind carrying a profile display name still reads by title
+    expect(
+      entityDisplayName('component:default/www', {
+        ...entity({
+          kind: 'Component',
+          name: 'www',
+          title: 'Web front end',
+          displayName: 'ignored',
+        }),
+      }),
+    ).toBe('Web front end');
+  });
+
+  it('falls back to the title, then the entity name', () => {
+    expect(entityDisplayName(ref, entity({ title: 'Christoph (title)' }))).toBe(
+      'Christoph (title)',
+    );
+    expect(entityDisplayName(ref, entity({}))).toBe('csmith');
+  });
+
+  it('reads like refDisplayName without an entity', () => {
+    expect(entityDisplayName(ref)).toBe('csmith');
+    expect(entityDisplayName(ref)).toBe(refDisplayName(ref));
+    expect(entityDisplayName('text:Jane (agency)')).toBe('Jane (agency)');
+    expect(entityDisplayName('not a ref')).toBe('not a ref');
   });
 });

@@ -79,6 +79,39 @@ The assignee editor SHALL offer autocomplete over the catalog's User and Group e
 - **WHEN** a user with write access removes an assignee chip
 - **THEN** the assignee is removed from the item and the change is recorded
 
+### Requirement: Entity display names for refs
+Wherever the boards UI names a creator or assignee ref itself — the assignee avatars, the assignee filter, and the item menu's assignee submenu — it SHALL use the catalog entity's display name: `spec.profile.displayName` for `User` and `Group` entities, `metadata.title` for entities of any other kind, then `metadata.name`. When the entity is unknown, not yet loaded, or carries none of those fields, the ref's own name SHALL be shown as before, and a `text:` ref SHALL show its text. Lists ordered by these names SHALL order by the resolved name, so the same people read and sort the same way on every surface.
+
+Each of those surfaces SHALL make the full entity ref available as a tooltip on the displayed name, so the underlying identity stays reachable. A `text:` ref SHALL NOT carry a tooltip. Surfaces that delegate naming to Backstage's own entity links are not affected by this requirement.
+
+#### Scenario: User display name from the profile
+- **WHEN** an item is assigned to `user:default/csmith` whose catalog entity has `spec.profile.displayName` "Christoph Smith"
+- **THEN** the assignee reads "Christoph Smith" on the card, in the assignee filter, and in the assignee submenu
+
+#### Scenario: Group display name from the profile
+- **WHEN** an item is assigned to `group:default/team-a` whose catalog entity has `spec.profile.displayName` "Team Alpha"
+- **THEN** the assignee reads "Team Alpha" rather than "team-a"
+
+#### Scenario: Title for entities without a profile display name
+- **WHEN** a ref points at an entity that has no `spec.profile.displayName` but has `metadata.title`
+- **THEN** the title is shown
+
+#### Scenario: Fallback for unknown or unresolved entities
+- **WHEN** a ref's entity is not in the catalog, has neither a profile display name nor a title, or has not been loaded yet
+- **THEN** the name from the ref is shown: the text of a `text:` ref, otherwise the entity name out of the ref
+
+#### Scenario: Full ref as a tooltip
+- **WHEN** a user hovers a resolved assignee name or its avatar
+- **THEN** the full entity ref (e.g. `user:default/csmith`) is shown, and for a stacked avatar the display name is shown with it
+
+#### Scenario: Free-text assignees carry no tooltip
+- **WHEN** a `text:` assignee is displayed
+- **THEN** its text is shown as the label and no ref tooltip is offered
+
+#### Scenario: One order everywhere
+- **WHEN** a board's assignees are listed in the assignee submenu and in the assignee filter
+- **THEN** both list them in the same order, by resolved display name
+
 ### Requirement: Item description
 An item SHALL have an optional markdown description using the same markdown subset and catalog-entity auto-linking as comments. Users with write access SHALL be able to add, edit, and clear the description inline in the item detail view; externally managed items SHALL show their description read-only.
 
@@ -91,7 +124,9 @@ An item SHALL have an optional markdown description using the same markdown subs
 - **THEN** the description is rendered without any edit controls
 
 ### Requirement: Filter and search items
-The board page SHALL provide a filter bar with free-text search matching item titles and descriptions (case-insensitive) and a tag filter offering the tags in use on the board. Active filters SHALL apply to both the board view and the table view; an item matches only if it satisfies every active filter (all selected tags and the text). The items API SHALL accept the same filters.
+The board page SHALL provide a filter bar with free-text search matching item titles and descriptions (case-insensitive), a tag filter offering the tags in use on the board, and an assignee filter offering the assignees in use on the board. The assignee filter SHALL list each assignee referenced by at least one of the board's items — catalog refs by their resolved display name, free-text refs by their display text — sorted alphabetically by that label, and SHALL be offered only while at least one item has an assignee.
+
+An item matches the assignee filter if it is assigned to ANY of the selected assignees; it matches the tag filter only if it carries ALL selected tags. The filters combine with AND: an item is visible only if it satisfies the text, the tags, and the assignees. Active filters SHALL apply to both the board view and the table view, SHALL be reflected in the count of matching items, and SHALL all be reset by the filter bar's clear action. The items API SHALL accept the same filters.
 
 #### Scenario: Text search
 - **WHEN** a user types "login" into the search field
@@ -101,13 +136,25 @@ The board page SHALL provide a filter bar with free-text search matching item ti
 - **WHEN** a user selects the tags "bug" and "urgent"
 - **THEN** only items carrying both tags remain visible
 
+#### Scenario: Assignee filter offers the board's assignees
+- **WHEN** a user opens the assignee filter on a board whose items are assigned to a catalog user and a free-text assignee
+- **THEN** both are offered, labelled by display name and by display text respectively, and nobody who is not assigned on this board is offered
+
+#### Scenario: Assignee filter matches any selected assignee
+- **WHEN** a user selects two assignees
+- **THEN** items assigned to either of them remain visible, and items assigned to neither are hidden
+
+#### Scenario: No assignee filter on a board without assignees
+- **WHEN** a user views a board on which no item has an assignee
+- **THEN** the filter bar offers no assignee filter
+
 #### Scenario: Filters combine and clear
-- **WHEN** text and tag filters are active and the user clears them
+- **WHEN** text, tag, and assignee filters are active and the user clears them
 - **THEN** matching intersects all filters while active, and clearing restores the full item set
 
 #### Scenario: API filtering
-- **WHEN** the items endpoint is called with `?text=…&tag=…`
-- **THEN** only matching items are returned
+- **WHEN** the items endpoint is called with `?text=…&tag=…&assignee=…`
+- **THEN** only items matching the text, carrying every requested tag, and assigned to at least one requested assignee are returned
 
 ### Requirement: Item archival, restore, and purge
 Deleting an item SHALL archive it rather than remove it: the item disappears from the board, table, and filter views but retains its fields, comments, and history. Users with write access SHALL be able to view a board's archived items (with who archived them and when) and restore them; archival and restore SHALL be recorded in the item's change history. Items archived more than 30 days ago SHALL be permanently removed by a scheduled backend task, including their comments, versions, changes, and watches.

@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { identityApiRef } from '@backstage/frontend-plugin-api';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
@@ -44,6 +44,46 @@ const items = [
   testItem({ id: 'item-2', title: 'Fix the build', columnId: 'column-2' }),
 ];
 
+const assignedItems = [
+  testItem({
+    id: 'item-1',
+    title: 'Bobs task',
+    tags: ['docs'],
+    assignees: ['user:default/bob'],
+  }),
+  testItem({
+    id: 'item-2',
+    title: 'Janes task',
+    assignees: ['text:Jane (agency)'],
+  }),
+  testItem({
+    id: 'item-3',
+    title: 'Zoes task',
+    columnId: 'column-2',
+    tags: ['ui'],
+    assignees: ['user:default/adams'],
+  }),
+];
+
+/** Resolves the two catalog assignees of `assignedItems` to display names. */
+function assigneeCatalogApi() {
+  const profiles: Record<string, string> = {
+    'user:default/adams': 'Zoe Zander',
+    'user:default/bob': 'Bob Builder',
+  };
+  return {
+    getEntities: jest.fn().mockResolvedValue({ items: [] }),
+    getEntitiesByRefs: jest.fn(async (request: { entityRefs: string[] }) => ({
+      items: request.entityRefs.map(ref => ({
+        apiVersion: 'backstage.io/v1alpha1',
+        kind: 'User',
+        metadata: { name: ref.split('/')[1], namespace: 'default' },
+        spec: { profile: { displayName: profiles[ref] } },
+      })),
+    })),
+  };
+}
+
 function renderBoard(
   over: {
     board?: Record<string, unknown>;
@@ -51,6 +91,7 @@ function renderBoard(
     boardsApi?: jest.Mocked<BoardsApi>;
     boardError?: Error;
     embedded?: boolean;
+    catalogApi?: unknown;
   } = {},
 ) {
   const boardsApi =
@@ -67,12 +108,22 @@ function renderBoard(
       apis: [
         [boardsApiRef, boardsApi],
         [identityApiRef, identityApi],
-        [catalogApiRef, catalogApi],
+        [catalogApiRef, over.catalogApi ?? catalogApi],
       ],
       mountedRoutes: { '/boards': rootRouteRef },
     },
   );
   return { boardsApi };
+}
+
+/** Toggles one assignee; the menu closes after every selection. */
+async function toggleAssignee(label: string, selected = 0) {
+  await userEvent.click(
+    screen.getByRole('button', {
+      name: selected > 0 ? `Assignees (${selected})` : 'Assignees',
+    }),
+  );
+  await userEvent.click(await screen.findByRole('menuitem', { name: label }));
 }
 
 async function openBoardMenu() {
@@ -214,6 +265,118 @@ describe('BoardPage filtering', () => {
     await screen.findByText('Todo (1)');
     expect(
       screen.queryByRole('button', { name: 'Tags' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('offers exactly the board’s assignees, by display name', async () => {
+    renderBoard({ items: assignedItems, catalogApi: assigneeCatalogApi() });
+    await screen.findByText('Todo (2)');
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Assignees' }),
+    );
+    const entries = (await screen.findAllByRole('menuitem')).map(
+      entry => entry.textContent,
+    );
+    // sorted by label, not by ref, and nobody who is not on this board
+    expect(entries).toEqual(['Bob Builder', 'Jane (agency)', 'Zoe Zander']);
+  });
+
+  it('carries the full ref on catalog filter entries only', async () => {
+    renderBoard({ items: assignedItems, catalogApi: assigneeCatalogApi() });
+    await screen.findByText('Todo (2)');
+    await userEvent.click(screen.getByRole('button', { name: 'Assignees' }));
+    const bob = await screen.findByRole('menuitem', { name: 'Bob Builder' });
+    expect(bob.querySelector('[title]')).toHaveAttribute(
+      'title',
+      'user:default/bob',
+    );
+    expect(
+      screen
+        .getByRole('menuitem', { name: 'Jane (agency)' })
+        .querySelector('[title]'),
+    ).toBeNull();
+  });
+
+  it('keeps items of any selected assignee', async () => {
+    renderBoard({ items: assignedItems, catalogApi: assigneeCatalogApi() });
+    await screen.findByText('Todo (2)');
+    await toggleAssignee('Bob Builder');
+    expect(await screen.findByText('1 of 3 items')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Zoes task' }),
+    ).not.toBeInTheDocument();
+
+    await toggleAssignee('Jane (agency)', 1);
+    expect(await screen.findByText('2 of 3 items')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('button', { name: 'Bobs task' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Janes task' }),
+    ).toBeInTheDocument();
+
+    // deselecting the ticked entry drops it from the filter again
+    await toggleAssignee('✓ Bob Builder', 2);
+    expect(await screen.findByText('1 of 3 items')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Bobs task' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('combines the assignee filter with tags, and clears it', async () => {
+    renderBoard({ items: assignedItems, catalogApi: assigneeCatalogApi() });
+    await screen.findByText('Todo (2)');
+    await toggleAssignee('Bob Builder');
+    await userEvent.click(screen.getByRole('button', { name: 'Tags' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'ui' }));
+    // Bob holds the 'docs' item, 'ui' is Zoe's: the AND leaves nothing
+    expect(await screen.findByText('0 of 3 items')).toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Clear filters' }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByText('0 of 3 items')).not.toBeInTheDocument(),
+    );
+    expect(
+      screen.getByRole('button', { name: 'Assignees' }),
+    ).toBeInTheDocument();
+  });
+
+  it('applies the assignee filter to the table view too', async () => {
+    renderBoard({ items: assignedItems, catalogApi: assigneeCatalogApi() });
+    await screen.findByText('Todo (2)');
+    await toggleAssignee('Bob Builder');
+    await userEvent.click(screen.getByRole('radio', { name: 'Table view' }));
+    const grid = await screen.findByRole('grid');
+    expect(within(grid).getByText('Bobs task')).toBeInTheDocument();
+    expect(within(grid).queryByText('Janes task')).not.toBeInTheDocument();
+    expect(within(grid).queryByText('Zoes task')).not.toBeInTheDocument();
+  });
+
+  it('counts and clears an assignee-only filter', async () => {
+    renderBoard({ items: assignedItems, catalogApi: assigneeCatalogApi() });
+    await screen.findByText('Todo (2)');
+    await toggleAssignee('Zoe Zander');
+    expect(await screen.findByText('1 of 3 items')).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Clear filters' }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('button', { name: 'Clear filters' }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(
+      screen.getByRole('button', { name: 'Assignees' }),
+    ).toBeInTheDocument();
+  });
+
+  it('offers no assignee filter when no item has an assignee', async () => {
+    renderBoard();
+    await screen.findByText('Todo (1)');
+    expect(
+      screen.queryByRole('button', { name: 'Assignees' }),
     ).not.toBeInTheDocument();
   });
 });

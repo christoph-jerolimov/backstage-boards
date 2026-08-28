@@ -5,12 +5,15 @@ import {
   BoardColumn,
   BoardItem,
   fridayISO,
+  isTextRef,
   refDisplayName,
   todayISO,
   tomorrowISO,
 } from '@internal/plugin-boards-common';
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '../queries';
+import { useProfiles } from './useProfiles';
+import { RefLabel } from './common';
 
 /**
  * The item mutations the item menu needs. Kept separate from the board
@@ -50,9 +53,13 @@ export function ItemMenu(props: {
     queryFn: () => identityApi.getBackstageIdentity(),
   });
   const meRef = identity?.userEntityRef;
-  const others = [...new Set(assigneePool)]
-    .filter(ref => ref !== meRef)
-    .sort((a, b) => refDisplayName(a).localeCompare(refDisplayName(b)));
+  const pool = [...new Set(assigneePool)].filter(ref => ref !== meRef);
+  // the same sorted ref list the cards already resolve, so this is served
+  // from cache; until it is, entries read by their ref name
+  const profiles = useProfiles(pool.filter(ref => !isTextRef(ref)));
+  const nameOf = (ref: string) =>
+    profiles.get(ref)?.displayName ?? refDisplayName(ref);
+  const others = [...pool].sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
   const toggle = (ref: string) => {
     const next = item.assignees.includes(ref)
       ? item.assignees.filter(entry => entry !== ref)
@@ -122,12 +129,13 @@ export function ItemMenu(props: {
           <Menu>
             {meRef && (
               <MenuItem onAction={() => toggle(meRef)}>
-                {mark(meRef, 'Me')}
+                {/* "Me" names a ref too: the tooltip says which account */}
+                <RefLabel entityRef={meRef}>{mark(meRef, 'Me')}</RefLabel>
               </MenuItem>
             )}
             {others.map(ref => (
               <MenuItem key={ref} onAction={() => toggle(ref)}>
-                {mark(ref, refDisplayName(ref))}
+                <RefLabel entityRef={ref}>{mark(ref, nameOf(ref))}</RefLabel>
               </MenuItem>
             ))}
           </Menu>
