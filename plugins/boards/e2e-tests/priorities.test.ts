@@ -106,7 +106,9 @@ test('the drawer changes the priority', async ({ page }) => {
   // the select's accessible name carries the current value too
   await drawer.getByRole('button', { name: /Priority/ }).click();
   await page.getByRole('option', { name: 'medium' }).click();
-  await expect(drawer.getByText('medium', { exact: true }).first()).toBeVisible();
+  await expect(
+    drawer.getByText('medium', { exact: true }).first(),
+  ).toBeVisible();
 });
 
 test('the matrix counts combinations and toggles sums', async ({ page }) => {
@@ -132,7 +134,9 @@ test('deleting a used priority reassigns its items', async ({ page }) => {
   await page.getByRole('button', { name: 'More board actions' }).click();
   await page.getByRole('menuitem', { name: 'Board settings…' }).click();
   const dialog = page.getByRole('dialog');
-  await dialog.getByRole('button', { name: 'Delete priority critical' }).click();
+  await dialog
+    .getByRole('button', { name: 'Delete priority critical' })
+    .click();
   await expect(dialog.getByText(/“critical” is still used/)).toBeVisible();
   await dialog.getByRole('button', { name: 'Reassign and delete' }).click();
   await expect(
