@@ -13,6 +13,7 @@ import {
   BoardPermissionLevel,
   BoardUpdate,
   BoardWithContext,
+  ColumnColor,
   CommentVersion,
   ItemComment,
   ItemUpdate,
@@ -20,6 +21,22 @@ import {
   NewItem,
   TimelineEntry,
 } from '@internal/plugin-boards-common';
+
+/** The message of a Backstage `{ error: { message } }` payload, if present. */
+function errorPayloadMessage(payload: unknown): string | undefined {
+  if (
+    typeof payload !== 'object' ||
+    payload === null ||
+    !('error' in payload)
+  ) {
+    return undefined;
+  }
+  const error = payload.error;
+  if (typeof error !== 'object' || error === null || !('message' in error)) {
+    return undefined;
+  }
+  return typeof error.message === 'string' ? error.message : undefined;
+}
 
 export interface BoardsApi {
   listBoards(options?: {
@@ -70,12 +87,12 @@ export interface BoardsApi {
 
   addColumn(
     boardId: string,
-    options: { title: string; position?: number; color?: string },
+    options: { title: string; position?: number; color?: ColumnColor },
   ): Promise<BoardColumn>;
   updateColumn(
     boardId: string,
     columnId: string,
-    update: { title?: string; position?: number; color?: string | null },
+    update: { title?: string; position?: number; color?: ColumnColor | null },
   ): Promise<BoardColumn>;
   deleteColumn(
     boardId: string,
@@ -150,11 +167,12 @@ export class BoardsClient implements BoardsApi {
     },
   ) {}
 
-  private async request<T>(
+  /** Calls the backend, turning a non-2xx response into an error. */
+  private async fetch(
     method: string,
     path: string,
     body?: unknown,
-  ): Promise<T> {
+  ): Promise<Response> {
     const baseUrl = await this.options.discoveryApi.getBaseUrl('boards');
     const response = await this.options.fetchApi.fetch(`${baseUrl}${path}`, {
       method,
@@ -164,17 +182,33 @@ export class BoardsClient implements BoardsApi {
     if (!response.ok) {
       let message = `${response.status} ${response.statusText}`;
       try {
-        const payload = await response.json();
-        message = payload?.error?.message ?? message;
+        message = errorPayloadMessage(await response.json()) ?? message;
       } catch {
         // keep the default message
       }
       throw new Error(message);
     }
-    if (response.status === 204) {
-      return undefined as T;
-    }
+    return response;
+  }
+
+  /** A call whose JSON body is the result. */
+  private async request<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+  ): Promise<T> {
+    const response = await this.fetch(method, path, body);
+    // the one place a cast is unavoidable: the wire carries no types
     return (await response.json()) as T;
+  }
+
+  /** A call whose response carries nothing the caller needs. */
+  private async requestVoid(
+    method: string,
+    path: string,
+    body?: unknown,
+  ): Promise<void> {
+    await this.fetch(method, path, body);
   }
 
   /** A list endpoint's payload is always the rows under one key. */
@@ -185,7 +219,7 @@ export class BoardsClient implements BoardsApi {
 
   /** Endpoints where PUT adds the current user and DELETE removes them. */
   private toggle(on: boolean, path: string): Promise<void> {
-    return this.request(on ? 'PUT' : 'DELETE', path);
+    return this.requestVoid(on ? 'PUT' : 'DELETE', path);
   }
 
   async listBoards(options?: {
@@ -228,15 +262,15 @@ export class BoardsClient implements BoardsApi {
   }
 
   deleteBoard(boardId: string): Promise<void> {
-    return this.request('DELETE', `/boards/${boardId}`);
+    return this.requestVoid('DELETE', `/boards/${boardId}`);
   }
 
   hardDeleteBoard(boardId: string): Promise<void> {
-    return this.request('POST', `/boards/${boardId}/delete-now`);
+    return this.requestVoid('POST', `/boards/${boardId}/delete-now`);
   }
 
   unarchiveBoard(boardId: string): Promise<void> {
-    return this.request('POST', `/boards/${boardId}/unarchive`);
+    return this.requestVoid('POST', `/boards/${boardId}/unarchive`);
   }
 
   duplicateBoard(
@@ -287,7 +321,7 @@ export class BoardsClient implements BoardsApi {
   }
 
   removePermission(boardId: string, permissionId: string): Promise<void> {
-    return this.request(
+    return this.requestVoid(
       'DELETE',
       `/boards/${boardId}/permissions/${permissionId}`,
     );
@@ -295,7 +329,7 @@ export class BoardsClient implements BoardsApi {
 
   addColumn(
     boardId: string,
-    options: { title: string; position?: number; color?: string },
+    options: { title: string; position?: number; color?: ColumnColor },
   ): Promise<BoardColumn> {
     return this.request('POST', `/boards/${boardId}/columns`, options);
   }
@@ -303,7 +337,7 @@ export class BoardsClient implements BoardsApi {
   updateColumn(
     boardId: string,
     columnId: string,
-    update: { title?: string; position?: number; color?: string | null },
+    update: { title?: string; position?: number; color?: ColumnColor | null },
   ): Promise<BoardColumn> {
     return this.request(
       'PATCH',
@@ -320,7 +354,7 @@ export class BoardsClient implements BoardsApi {
     const query = options?.moveItemsTo
       ? `?moveItemsTo=${encodeURIComponent(options.moveItemsTo)}`
       : '';
-    return this.request(
+    return this.requestVoid(
       'DELETE',
       `/boards/${boardId}/columns/${columnId}${query}`,
     );
@@ -355,7 +389,7 @@ export class BoardsClient implements BoardsApi {
   }
 
   deleteItem(boardId: string, itemId: string): Promise<void> {
-    return this.request('DELETE', `/boards/${boardId}/items/${itemId}`);
+    return this.requestVoid('DELETE', `/boards/${boardId}/items/${itemId}`);
   }
 
   listArchivedItems(boardId: string): Promise<BoardItem[]> {
@@ -427,7 +461,7 @@ export class BoardsClient implements BoardsApi {
     itemId: string,
     commentId: string,
   ): Promise<void> {
-    return this.request(
+    return this.requestVoid(
       'DELETE',
       `/boards/${boardId}/items/${itemId}/comments/${commentId}`,
     );

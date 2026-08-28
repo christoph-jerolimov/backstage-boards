@@ -209,10 +209,7 @@ export class BoardsService {
   // ---------------------------------------------------------------- access
 
   private async permissionRows(boardId: string): Promise<PermissionRow[]> {
-    return this.knex('board_permissions').where(
-      'board_id',
-      boardId,
-    );
+    return this.knex('board_permissions').where('board_id', boardId);
   }
 
   private async effectiveLevel(
@@ -239,9 +236,7 @@ export class BoardsService {
     boardId: string,
     required: BoardPermissionLevel,
   ): Promise<{ board: BoardRow; level: BoardPermissionLevel }> {
-    const board = await this.knex('boards')
-      .where('id', boardId)
-      .first();
+    const board = await this.knex('boards').where('id', boardId).first();
     if (!board) {
       throw new NotFoundError(`Board ${boardId} not found`);
     }
@@ -442,9 +437,7 @@ export class BoardsService {
       withCounts?: boolean;
     },
   ): Promise<BoardListEntry[]> {
-    const query = this.knex('boards')
-      .whereNull('archived_at')
-      .orderBy('name');
+    const query = this.knex('boards').whereNull('archived_at').orderBy('name');
     if (options?.entityRef) {
       const entityRef = options.entityRef;
       query.whereExists(function entityMatch() {
@@ -1927,10 +1920,7 @@ export class BoardsService {
     }
     const commentRows = await this.knex('comments').where('item_id', itemId);
     const comments = await this.hydrateComments(commentRows.map(row => row.id));
-    const changeRows = await this.knex('changes').where(
-      'item_id',
-      itemId,
-    );
+    const changeRows = await this.knex('changes').where('item_id', itemId);
     const entries: TimelineEntry[] = [
       ...comments.map(comment => ({
         kind: 'comment' as const,

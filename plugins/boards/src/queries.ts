@@ -7,7 +7,7 @@ import {
 import { useEffect } from 'react';
 import { useApi } from '@backstage/frontend-plugin-api';
 import { useSignal } from '@backstage/plugin-signals-react';
-import { BoardItem } from '@internal/plugin-boards-common';
+import { BoardItem, errorMessage } from '@internal/plugin-boards-common';
 import { boardsApiRef } from './api';
 
 /**
@@ -185,7 +185,7 @@ function useOptimisticItemMutation<TInput extends { itemId: string }>(
       if (context?.previous) {
         client.setQueryData(queryKey, context.previous);
       }
-      onError((error as Error).message);
+      onError(errorMessage(error));
     },
     onSettled: () => {
       client.invalidateQueries({ queryKey });

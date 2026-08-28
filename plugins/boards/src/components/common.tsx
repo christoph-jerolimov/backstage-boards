@@ -1,9 +1,27 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Badge, Button, Flex, Text, TextField } from '@backstage/ui';
 import { EntityRefLink } from '@backstage/plugin-catalog-react';
-import { isTextRef, textRefDisplay } from '@internal/plugin-boards-common';
+import {
+  errorMessage,
+  isTextRef,
+  textRefDisplay,
+} from '@internal/plugin-boards-common';
 import { AssigneeAvatars } from './AssigneeAvatars';
 import { BlockToken, InlineToken, parseMarkdown } from './markdown';
+
+/**
+ * Narrows a selection key coming back from a `Select`, `Tabs` or
+ * `ToggleButtonGroup` to one of the options that was offered. Those
+ * callbacks are typed as a bare react-aria `Key`, so matching the key
+ * against the option list is what turns it back into the union the rest
+ * of the code works with; an unknown key yields undefined.
+ */
+export function selectedOption<T extends string>(
+  key: unknown,
+  options: readonly T[],
+): T | undefined {
+  return options.find(option => option === key);
+}
 
 /** Renders a creator/assignee/actor ref: catalog refs link, `text:` refs don't. */
 export function RefDisplay(props: { refString: string }) {
@@ -195,7 +213,7 @@ export function AsyncList<T>(props: {
 }): React.ReactNode {
   const { isLoading, error, items, loading, empty, renderError } = props;
   if (error) {
-    const message = (error as Error).message;
+    const message = errorMessage(error);
     return renderError ? (
       renderError(message)
     ) : (

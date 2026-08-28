@@ -15,6 +15,7 @@ import {
   groupItems,
   ItemSortDescriptor,
   sortItems,
+  toItemSortDescriptor,
 } from './grouping';
 import { GroupLabel } from './GroupLabel';
 import { ItemMenu } from './ItemMenu';
@@ -42,9 +43,12 @@ function ItemsTable(props: {
       aria-label="Board items"
       onRowAction={key => openItem(String(key))}
       sortDescriptor={sort}
-      onSortChange={descriptor =>
-        onSortChange(descriptor as ItemSortDescriptor)
-      }
+      onSortChange={descriptor => {
+        const next = toItemSortDescriptor(descriptor);
+        if (next) {
+          onSortChange(next);
+        }
+      }}
     >
       <TableHeader>
         <Column id="title" isRowHeader allowsSorting>

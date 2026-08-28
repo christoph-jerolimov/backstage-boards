@@ -5,9 +5,37 @@ import {
   todayISO,
 } from '@internal/plugin-boards-common';
 
+/** The table columns that can be sorted on. */
+export const ITEM_SORT_COLUMNS = [
+  'title',
+  'status',
+  'dueDate',
+  'createdBy',
+  'updatedAt',
+] as const;
+
 export interface ItemSortDescriptor {
-  column: 'title' | 'status' | 'dueDate' | 'createdBy' | 'updatedAt';
+  column: (typeof ITEM_SORT_COLUMNS)[number];
   direction: 'ascending' | 'descending';
+}
+
+/**
+ * Narrows the sort descriptor a table hands back — whose column is a bare
+ * react-aria `Key` — to a column this table actually sorts on.
+ */
+export function toItemSortDescriptor(descriptor: {
+  column?: unknown;
+  direction?: unknown;
+}): ItemSortDescriptor | undefined {
+  const column = ITEM_SORT_COLUMNS.find(name => name === descriptor.column);
+  if (!column) {
+    return undefined;
+  }
+  return {
+    column,
+    direction:
+      descriptor.direction === 'descending' ? 'descending' : 'ascending',
+  };
 }
 
 /**
@@ -50,7 +78,15 @@ export const NO_DUE_DATE = 'no-due-date';
 export const UNTAGGED = 'untagged';
 
 /** How board/table items are grouped. */
-export type GroupByMode = 'none' | 'assignee' | 'dueDate' | 'tags';
+/** Every grouping the board and my-items views offer. */
+export const ALL_GROUP_BY_MODES = [
+  'none',
+  'assignee',
+  'dueDate',
+  'tags',
+] as const;
+
+export type GroupByMode = (typeof ALL_GROUP_BY_MODES)[number];
 
 export interface ItemGroup {
   key: string;
