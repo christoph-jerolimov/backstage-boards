@@ -11,6 +11,10 @@ import { Request } from 'express';
 import { BoardsService } from './service/BoardsService';
 import { BoardsPrincipal } from './service/access';
 
+function isString(value: unknown): value is string {
+  return typeof value === 'string';
+}
+
 export interface RouterOptions {
   service: BoardsService;
   httpAuth: HttpAuthService;
@@ -288,11 +292,13 @@ export async function createRouter(
 
   router.get('/boards/:boardId/items', async (req, res) => {
     const principal = await principalOf(req);
+    // express parses a repeated query parameter into an array whose entries
+    // may themselves be nested objects, so only the strings are kept
     const asArray = (value: unknown): string[] => {
       if (typeof value === 'string') {
         return [value];
       }
-      return Array.isArray(value) ? (value as string[]) : [];
+      return Array.isArray(value) ? value.filter(isString) : [];
     };
     res.json({
       items: await service.listItems(principal, req.params.boardId, {

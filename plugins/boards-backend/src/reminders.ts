@@ -27,6 +27,14 @@ export type ReminderScope = (typeof REMINDER_SCOPES)[number];
 export const REMINDER_GROUPINGS = ['combined', 'per-board'] as const;
 export type ReminderGrouping = (typeof REMINDER_GROUPINGS)[number];
 
+function isReminderScope(value: string): value is ReminderScope {
+  return REMINDER_SCOPES.some(scope => scope === value);
+}
+
+function isReminderGrouping(value: string): value is ReminderGrouping {
+  return REMINDER_GROUPINGS.some(grouping => grouping === value);
+}
+
 export interface ReminderConfig {
   id: string;
   /** Standard Backstage scheduler configuration. */
@@ -65,17 +73,16 @@ export function readRemindersConfig(
         `boards.reminders '${id}' has an invalid 'schedule': ${error}`,
       );
     }
-    const scope = (entry.getOptionalString('scope') ?? 'all') as ReminderScope;
-    if (!REMINDER_SCOPES.includes(scope)) {
+    const scope = entry.getOptionalString('scope') ?? 'all';
+    if (!isReminderScope(scope)) {
       throw new Error(
         `boards.reminders '${id}' has invalid scope '${scope}' (expected one of ${REMINDER_SCOPES.join(
           ', ',
         )})`,
       );
     }
-    const grouping = (entry.getOptionalString('grouping') ??
-      'combined') as ReminderGrouping;
-    if (!REMINDER_GROUPINGS.includes(grouping)) {
+    const grouping = entry.getOptionalString('grouping') ?? 'combined';
+    if (!isReminderGrouping(grouping)) {
       throw new Error(
         `boards.reminders '${id}' has invalid grouping '${grouping}' (expected one of ${REMINDER_GROUPINGS.join(
           ', ',

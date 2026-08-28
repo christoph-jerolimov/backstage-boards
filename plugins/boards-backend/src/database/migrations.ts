@@ -1,5 +1,13 @@
 import { Knex } from 'knex';
 
+/**
+ * `boards.entity_ref`, as it existed before `boardEntities` moved board
+ * references into their own table. Migrations run against historical
+ * schemas, so they name the columns they touch instead of using the
+ * current row types from `./tables`.
+ */
+type BoardWithEntityRef = { id: string; entity_ref: string };
+
 type Migration = {
   name: string;
   up: (knex: Knex) => Promise<void>;
@@ -298,7 +306,7 @@ const boardEntities: Migration = {
       table.unique(['board_id', 'entity_ref']);
       table.index(['entity_ref']);
     });
-    const rows = await knex('boards')
+    const rows = await knex<BoardWithEntityRef>('boards')
       .whereNotNull('entity_ref')
       .select('id', 'entity_ref');
     if (rows.length > 0) {
@@ -316,7 +324,7 @@ const boardEntities: Migration = {
     });
     const rows = await knex('board_entities').select('board_id', 'entity_ref');
     for (const row of rows) {
-      await knex('boards')
+      await knex<BoardWithEntityRef>('boards')
         .where('id', row.board_id)
         .whereNull('entity_ref')
         .update({ entity_ref: row.entity_ref });
