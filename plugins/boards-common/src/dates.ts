@@ -87,3 +87,17 @@ export function relativeDueLabel(
   }
   return undefined;
 }
+
+/**
+ * How long an archived board or item is kept before it is purged for
+ * good. The backend's cleanup task enforces it; the UI explains it.
+ * Both read it here so they cannot drift apart.
+ */
+export const RETENTION_DAYS = 30;
+
+/** When something archived at `archivedAt` is purged. */
+export function purgeDate(archivedAt: string): Date {
+  const date = new Date(archivedAt);
+  date.setDate(date.getDate() + RETENTION_DAYS);
+  return date;
+}
