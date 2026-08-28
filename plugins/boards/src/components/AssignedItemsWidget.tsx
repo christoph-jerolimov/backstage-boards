@@ -7,6 +7,7 @@ import { Badge, Button, Flex, Text } from '@backstage/ui';
 import { MyBoardItem } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
 import { rootRouteRef } from '../routes';
+import { ErrorText } from './common';
 import { DueDateBadge, formatDueDate } from './DueDate';
 import {
   filterDueEntries,
@@ -139,9 +140,9 @@ export function AssignedItemsContent(props: AssignedItemsContentProps) {
   }
   if (error) {
     return (
-      <Text style={{ color: 'var(--bui-fg-negative)' }}>
+      <ErrorText>
         Your items could not be loaded: {(error as Error).message}
-      </Text>
+      </ErrorText>
     );
   }
   if (groups.length === 0) {

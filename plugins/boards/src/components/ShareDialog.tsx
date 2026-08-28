@@ -20,7 +20,7 @@ import { boardsApiRef } from '../api';
 import { queryKeys } from '../queries';
 import { PrincipalPicker } from './PrincipalPicker';
 import { useAsyncAction } from './useAsyncAction';
-import { RefDisplay } from './common';
+import { ErrorText, RefDisplay } from './common';
 
 const VISIBILITY_OPTIONS: Array<{ value: BoardVisibility; label: string }> = [
   { value: 'private', label: 'Private – only people listed below' },
@@ -149,11 +149,7 @@ export function ShareDialog(props: {
               Add
             </Button>
           </Flex>
-          {error && (
-            <Text variant="body-small" style={{ color: '#cc3344' }}>
-              {error}
-            </Text>
-          )}
+          {error && <ErrorText>{error}</ErrorText>}
         </Flex>
       </DialogBody>
     </Dialog>

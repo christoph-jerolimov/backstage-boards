@@ -10,6 +10,7 @@ import {
 } from '@internal/plugin-boards-common';
 import { useBoardListQuery } from '../queries';
 import { rootRouteRef } from '../routes';
+import { ErrorText } from './common';
 
 export { BoardsWidgetProvider } from './widgetCommon';
 
@@ -120,9 +121,9 @@ export function BoardsContent(props: BoardsContentProps) {
   }
   if (error) {
     return (
-      <Text style={{ color: 'var(--bui-fg-negative)' }}>
+      <ErrorText>
         Boards could not be loaded: {(error as Error).message}
-      </Text>
+      </ErrorText>
     );
   }
   if ((boards ?? []).length === 0) {

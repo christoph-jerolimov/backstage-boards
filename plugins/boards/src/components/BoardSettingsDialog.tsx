@@ -11,6 +11,7 @@ import {
 import { EntityRefLink } from '@backstage/plugin-catalog-react';
 import { BoardWithContext } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
+import { ErrorText } from './common';
 import { EntityPicker } from './EntityPicker';
 import { useAsyncAction } from './useAsyncAction';
 
@@ -42,9 +43,7 @@ export function BoardSettingsDialog(props: {
           <Text variant="body-small" color="secondary">
             Referenced catalog entities, e.g. a component and the owning team.
           </Text>
-          {error && (
-            <Text style={{ color: 'var(--bui-fg-negative)' }}>{error}</Text>
-          )}
+          {error && <ErrorText>{error}</ErrorText>}
           {board.entityRefs.length === 0 && (
             <Text variant="body-small" color="secondary">
               No entities referenced yet.
