@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useApi } from '@backstage/frontend-plugin-api';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
 import { useQuery } from '@tanstack/react-query';
-import { refDisplayName } from '@internal/plugin-boards-common';
+import { entityDisplayName } from '@internal/plugin-boards-common';
 
 export interface Profile {
   displayName: string;
@@ -31,15 +31,9 @@ export function useProfiles(entityRefs: string[]): Map<string, Profile> {
     const profiles = new Map<string, Profile>();
     sorted.forEach((ref, index) => {
       const entity = data?.items[index];
-      const profile = entity?.spec?.profile as
-        | { displayName?: string; picture?: string }
-        | undefined;
+      const profile = entity?.spec?.profile as { picture?: string } | undefined;
       profiles.set(ref, {
-        displayName:
-          profile?.displayName ??
-          entity?.metadata.title ??
-          entity?.metadata.name ??
-          refDisplayName(ref),
+        displayName: entityDisplayName(ref, entity ?? undefined),
         picture: profile?.picture,
       });
     });

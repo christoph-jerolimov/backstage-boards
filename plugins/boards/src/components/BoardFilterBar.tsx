@@ -17,6 +17,7 @@ import {
   refDisplayName,
 } from '@internal/plugin-boards-common';
 import { useProfiles } from './useProfiles';
+import { RefLabel } from './common';
 
 /** One entry of the assignee filter menu: the ref and how it reads. */
 export interface AssigneeOption {
@@ -144,9 +145,11 @@ export function BoardFilterBar(props: { filter: ItemFilterHandle }) {
                 key={option.ref}
                 onAction={() => filter.toggleAssignee(option.ref)}
               >
-                {filter.assignees.includes(option.ref)
-                  ? `✓ ${option.label}`
-                  : option.label}
+                <RefLabel entityRef={option.ref}>
+                  {filter.assignees.includes(option.ref)
+                    ? `✓ ${option.label}`
+                    : option.label}
+                </RefLabel>
               </MenuItem>
             ))}
           </Menu>

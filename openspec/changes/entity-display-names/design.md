@@ -82,18 +82,27 @@ missing. `EntityRefLink` surfaces already carry Backstage's own
 behavior. A `text:` ref gets no tooltip — its label *is* its value, and
 a tooltip repeating it with a `text:` prefix is noise.
 
-**Design-system `Tooltip` where an element can host one, the native
-`title` attribute inside menu items.**
-Avatars and the single-assignee name are ordinary hoverable/focusable
-elements: `TooltipTrigger` + `Tooltip` works there and matches the
-existing avatar stack. Menu entries are owned by react-aria's menu,
-which manages focus and its own overlays; nesting a `TooltipTrigger`
-inside a `MenuItem` risks fighting that. A `title` on the label span
-inside the item needs nothing from the menu, degrades to no tooltip at
-worst, and keeps the entry keyboard-navigable. If a `TooltipTrigger`
-turns out to work cleanly in a `MenuItem` during implementation, it is
-the better rendering and should be used instead — the requirement is the
-ref being reachable, not the mechanism.
+**The design-system `Tooltip` stays on the avatar stack; every plain
+label gets the native `title` attribute.**
+The stacked avatars already carry a `TooltipTrigger`, and an avatar is
+initials with nothing else to read, so the richer tooltip earns its
+`Focusable` wrapper there — it just gains the ref beneath the name.
+Everywhere else the label is already text, and the same wrapper would
+cost something: around the single-assignee `EntityRefLink` it adds a
+second tab stop over one link, and inside a `MenuItem` it puts a
+focus-managing overlay inside react-aria's menu. A `title` on a span
+needs nothing from either, and a `RefLabel` in `common.tsx` applies it in
+one place (and skips it for `text:` refs). Verified in a browser rather
+than assumed: the stack tooltip reads "The Guests Team /
+group:default/guests", and the `title`s carry the refs.
+
+**Testing tooltips: focus, not hover.**
+react-aria warms hover tooltips up over 1.5s before the first one opens,
+and in jsdom that first hover never resolves — a cold hover test fails
+while the same assertion passes once another test has warmed the state
+up, which is a test that lies. Keyboard focus opens a tooltip
+immediately, so the stacked-avatar test tabs to it; `title` attributes
+are asserted directly.
 
 **The stacked-avatar tooltip shows the name *and* the ref.**
 It shows the display name today, and an avatar is initials — replacing
@@ -115,9 +124,11 @@ extra request no matter how many rows mount one.
   their avatars the query is warm and nothing visibly moves; on a cold
   first paint of the menu it can reorder once. Accepted — the
   alternative is blocking the menu on a request.
-- **A tooltip in a menu may not survive react-aria's focus handling.**
-  Mitigated by using the native `title` there, which nothing can
-  intercept; the design-system tooltip is used where it already works.
+- **A native `title` is the browser's tooltip, not the design system's**
+  — it appears after the browser's own delay and in the browser's own
+  styling, so hovering a name in a menu looks different from hovering a
+  stacked avatar. Accepted for the reasons above; making them identical
+  means putting react-aria overlays inside menu items.
 - **Two entities sharing a display name still look identical until
   hovered.** The tooltip is the disambiguator; putting the ref on screen
   permanently would bloat every card. Accepted.

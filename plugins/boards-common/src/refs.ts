@@ -1,4 +1,4 @@
-import { parseEntityRef } from '@backstage/catalog-model';
+import { Entity, parseEntityRef } from '@backstage/catalog-model';
 import { BoardPermissionLevel, BoardVisibility } from './types';
 
 /**
@@ -29,6 +29,34 @@ export function refDisplayName(ref: string): string {
   } catch {
     return ref;
   }
+}
+
+/** The kinds whose `spec.profile.displayName` names the entity. */
+const PROFILE_KINDS = ['user', 'group'];
+
+/**
+ * How a ref reads once its catalog entity is known: the profile display
+ * name of a user or group, otherwise the entity's title, otherwise its
+ * name. Without an entity — unknown, unresolved, or a `text:` ref — this
+ * is {@link refDisplayName}, so a caller can render before the catalog
+ * answers and again afterwards.
+ */
+export function entityDisplayName(ref: string, entity?: Entity): string {
+  if (!entity) {
+    return refDisplayName(ref);
+  }
+  const profile = entity.spec?.profile as { displayName?: string } | undefined;
+  const displayName = PROFILE_KINDS.includes(
+    entity.kind.toLocaleLowerCase('en-US'),
+  )
+    ? profile?.displayName
+    : undefined;
+  return (
+    displayName ??
+    entity.metadata.title ??
+    entity.metadata.name ??
+    refDisplayName(ref)
+  );
 }
 
 /**

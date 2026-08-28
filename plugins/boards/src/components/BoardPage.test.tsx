@@ -281,6 +281,22 @@ describe('BoardPage filtering', () => {
     expect(entries).toEqual(['Bob Builder', 'Jane (agency)', 'Zoe Zander']);
   });
 
+  it('carries the full ref on catalog filter entries only', async () => {
+    renderBoard({ items: assignedItems, catalogApi: assigneeCatalogApi() });
+    await screen.findByText('Todo (2)');
+    await userEvent.click(screen.getByRole('button', { name: 'Assignees' }));
+    const bob = await screen.findByRole('menuitem', { name: 'Bob Builder' });
+    expect(bob.querySelector('[title]')).toHaveAttribute(
+      'title',
+      'user:default/bob',
+    );
+    expect(
+      screen
+        .getByRole('menuitem', { name: 'Jane (agency)' })
+        .querySelector('[title]'),
+    ).toBeNull();
+  });
+
   it('keeps items of any selected assignee', async () => {
     renderBoard({ items: assignedItems, catalogApi: assigneeCatalogApi() });
     await screen.findByText('Todo (2)');

@@ -73,12 +73,18 @@ function AvatarLink(props: {
   if (!withTooltip) {
     return avatar;
   }
+  // an avatar in a stack shows initials only, so its tooltip carries the
+  // name as well as the ref
   return (
     <TooltipTrigger>
       <Focusable>
         <span style={{ display: 'inline-flex' }}>{avatar}</span>
       </Focusable>
-      <Tooltip>{profile.displayName}</Tooltip>
+      <Tooltip>
+        {profile.displayName}
+        <br />
+        {entityRef}
+      </Tooltip>
     </TooltipTrigger>
   );
 }
@@ -125,10 +131,13 @@ export function AssigneeAvatars(props: { refs: string[] }) {
         // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
         <span onClick={event => event.stopPropagation()}>
           <Text variant="body-x-small">
-            <EntityRefLink entityRef={entityRefs[0]} hideIcon disableTooltip>
-              {profiles.get(entityRefs[0])?.displayName ??
-                refDisplayName(entityRefs[0])}
-            </EntityRefLink>
+            {/* the ref as a native title: no extra tab stop around the link */}
+            <span title={entityRefs[0]}>
+              <EntityRefLink entityRef={entityRefs[0]} hideIcon disableTooltip>
+                {profiles.get(entityRefs[0])?.displayName ??
+                  refDisplayName(entityRefs[0])}
+              </EntityRefLink>
+            </span>
           </Text>
         </span>
       )}
