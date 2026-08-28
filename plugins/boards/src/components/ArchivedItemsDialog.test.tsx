@@ -1,7 +1,8 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { boardsApiRef } from '../api';
 import { ArchivedItemsDialog } from './ArchivedItemsDialog';
+import { formatDate } from './common';
 import {
   renderWithProviders,
   testBoardsApi,
@@ -50,15 +51,23 @@ describe('ArchivedItemsDialog', () => {
     expect(await screen.findByText('Loading…')).toBeInTheDocument();
   });
 
-  it('lists the archived items with who archived them and when', async () => {
+  it('lists the archived items in a table with who archived them and when', async () => {
     renderDialog();
-    expect(await screen.findByText('Old task')).toBeInTheDocument();
+    expect(await screen.findByRole('grid')).toBeInTheDocument();
+    expect(
+      screen.getAllByRole('columnheader').map(cell => cell.textContent),
+    ).toEqual(['Title', 'Archived by', 'Archived', 'Actions']);
     expect(
       screen.getByText('Archived items are removed permanently after 30 days.'),
     ).toBeInTheDocument();
-    expect(
-      await screen.findByRole('link', { name: 'jane' }),
-    ).toBeInTheDocument();
+
+    const row = screen.getByRole('row', { name: /Old task/ });
+    expect(within(row).getByRole('rowheader')).toHaveTextContent('Old task');
+    const [archivedBy, archivedAt] = within(row).getAllByRole('gridcell');
+    expect(within(archivedBy).getByRole('link')).toHaveTextContent('jane');
+    expect(archivedAt).toHaveTextContent(
+      formatDate('2026-08-01T10:00:00.000Z'),
+    );
   });
 
   it('restores an item and refreshes the board', async () => {
