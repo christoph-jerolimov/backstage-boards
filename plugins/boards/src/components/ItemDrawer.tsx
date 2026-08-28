@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useApi } from '@backstage/frontend-plugin-api';
+import { RiCloseLine } from '@remixicon/react';
 import {
   Button,
   ButtonIcon,
@@ -26,19 +27,6 @@ import { PrincipalPicker } from './PrincipalPicker';
 import { TagsEditor } from './TagsEditor';
 import { changeSummary, formatDate, InlineEdit, RefDisplay } from './common';
 import { StatusBadge } from './StatusBadge';
-
-function CloseIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden>
-      <path
-        d="M6 6l12 12M18 6L6 18"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
 
 function CommentBlock(props: {
   boardId: string;
@@ -212,7 +200,7 @@ export function ItemDrawer(props: {
             <ButtonIcon
               aria-label="Close item details"
               variant="tertiary"
-              icon={<CloseIcon />}
+              icon={<RiCloseLine size={16} />}
               onPress={onClose}
             />
           </Flex>

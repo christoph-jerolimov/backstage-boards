@@ -1,5 +1,6 @@
 import { Fragment, useRef, useState } from 'react';
 import { useDrag, useDrop } from 'react-aria';
+import { RiMore2Fill } from '@remixicon/react';
 import {
   Button,
   ButtonIcon,
@@ -43,16 +44,6 @@ export interface BoardActions extends ItemActions {
   setColumnColor: (columnId: string, color: string | null) => Promise<void>;
   deleteColumn: (columnId: string, moveItemsTo?: string) => Promise<void>;
   renameItem: (itemId: string, title: string) => Promise<void>;
-}
-
-function MoreIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden>
-      <circle cx="5" cy="12" r="1.8" fill="currentColor" />
-      <circle cx="12" cy="12" r="1.8" fill="currentColor" />
-      <circle cx="19" cy="12" r="1.8" fill="currentColor" />
-    </svg>
-  );
 }
 
 function ItemCard(props: {
@@ -146,7 +137,7 @@ function ItemCard(props: {
               aria-label={`Actions for ${item.title}`}
               variant="tertiary"
               size="small"
-              icon={<MoreIcon />}
+              icon={<RiMore2Fill size={16} />}
             />
             <ItemMenu
               item={item}
@@ -323,7 +314,7 @@ function ColumnLane(props: {
               aria-label={`Actions for column ${column.title}`}
               variant="tertiary"
               size="small"
-              icon={<MoreIcon />}
+              icon={<RiMore2Fill size={16} />}
             />
             <Menu placement="right top">
               <MenuItem onAction={props.onInsertBefore}>
