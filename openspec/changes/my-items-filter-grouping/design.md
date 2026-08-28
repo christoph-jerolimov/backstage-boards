@@ -2,236 +2,252 @@
 
 ## Context
 
-See `proposal.md` — Why. The constraints that actually shape this design:
+See `proposal.md` — Why. The constraints that actually shape this design,
+all of them on the current `main`:
 
-- `MyItemsList` (`plugins/boards/src/components/MyItemsPage.tsx`) already
-  loads the **complete** result of `GET /my-items` into the TanStack
-  cache under `['boards', 'my-items']` and renders it with a local
-  `groupByBoard()` helper. There is no paging and no server-side filter,
-  so every field the new controls need (title, description, tags,
-  assignees, due date, board name) is already in memory.
-- `MyBoardItem` is `{ item: BoardItem, boardId, boardName, columnTitle }`.
-  Its `item` is a full `BoardItem`, so `itemMatchesFilter(item, filter)`
-  from `boards-common` applies unchanged.
-- The board page's filter bar (`BoardPage.tsx`) is
-  `SearchField` + a `MenuTrigger`/`Menu` tag toggle list + a count and a
-  "Clear filters" button; its group-by is a `Select` with four options.
-  Matching those two controls is the explicit ask, so this change reuses
-  their code rather than their look.
-- `components/grouping.ts` already holds two grouping families: board
-  items (`GroupByMode`, `groupItems`) and my-items
-  (`MyItemsGroupBy = 'board' | 'status' | 'dueDate'`, `groupMyItems`).
-  The home page "Assigned items" widget is the only current caller of the
-  my-items family, and its RJSF settings schema hard-codes those three
+- The board filter bar is already reusable:
+  `components/BoardFilterBar.tsx` exports `useItemFilter(items:
+  BoardItem[])` — owning the text/tag/assignee state, resolving assignee
+  labels through `useProfiles` and sorting them — and `BoardFilterBar`,
+  which renders the search field, the two menus, the "N of M items" count
+  and "Clear filters". It offers the assignee menu whenever
+  `assigneeOptions.length > 0`.
+- `ItemFilter` in `boards-common` already carries `text`, `tags` and
+  `assignees`, and `itemMatchesFilter` already combines them with the
+  right semantics: text substring, **all** tags, **any** assignee.
+- `MyItemsList` (`components/MyItemsPage.tsx`) loads the complete
+  `GET /my-items` result via `useMyItemsQuery()` and renders it through a
+  local `groupByBoard()`. There is no paging and no server-side filter,
+  so every field the controls need is already in memory.
+- `MyBoardItem` is `{ item: BoardItem, boardId, boardName, columnTitle }`,
+  so `itemMatchesFilter(entry.item, filter)` applies unchanged.
+- **`BoardGroupTable` is per board today**: it calls
+  `useBoardQuery(group.boardId)` once per group and uses that board for
+  `StatusBadge`, the `canWrite` check, and the `ItemActions` bound to
+  `group.boardId`. A group that spans boards breaks that assumption — the
+  central structural problem of this change.
+- `grouping.ts` holds two grouping families: board items (`GroupByMode =
+  none | assignee | dueDate | tags`, `groupItems`, `groupKeysOf`,
+  `REST_KEY`) and my-items (`MyItemsGroupBy = board | status | dueDate`,
+  `groupMyItems`). The home page "Assigned items" widget is the only
+  caller of the my-items family, and its RJSF schema hard-codes its three
   values.
-- `MyItemsList` is rendered by both `MyItemsPage` (the `/my-items` route)
-  and `BoardListPage`'s "My items" tab, so anything added to it lands in
-  both places at once.
-- The frontend can read the viewer's identity through `identityApiRef`
-  (`getBackstageIdentity()` → `userEntityRef`, `ownershipEntityRefs`);
-  `ItemMenu.tsx` already does this via `useAsyncData`.
+- `GroupLabel` already renders a heading for a `GroupByMode` group key —
+  relative due-date labels, the tag, "Untagged", "No due date".
+- `BoardHeader` renders the group-by `Select` with
+  `selectedOption(key, ALL_GROUP_BY_MODES)`.
+- `MyItemsList` is rendered by both `MyItemsPage` (`/my-items`) and
+  `BoardListPage`'s "My items" tab, so anything added to it lands in both.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- The my-items filter bar behaves identically to the board page's for
-  the facets they share (text, tags), down to the AND semantics and the
-  "N of M items" / "Clear filters" affordances.
-- Grouping is a superset of what the page does today, with **board** as
-  the unchanged default, so an untouched page looks exactly as it does
-  now.
-- No new request, no new endpoint, no widened response.
-- The tag filter menu exists **once** in the codebase after this change.
+- One filter bar implementation for both pages, including the catalog
+  display names for assignees.
+- Grouping is a superset of today's behavior, with **board** as the
+  unchanged default, so an untouched page looks exactly as it does now.
+- The row menu keeps working identically in every grouping, including
+  the write-access and externally-managed restrictions that need the
+  item's board.
+- No new request per row and no new endpoint.
 
 **Non-Goals:**
 
-- No server-side filtering of `/my-items` and no `ItemFilter` change: the
-  assignee facet never leaves the browser.
+- No change to `boards-common`, the items API, or `/my-items`.
+- No change to the board page's filter behavior; the file rename is
+  mechanical.
 - No persistence of filter or grouping state — not in the URL, not in
-  local storage. The board page does not persist its own; matching it is
-  the point. (`?item=` style deep links stay out of scope.)
-- No new grouping option on the home page "Assigned items" widget. Its
+  local storage. The board page does not persist its own.
+- No new grouping option on the home page "Assigned items" widget: its
   settings schema keeps `board | status | dueDate`.
-- No status grouping on the my-items page (the board column is already a
+- No status grouping on the my-items page (the column is already a
   per-row badge, and the ask names board / none / due date / tags).
 - No sorting controls, no saved views, no per-group collapse.
-- No e2e test: the behavior is local to one component and covered by
-  component tests, matching how the board page's own filter bar is
-  covered.
 
 ## Decisions
 
-### 1. Filtering stays client-side and reuses `itemMatchesFilter`
+### 1. Reuse `useItemFilter` over the entries' items
 
-The page holds every entry already, so a `useMemo` over the loaded array
-is both the cheapest and the most consistent option: text and tag
-matching then come out of the same `boards-common` function the board
-page and the backend use, and cannot drift.
-
-A new my-items-only helper in `grouping.ts` composes the shared matcher
-with the assignee facet:
+`useItemFilter` wants `BoardItem[]`; my-items holds `MyBoardItem[]`. The
+hook is used on the mapped items and the entries are filtered with the
+handle's own filter:
 
 ```ts
-export interface MyItemsFilter {
-  text?: string;
-  tags?: string[];
-  /** Viewer identity refs; an entry matches if it carries ANY of them. */
-  assignees?: string[];
-}
-
-export function filterMyItems(
-  entries: MyBoardItem[],
-  filter: MyItemsFilter,
-): MyBoardItem[];
-export function isEmptyMyItemsFilter(filter: MyItemsFilter): boolean;
+const items = useMemo(() => (entries ?? []).map(entry => entry.item), [entries]);
+const filter = useItemFilter(items);
+const filtered = useMemo(
+  () => (entries ?? []).filter(entry => itemMatchesFilter(entry.item, filter.filter)),
+  [entries, filter.filter],
+);
 ```
 
-`filterMyItems` delegates to `itemMatchesFilter(entry.item, { text, tags })`
-and then checks the assignee facet. `ItemFilter` in `boards-common` is
-**not** extended: it is the shape the items API accepts, and an assignee
-field there would advertise a query parameter that does not exist.
+Nothing in the hook changes. Its `filteredItems`/`totalCount` — and so
+the bar's "N of M items" — stay correct for my-items because the mapping
+is 1:1 (an item id appears once in the listing).
 
-### 2. The assignee facet lists the viewer's own identities, OR-combined
+Rejected: a parallel `useMyItemsFilter`. It would duplicate the state,
+the profile resolution and the label sorting to save one `map`.
 
-The my-items list only ever contains items assigned to one of the
-viewer's refs, so the useful question the facet answers is *"through
-which of my identities is this mine?"* — personally, or via
-`group:default/team-a`, or via `group:default/platform`.
+Rejected: making `useItemFilter` generic over a row type with an accessor.
+It complicates the board page's call site for a single extra caller.
 
-- **Options** = the viewer's refs (`userEntityRef` +
-  `ownershipEntityRefs`, de-duplicated) that appear on at least one
-  loaded entry's `assignees`. Comparison is case-insensitive on the full
-  entity ref, because catalog refs round-trip with inconsistent casing.
-- **Visibility**: rendered only when that intersection has **two or more**
-  entries. With one, every row would match and the control could not
-  exclude anything.
-- **Semantics**: selecting several keeps entries assigned to **any** of
-  them (OR). Tags stay AND. The difference is deliberate: an item is
-  rarely assigned to both a user *and* their group, so AND would render
-  most selections empty, while the tag AND is what the board page's spec
-  already promises.
-- Co-assignees (a colleague on a shared item) are **not** offered. They
-  are not why the item is in this list, and offering them would turn a
-  three-entry menu into a directory.
+### 2. `minAssigneeOptions` on the shared bar
 
-Rejected alternative: listing every distinct assignee ref found on the
-entries. It answers a different question ("who else is on this?"),
-scales with team size, and makes the ">1 assignee" visibility rule fire
-on lists where the viewer has only one identity.
+The ask is that my-items offers the assignee filter only when more than
+one assignee is found. That rule is right for my-items and wrong for a
+board: every my-items entry is assigned to the viewer, so one option
+matches every row and can exclude nothing, while on a board a single
+option still separates assigned from unassigned items.
 
-`identityApiRef` is read with the existing `useAsyncData` helper. Identity
-failing to resolve is not an error state for the page: the facet is
-simply hidden, and text/tags/grouping keep working.
+So the rule is a prop, not a change of behavior:
+`BoardFilterBar` takes `minAssigneeOptions?: number` (default `1`, the
+board page's current behavior) and renders the menu only when
+`assigneeOptions.length >= minAssigneeOptions`. My-items passes `2`.
 
-### 3. Grouping widens the existing my-items family
+The options themselves stay the hook's: **every** assignee found on the
+listed items, catalog-labelled. That includes a colleague who shares one
+of the viewer's items — which is what makes the count exceed one for a
+user with a single identity, and is the same list the board bar offers.
 
-`MyItemsGroupBy` becomes `'none' | 'board' | 'status' | 'dueDate' | 'tags'`
-and `groupMyItems` handles the two new modes:
+Rejected: restricting the options to the viewer's own identity refs
+(user ref + ownership refs, read through `identityApiRef`). It answers a
+narrower question ("through which of my identities is this mine?"),
+needs an identity round-trip and a case-insensitive ref match, and it
+would have my-items offer a *different* assignee list than every other
+filter bar in the plugin. The `>= 2` rule already keeps the menu away
+when it would be useless.
 
-- `none` → a single group `{ key: 'all', label: '', entries }`, rendered
-  without a heading.
-- `tags` → one group per tag, ordered alphabetically, an entry appearing
-  in **each** of its tag groups, and a trailing `UNTAGGED` group labelled
-  "Untagged" — the same shape `groupItems(items, 'tags')` produces for
-  board items.
+### 3. Rename `BoardFilterBar` → `ItemFilterBar`
 
-`board`, `status` and `dueDate` keep their current behavior and ordering
-(due dates chronological, so overdue first, with `NO_DUE_DATE` last).
-Widening the union is source-compatible for the home page widget: its
-`groupBy` prop type widens, its schema does not, and its default stays
-`board`.
+The component now serves the board page and the my-items page. The file
+becomes `components/ItemFilterBar.tsx`, the component `ItemFilterBar`;
+`useItemFilter`, `ItemFilterHandle` and `AssigneeOption` keep their names
+and move with it. `BoardPage.tsx` is updated in the same commit, and
+`BoardPage.test.tsx` stays **unmodified** as the regression check.
 
-Rejected alternative: a separate `MyItemsPageGroupBy` type plus a second
-grouping function. It would duplicate the board/status/due-date logic
-that already exists purely to avoid touching one union.
+### 4. Grouping widens the my-items family
 
-### 4. The Board column appears when the grouping is not by board
+```ts
+export type MyItemsGroupBy = 'none' | 'board' | 'status' | 'dueDate' | 'tags';
+/** The groupings the my-items page offers, in menu order. */
+export const MY_ITEMS_PAGE_GROUP_BY = ['board', 'none', 'dueDate', 'tags'] as const;
+```
 
-Today each group heading *is* the board name and links to the board.
-Under `none`, `dueDate` or `tags` a row would otherwise not say where it
-lives. So the table renders `Board | Item | Status | Due | Tags | Actions`
-whenever `groupBy !== 'board'`, with the board cell a link to the board;
-under `board` the columns are exactly today's five. "Open board" stays in
-the row menu in both cases.
+`status` stays in the type for the home page widget but is not on the
+page's menu; the page validates its `Select` with
+`selectedOption(key, MY_ITEMS_PAGE_GROUP_BY)`, exactly as `BoardHeader`
+does with `ALL_GROUP_BY_MODES`.
 
-Group headings by mode:
+`groupMyItems` gains the two modes, and the multi-valued one reuses the
+board family's key logic rather than restating it — `dueDate` and `tags`
+delegate to the existing `groupKeysOf(entry.item, mode)` / `REST_KEY[mode]`
+so both pages group by the same rules:
+
+- `none` → one group `{ key: 'all', label: '', entries }`.
+- `tags` → one group per tag, alphabetical, an entry in **each** of its
+  tag groups, trailing `UNTAGGED` group.
+- `dueDate` → unchanged: chronological (most overdue first), trailing
+  `NO_DUE_DATE`.
+- `board`, `status` → unchanged.
+
+Widening the union is source-compatible for the widget: its `groupBy`
+prop type widens, its schema does not, and it already defaults an
+absent prop to `board`.
+
+### 5. Rows resolve their own board
+
+This is what the grouping change actually costs. Today one board query
+serves a whole table; under `none`, `dueDate` or `tags` a table mixes
+boards, and each row still needs its board for the status badge's color,
+`canWrite`, and the actions bound to the right board id.
+
+`queries.ts` gains:
+
+```ts
+/** The boards behind a set of entries, as a map, one query each. */
+export function useBoardsQueries(boardIds: string[]): Map<string, Board>;
+```
+
+implemented with TanStack's `useQueries` over `queryKeys.board(id)` and
+`boardsApi.getBoard(id)` — the same key `useBoardQuery` uses, so a board
+already in the cache (the board page, another group) costs nothing and a
+row never triggers its own request. `MyItemsList` calls it once with the
+distinct board ids across **all** entries, so the set does not change
+when the grouping or the filter does.
+
+`BoardGroupTable` becomes `MyItemsTable({ entries, boards, basePath,
+showBoardColumn, onError })`: it renders any group, looks each row's
+board up in the map, and builds that row's `ItemActions` for
+`entry.boardId`. The board falling back to `undefined` keeps today's
+behavior — the listing's own `columnTitle` in a plain `Badge`, no write
+actions — which is also what an unreadable board would give.
+
+`useRowMenu` stays one per table, keyed on `MyBoardItem` instead of
+`BoardItem` so its `children` can reach `entry.boardId`. The quick-assign
+pool is computed once from all entries rather than per board; it is a
+convenience list, and "whoever shares my items" is if anything the better
+pool.
+
+Rejected: a component per row calling `useBoardQuery`. It works, but it
+would fragment the row menu, which is deliberately one per table.
+
+### 6. Headings, and the Board column
 
 | Mode | Heading |
 | --- | --- |
-| `board` | board name as a link (today's `Button`), plus entry count |
+| `board` | board name as today's link button, plus entry count |
 | `none` | no heading — one plain table |
-| `dueDate` | relative label via `relativeDueLabel` ("Overdue", "Due today"), falling back to `formatDueDate`; "No due date" last |
-| `tags` | the tag; "Untagged" last |
+| `dueDate` | `<GroupLabel mode="dueDate" groupKey={key} />` — "Due today", "Overdue", "No due date" last |
+| `tags` | `<GroupLabel mode="tags" groupKey={key} />` — the tag, "Untagged" last |
 
-The due-date and tag labels come from the same helpers `GroupLabel`
-already uses for board grouping, so the two pages read alike.
+`GroupLabel` takes a `GroupByMode`, and `dueDate`/`tags` are literals of
+both unions, so the two pages read alike with no new label code.
 
-### 5. One tag filter menu, shared
+Under `board` the columns stay exactly today's five (Item, Status, Due,
+Tags, Actions). In every other mode a leading **Board** column is added,
+linking to the board, so a row still names where it lives. "Open board"
+stays in the row menu in both cases.
 
-`BoardPage`'s inline tag `MenuTrigger` is extracted to
-`components/FilterBar.tsx` as:
+### 7. State, order of operations, empty states
 
-```tsx
-<MultiSelectFilterMenu
-  label="Tags"          // renders `Tags (2)` when 2 are selected
-  ariaLabel="Filter by tags"
-  options={allTags}     // { value, label }[] for the assignee menu
-  selected={filterTags}
-  onChange={setFilterTags}
-/>
-```
+`groupBy` (default `'board'`) is `useState` in `MyItemsList`; the filter
+state lives in `useItemFilter`. Filtering runs **before** grouping, so a
+group whose entries all filter out is never rendered.
 
-The same component renders the assignee menu with entity-name labels, so
-the ✓-prefix toggle behavior is written once. `assigneeLabel` (currently
-private in `ItemMenu.tsx`, handling `text:` refs and `parseEntityRef`)
-moves to `common.tsx` and is exported for that.
-
-`BoardPage` is refactored to use the component in the same commit; its
-existing tests must pass unchanged, which is the regression check for the
-extraction.
-
-### 6. State lives in `MyItemsList`
-
-`filterText`, `filterTags`, `filterAssignees` and `groupBy` are
-`useState` in `MyItemsList`, defaulting to `''`, `[]`, `[]` and `'board'`
-— the same pattern and the same defaults-shaped decision as `BoardPage`.
-Putting them in `MyItemsList` rather than `MyItemsPage` is what gives the
-boards page's "My items" tab the same controls for free.
-
-Filtering runs before grouping (`useMemo` on entries + filter, then
-`useMemo` on the result + mode), so a group that filters down to nothing
-disappears instead of rendering an empty table.
+`AsyncList`'s `empty` node becomes filter-aware: "Nothing is assigned to
+you on any board." when no filter is active, "No items match your
+filters." when one is. The distinction matters — the first message is
+wrong and confusing while a filter is on.
 
 ## Risks / Trade-offs
 
-- **Tag AND vs assignee OR in one bar** → a user could reasonably expect
-  one rule. Mitigated by the visible count ("12 of 40 items") and by tags
-  keeping the semantics the board page's spec already states; the
-  assignee menu is at most a three-item list where OR is the obvious
-  reading.
-- **`MyItemsGroupBy` widening reaches the home page widget's prop type** →
-  a widget stored with an out-of-schema value would now type-check. It
-  cannot get one: the schema is the only writer, and the component
-  already defaults an unknown/absent prop to `board`.
-- **Extracting the tag menu touches a working board page** → the
-  extraction is mechanical (same markup, props instead of closures) and
-  `BoardPage.test.tsx` covers the filter bar; the tests are not modified,
-  so a behavioral drift fails the build.
+- **`useBoardsQueries` fires one request per distinct board** on a first
+  visit to `/my-items`. It is bounded by the number of boards the user
+  has items on, it is what the page already does today (one
+  `useBoardQuery` per board group), and every board the user opens
+  afterwards is a cache hit.
+- **Renaming the filter bar touches a working board page** → the rename
+  is mechanical and `BoardPage.test.tsx` is not modified, so any drift
+  fails the build.
+- **`minAssigneeOptions` makes the two bars behave differently** → one
+  prop, defaulted to today's behavior, documented where it is declared.
+  The alternative (same rule everywhere) would either hide a useful board
+  filter or show a useless my-items one.
 - **Grouping by tags multiplies rows** → an item with four tags renders
-  four times, which is the established board-grouping behavior and is
-  what makes "everything tagged `release`" answerable. The per-group
-  count makes the duplication legible.
-- **Identity-derived options depend on the catalog's ownership refs** →
-  if an app resolves no ownership refs, the assignee facet never shows.
-  That is the correct outcome (there is only one identity in play), not a
-  degraded one.
+  four times. That is the established board-grouping behavior and is what
+  makes "everything tagged `release`" answerable; the per-group count
+  makes it legible.
+- **`MyItemsGroupBy` widening reaches the widget's prop type** → a widget
+  stored with an out-of-schema value would now type-check. It cannot get
+  one: the schema is the only writer, and the component defaults an
+  unknown or absent prop to `board`.
 
 ## Migration Plan
 
-None. Every change is additive and frontend-local: new local state, new
-optional grouping modes on an existing function, and a component
-extraction with no API surface outside the plugin. Rolling back is
-reverting the commit — nothing is persisted, no response shape moves, and
-the default rendering (grouped by board, unfiltered) is byte-identical to
-today's.
+None. Every change is frontend-local and additive: new local state, new
+optional grouping modes on an existing function, one new optional prop,
+a file rename, and a query helper over an existing query key. Rolling
+back is reverting the commit — nothing is persisted, no response shape
+moves, and the default rendering (grouped by board, unfiltered) is
+identical to today's.
