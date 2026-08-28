@@ -3,12 +3,11 @@ import { Button, Flex, Text } from '@backstage/ui';
 import {
   BoardListEntry,
   BoardStatusCount,
-  COLUMN_COLORS,
 } from '@internal/plugin-boards-common';
 import { useBoardListQuery, useBoardsSignal } from '../queries';
 import { useBoardsBasePath } from '../routes';
 import { AsyncList, ErrorText } from './common';
-import { ColorDot } from './StatusBadge';
+import { StatusChip } from './StatusBadge';
 
 export { BoardsWidgetProvider } from './widgetCommon';
 
@@ -24,29 +23,13 @@ export interface BoardsContentProps {
   showCounts?: boolean;
 }
 
-const NEUTRAL = '#8a8f98';
-
 /** One `<title> <count>` chip, tinted with the column's color. */
 function StatusCountChip(props: { count: BoardStatusCount }) {
   const { count } = props;
-  const hex = count.color ? COLUMN_COLORS[count.color] : NEUTRAL;
   return (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 4,
-        padding: '1px 6px',
-        borderRadius: 10,
-        background: `${hex}22`,
-        border: `1px solid ${hex}55`,
-        fontSize: '0.75em',
-        whiteSpace: 'nowrap',
-      }}
-    >
-      <ColorDot color={count.color} size={6} />
+    <StatusChip color={count.color} size="small">
       {count.title} {count.count}
-    </span>
+    </StatusChip>
   );
 }
 
