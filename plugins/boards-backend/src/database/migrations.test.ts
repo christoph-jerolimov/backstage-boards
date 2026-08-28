@@ -1,8 +1,5 @@
 import { createTestKnex } from '../service/testUtils';
-import {
-  applyDatabaseMigrations,
-  BoardsMigrationSource,
-} from './migrations';
+import { applyDatabaseMigrations, BoardsMigrationSource } from './migrations';
 
 describe('migrations', () => {
   it('creates all tables on sqlite', async () => {

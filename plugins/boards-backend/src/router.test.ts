@@ -504,9 +504,7 @@ describe('createRouter', () => {
         })
         .expect(201),
     );
-    expect(created.checklist).toEqual([
-      { text: 'write docs', checked: false },
-    ]);
+    expect(created.checklist).toEqual([{ text: 'write docs', checked: false }]);
     const patched = body<BoardItem>(
       await request(app)
         .patch(`/boards/${board.id}/items/${created.id}`)

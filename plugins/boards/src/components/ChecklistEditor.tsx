@@ -120,9 +120,7 @@ export function ChecklistEditor(props: {
                 aria-label={`Remove checklist entry ${entry.text}`}
                 onPress={() =>
                   onChange(
-                    checklist.filter(
-                      (_, otherIndex) => otherIndex !== index,
-                    ),
+                    checklist.filter((_, otherIndex) => otherIndex !== index),
                   )
                 }
               >

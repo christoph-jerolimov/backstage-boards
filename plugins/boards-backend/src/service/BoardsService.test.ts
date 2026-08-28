@@ -1724,8 +1724,7 @@ describe('BoardsService', () => {
       });
       const timeline = await service.getTimeline(alice, board.id, item.id);
       const checklistChanges = timeline.filter(
-        entry =>
-          entry.kind === 'change' && entry.change.field === 'checklist',
+        entry => entry.kind === 'change' && entry.change.field === 'checklist',
       );
       expect(checklistChanges).toHaveLength(1);
       expect((checklistChanges[0] as any).change.actorRef).toBe(
