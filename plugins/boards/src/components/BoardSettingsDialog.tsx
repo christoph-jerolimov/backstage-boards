@@ -327,7 +327,11 @@ export function BoardSettingsDialog(props: {
     });
 
   return (
-    <Dialog isOpen={isOpen} onOpenChange={onOpenChange}>
+    <Dialog
+      isOpen={isOpen}
+      onOpenChange={onOpenChange}
+      style={{ width: '800px', maxWidth: '95%' }}
+    >
       <DialogHeader>Board settings</DialogHeader>
       <DialogBody>
         <Flex direction="column" gap="3">

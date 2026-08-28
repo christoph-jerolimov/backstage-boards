@@ -127,7 +127,11 @@ export function PriorityMatrixDialog(props: {
     textAlign: 'left',
   };
   return (
-    <Dialog isOpen={isOpen} onOpenChange={onOpenChange} width="90%">
+    <Dialog
+      isOpen={isOpen}
+      onOpenChange={onOpenChange}
+      style={{ width: '800px', maxWidth: '95%' }}
+    >
       <DialogHeader>Priority matrix</DialogHeader>
       <DialogBody>
         <Text variant="body-small" color="secondary">

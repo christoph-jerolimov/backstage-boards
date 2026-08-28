@@ -61,7 +61,11 @@ export function DuplicateBoardDialog(props: {
     });
 
   return (
-    <Dialog isOpen={isOpen} onOpenChange={onOpenChange}>
+    <Dialog
+      isOpen={isOpen}
+      onOpenChange={onOpenChange}
+      style={{ width: '800px', maxWidth: '95%' }}
+    >
       <DialogHeader>Duplicate “{board.name}”</DialogHeader>
       <DialogBody>
         <Flex direction="column" gap="3">

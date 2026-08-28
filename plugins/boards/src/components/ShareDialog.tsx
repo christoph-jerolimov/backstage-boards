@@ -67,7 +67,11 @@ export function ShareDialog(props: {
     });
 
   return (
-    <Dialog isOpen={isOpen} onOpenChange={onOpenChange}>
+    <Dialog
+      isOpen={isOpen}
+      onOpenChange={onOpenChange}
+      style={{ width: '800px', maxWidth: '95%' }}
+    >
       <DialogHeader>Share “{board.name}”</DialogHeader>
       <DialogBody>
         <Flex direction="column" gap="3">

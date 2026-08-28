@@ -95,7 +95,11 @@ export function ArchivedItemsDialog(props: {
   );
 
   return (
-    <Dialog isOpen={isOpen} onOpenChange={onOpenChange}>
+    <Dialog
+      isOpen={isOpen}
+      onOpenChange={onOpenChange}
+      style={{ width: '800px', maxWidth: '95%' }}
+    >
       <DialogHeader>Archived items</DialogHeader>
       <DialogBody>{content}</DialogBody>
     </Dialog>
