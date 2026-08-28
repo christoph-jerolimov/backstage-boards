@@ -110,6 +110,18 @@ export function MarkdownContent(props: { text: string }) {
 }
 
 /**
+ * An error message. One style for every failure the plugin reports, from
+ * the design system's status colors rather than a hand-picked hex.
+ */
+export function ErrorText(props: { children: React.ReactNode }) {
+  return (
+    <Text variant="body-small" color="danger">
+      {props.children}
+    </Text>
+  );
+}
+
+/**
  * Click-to-edit text. Renders as text until clicked (when `canEdit`),
  * then as a text field; Enter or blur commits, Escape cancels.
  */

@@ -32,6 +32,7 @@ import { boardsApiRef } from '../api';
 import { useBoardsQuery, boardsQueryClient, queryKeys } from '../queries';
 import { MyItemsList } from './MyItemsPage';
 import { RowActionsMenu, RowContextMenu, useRowContextMenu } from './RowMenu';
+import { ErrorText } from './common';
 import { useAsyncAction } from './useAsyncAction';
 
 function StarIcon(props: { filled: boolean }) {
@@ -223,7 +224,7 @@ export function BoardListPage() {
           Create board
         </Button>
       </Flex>
-      {error && <Text color="danger">{error}</Text>}
+      {error && <ErrorText>{error}</ErrorText>}
       {loading ? (
         <Text>Loading boards…</Text>
       ) : (

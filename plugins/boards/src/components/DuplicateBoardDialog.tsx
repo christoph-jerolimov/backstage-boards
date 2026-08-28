@@ -18,6 +18,7 @@ import {
 } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
 import { rootRouteRef } from '../routes';
+import { ErrorText } from './common';
 import { useAsyncAction } from './useAsyncAction';
 
 /** Duplicates a board's structure and optionally its items. */
@@ -89,11 +90,7 @@ export function DuplicateBoardDialog(props: {
           <Text variant="body-small" color="secondary">
             You become an admin of the copy.
           </Text>
-          {error && (
-            <Text variant="body-small" style={{ color: '#cc3344' }}>
-              {error}
-            </Text>
-          )}
+          {error && <ErrorText>{error}</ErrorText>}
         </Flex>
       </DialogBody>
       <DialogFooter>

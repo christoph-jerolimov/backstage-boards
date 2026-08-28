@@ -13,6 +13,7 @@ import { ItemDrawer } from './ItemDrawer';
 import { ArchivedBoardAlert, BoardHeader, BoardViewMode } from './BoardHeader';
 import { BoardDialogKind, BoardDialogs } from './BoardDialogs';
 import { BoardFilterBar, useItemFilter } from './BoardFilterBar';
+import { ErrorText } from './common';
 import { useBoardActions, useOpenItemParam } from './useBoardActions';
 import { GroupByMode } from './grouping';
 
@@ -103,11 +104,7 @@ export function BoardPageContent(props: {
 
       <BoardFilterBar filter={filter} />
 
-      {error && (
-        <Text variant="body-small" style={{ color: '#cc3344' }}>
-          {error}
-        </Text>
-      )}
+      {error && <ErrorText>{error}</ErrorText>}
 
       {view === 'board' ? (
         <BoardView

@@ -37,6 +37,7 @@ import { rootRouteRef } from '../routes';
 import { DueDateBadge } from './DueDate';
 import { ItemActions, ItemContextMenu, ItemMenu } from './ItemMenu';
 import { RowActionsMenu, useRowContextMenu } from './RowMenu';
+import { ErrorText } from './common';
 import { StatusBadge } from './StatusBadge';
 import { useAsyncAction } from './useAsyncAction';
 
@@ -217,13 +218,11 @@ export function MyItemsList() {
   return (
     <Flex direction="column" gap="4">
       {error && (
-        <Text style={{ color: 'var(--bui-fg-negative)' }}>
+        <ErrorText>
           My items could not be loaded: {(error as Error).message}
-        </Text>
+        </ErrorText>
       )}
-      {actionError && (
-        <Text style={{ color: 'var(--bui-fg-negative)' }}>{actionError}</Text>
-      )}
+      {actionError && <ErrorText>{actionError}</ErrorText>}
       {isLoading && <Text>Loading your items…</Text>}
       {!isLoading && !error && groups.length === 0 && (
         <Text color="secondary">Nothing is assigned to you on any board.</Text>
