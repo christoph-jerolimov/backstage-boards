@@ -5202,6 +5202,7 @@ __metadata:
   dependencies:
     "@backstage/catalog-model": "npm:^1.10.0"
     "@backstage/cli": "npm:^0.36.5"
+    "@backstage/filter-predicates": "npm:^0.1.4"
     "@backstage/frontend-plugin-api": "npm:^0.18.0"
     "@backstage/frontend-test-utils": "npm:^0.6.0"
     "@backstage/plugin-catalog-react": "npm:^3.2.1"
@@ -5236,6 +5237,7 @@ __metadata:
     "@backstage/catalog-model": "npm:^1.10.0"
     "@backstage/cli": "npm:^0.36.5"
     "@backstage/plugin-catalog-node": "npm:^2.2.4"
+    "@backstage/types": "npm:^1.2.2"
     "@internal/plugin-boards-common": "workspace:^"
   languageName: unknown
   linkType: soft

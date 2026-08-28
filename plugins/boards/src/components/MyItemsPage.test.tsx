@@ -96,7 +96,7 @@ function renderList(
     listMyItems,
     getBoard,
     ...over.api,
-  } as any);
+  });
   renderWithProviders(<MyItemsList />, {
     apis: [
       [boardsApiRef, boardsApi],

@@ -2,7 +2,7 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { identityApiRef } from '@backstage/frontend-plugin-api';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
-import { boardsApiRef } from '../api';
+import { boardsApiRef, BoardsApi } from '../api';
 import { rootRouteRef } from '../routes';
 import { BoardPageContent } from './BoardPage';
 import {
@@ -48,7 +48,7 @@ function renderBoard(
   over: {
     board?: Record<string, unknown>;
     items?: typeof items;
-    boardsApi?: any;
+    boardsApi?: jest.Mocked<BoardsApi>;
     boardError?: Error;
     embedded?: boolean;
   } = {},
@@ -60,7 +60,7 @@ function renderBoard(
         ? jest.fn().mockRejectedValue(over.boardError)
         : jest.fn().mockResolvedValue({ ...board, ...over.board }),
       listItems: jest.fn().mockResolvedValue(over.items ?? items),
-    } as any);
+    });
   renderWithProviders(
     <BoardPageContent boardId="board-1" embedded={over.embedded} />,
     {
@@ -147,7 +147,7 @@ describe('BoardPage header', () => {
       getBoard: jest.fn().mockResolvedValue(board),
       listItems: jest.fn().mockResolvedValue(items),
       setFavorite: jest.fn().mockRejectedValue(new Error('Read-only')),
-    } as any);
+    });
     renderBoard({ boardsApi });
     await userEvent.click(
       await screen.findByRole('button', { name: 'Add to favorites' }),

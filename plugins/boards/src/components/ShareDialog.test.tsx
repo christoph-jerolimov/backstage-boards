@@ -1,11 +1,15 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
-import { BoardWithContext } from '@internal/plugin-boards-common';
-import { boardsApiRef } from '../api';
+import {
+  BoardPermissionLevel,
+  BoardVisibility,
+} from '@internal/plugin-boards-common';
+import { boardsApiRef, BoardsApi } from '../api';
 import { ShareDialog } from './ShareDialog';
 import {
   renderWithProviders,
+  testBoard,
   testBoardsApi,
 } from './__testUtils__/testHelpers';
 
@@ -21,24 +25,24 @@ const permissions = [
 ];
 
 function renderDialog(
-  over: { boardsApi?: any; access?: string; visibility?: string } = {},
+  over: {
+    boardsApi?: jest.Mocked<BoardsApi>;
+    access?: BoardPermissionLevel;
+    visibility?: BoardVisibility;
+  } = {},
 ) {
   const boardsApi =
     over.boardsApi ??
     testBoardsApi({
       listPermissions: jest.fn().mockResolvedValue(permissions),
-    } as any);
+    });
   const onChanged = jest.fn().mockResolvedValue(undefined);
   renderWithProviders(
     <ShareDialog
-      board={
-        {
-          id: 'board-1',
-          name: 'Roadmap',
-          access: over.access ?? 'admin',
-          visibility: over.visibility ?? 'private',
-        } as unknown as BoardWithContext
-      }
+      board={testBoard({
+        access: over.access ?? 'admin',
+        visibility: over.visibility ?? 'private',
+      })}
       isOpen
       onOpenChange={jest.fn()}
       onChanged={onChanged}
@@ -60,10 +64,9 @@ function renderDialog(
  */
 function byLabel(ariaLabel: string): HTMLElement {
   const element = document.querySelector(`[aria-label="${ariaLabel}"]`);
-  return (
-    (element as HTMLElement | null) ??
-    screen.getByRole('button', { name: new RegExp(ariaLabel) })
-  );
+  return element instanceof HTMLElement
+    ? element
+    : screen.getByRole('button', { name: new RegExp(ariaLabel) });
 }
 
 /** Picks an option from a BUI Select. */
@@ -86,7 +89,7 @@ describe('ShareDialog', () => {
   it('does not load the permissions for non-admins', async () => {
     const boardsApi = testBoardsApi({
       listPermissions: jest.fn().mockResolvedValue(permissions),
-    } as any);
+    });
     renderDialog({ boardsApi, access: 'write' });
     await waitFor(() =>
       expect(screen.getByText('People and groups')).toBeInTheDocument(),
@@ -145,7 +148,7 @@ describe('ShareDialog', () => {
     const boardsApi = testBoardsApi({
       listPermissions: jest.fn().mockResolvedValue(permissions),
       updateBoard: jest.fn().mockRejectedValue(new Error('Not an admin')),
-    } as any);
+    });
     renderDialog({ boardsApi });
     await pick('Board visibility', 'Public – anyone can edit');
     expect(await screen.findByText('Not an admin')).toBeInTheDocument();

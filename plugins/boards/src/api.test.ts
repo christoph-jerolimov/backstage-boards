@@ -1,23 +1,24 @@
-import { BoardsClient } from './api';
+import { BoardsClient, BoardsFetchResponse } from './api';
 
 function setup(
-  responder?: (url: string, init: RequestInit) => Partial<Response>,
+  responder?: (url: string, init: RequestInit) => Partial<BoardsFetchResponse>,
 ) {
   const calls: { url: string; init: RequestInit }[] = [];
-  const fetch = jest.fn(async (url: string, init: RequestInit) => {
-    calls.push({ url, init });
-    const response = responder?.(url, init) ?? {};
-    return {
-      ok: true,
-      status: 200,
-      statusText: 'OK',
-      json: async () => ({}),
-      ...response,
-    } as Response;
-  });
+  const fetch = jest.fn(
+    async (url: string, init: RequestInit): Promise<BoardsFetchResponse> => {
+      calls.push({ url, init });
+      return {
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        json: async () => ({}),
+        ...responder?.(url, init),
+      };
+    },
+  );
   const client = new BoardsClient({
     discoveryApi: { getBaseUrl: async () => 'http://backstage/api/boards' },
-    fetchApi: { fetch: fetch as any },
+    fetchApi: { fetch },
   });
   return { client, calls, fetch };
 }
@@ -293,7 +294,10 @@ describe('BoardsClient item endpoints', () => {
 
   it('creates, updates, moves, deletes and restores items', async () => {
     const { client, calls } = setup(() => ({ status: 204 }));
-    await client.createItem('board-1', { title: 'New' } as any);
+    await client.createItem('board-1', {
+      columnId: 'column-1',
+      title: 'New',
+    });
     await client.updateItem('board-1', 'item-1', { title: 'Renamed' });
     await client.moveItem('board-1', 'item-1', {
       columnId: 'column-2',

@@ -1,10 +1,12 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { boardsApiRef } from '../api';
+import { BoardListEntry } from '@internal/plugin-boards-common';
+import { boardsApiRef, BoardsApi } from '../api';
 import { rootRouteRef } from '../routes';
 import { BoardListPage } from './BoardListPage';
 import {
   renderWithProviders,
+  testBoardListEntry,
   testBoardsApi,
 } from './__testUtils__/testHelpers';
 
@@ -14,29 +16,30 @@ jest.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
 }));
 
-const boards = [
-  {
+const boards: BoardListEntry[] = [
+  testBoardListEntry({
     id: 'board-1',
     name: 'Roadmap',
     favorite: true,
     access: 'admin',
     entityRefs: ['component:default/www'],
-  },
-  {
+  }),
+  testBoardListEntry({
     id: 'board-2',
     name: 'Support',
     favorite: false,
     access: 'read',
-    entityRefs: [],
-  },
+  }),
 ];
 
-function renderPage(over: { boardsApi?: any; boards?: unknown[] } = {}) {
+function renderPage(
+  over: { boardsApi?: jest.Mocked<BoardsApi>; boards?: BoardListEntry[] } = {},
+) {
   const boardsApi =
     over.boardsApi ??
     testBoardsApi({
       listBoards: jest.fn().mockResolvedValue(over.boards ?? boards),
-    } as any);
+    });
   renderWithProviders(<BoardListPage />, {
     apis: [[boardsApiRef, boardsApi]],
     mountedRoutes: { '/boards': rootRouteRef },
@@ -157,7 +160,7 @@ describe('BoardListPage', () => {
     const boardsApi = testBoardsApi({
       listBoards: jest.fn().mockResolvedValue(boards),
       createBoard: jest.fn().mockResolvedValue({ id: 'board-3' }),
-    } as any);
+    });
     renderPage({ boardsApi });
     await userEvent.click(
       await screen.findByRole('button', { name: 'Create board' }),
@@ -185,7 +188,7 @@ describe('BoardListPage', () => {
     const boardsApi = testBoardsApi({
       listBoards: jest.fn().mockResolvedValue(boards),
       createBoard: jest.fn().mockRejectedValue(new Error('Name taken')),
-    } as any);
+    });
     renderPage({ boardsApi });
     await userEvent.click(
       await screen.findByRole('button', { name: 'Create board' }),

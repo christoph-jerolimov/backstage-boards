@@ -1,32 +1,30 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { BoardPermissionLevel } from '@internal/plugin-boards-common';
-import { boardsApiRef } from '../api';
+import { boardsApiRef, BoardsApi } from '../api';
 import { rootRouteRef } from '../routes';
 import { DuplicateBoardDialog } from './DuplicateBoardDialog';
 import {
   renderWithProviders,
+  testBoard,
   testBoardsApi,
 } from './__testUtils__/testHelpers';
 
 function renderDialog(
-  over: { access?: BoardPermissionLevel; boardsApi?: any } = {},
+  over: {
+    access?: BoardPermissionLevel;
+    boardsApi?: jest.Mocked<BoardsApi>;
+  } = {},
 ) {
   const boardsApi =
     over.boardsApi ??
     testBoardsApi({
       duplicateBoard: jest.fn().mockResolvedValue({ id: 'board-2' }),
-    } as any);
+    });
   const onOpenChange = jest.fn();
   renderWithProviders(
     <DuplicateBoardDialog
-      board={
-        {
-          id: 'board-1',
-          name: 'Roadmap',
-          access: over.access ?? 'write',
-        } as any
-      }
+      board={testBoard({ access: over.access ?? 'write' })}
       isOpen
       onOpenChange={onOpenChange}
     />,
@@ -123,7 +121,7 @@ describe('DuplicateBoardDialog', () => {
   it('shows why duplicating failed and stays open', async () => {
     const boardsApi = testBoardsApi({
       duplicateBoard: jest.fn().mockRejectedValue(new Error('Quota reached')),
-    } as any);
+    });
     const { onOpenChange } = renderDialog({ boardsApi });
     await userEvent.click(screen.getByRole('button', { name: 'Duplicate' }));
     expect(await screen.findByText('Quota reached')).toBeInTheDocument();

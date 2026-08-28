@@ -1,8 +1,4 @@
-import {
-  createApiRef,
-  DiscoveryApi,
-  FetchApi,
-} from '@backstage/frontend-plugin-api';
+import { createApiRef, DiscoveryApi } from '@backstage/frontend-plugin-api';
 import {
   Board,
   BoardChangeEntry,
@@ -159,20 +155,32 @@ export const boardsApiRef = createApiRef<BoardsApi>({
   id: 'plugin.boards.api',
 });
 
+/**
+ * The response members this client reads. A real `Response` satisfies it,
+ * and naming them keeps a stand-in from having to pretend to be one.
+ */
+export type BoardsFetchResponse = Pick<
+  Response,
+  'ok' | 'status' | 'statusText' | 'json'
+>;
+
+/** The discovery and fetch this client needs; the app's own APIs satisfy it. */
+export interface BoardsClientOptions {
+  discoveryApi: Pick<DiscoveryApi, 'getBaseUrl'>;
+  fetchApi: {
+    fetch(url: string, init: RequestInit): Promise<BoardsFetchResponse>;
+  };
+}
+
 export class BoardsClient implements BoardsApi {
-  constructor(
-    private readonly options: {
-      discoveryApi: DiscoveryApi;
-      fetchApi: FetchApi;
-    },
-  ) {}
+  constructor(private readonly options: BoardsClientOptions) {}
 
   /** Calls the backend, turning a non-2xx response into an error. */
   private async fetch(
     method: string,
     path: string,
     body?: unknown,
-  ): Promise<Response> {
+  ): Promise<BoardsFetchResponse> {
     const baseUrl = await this.options.discoveryApi.getBaseUrl('boards');
     const response = await this.options.fetchApi.fetch(`${baseUrl}${path}`, {
       method,

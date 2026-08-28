@@ -123,22 +123,21 @@ describe('positionBefore', () => {
 });
 
 describe('groupItems', () => {
-  const mk = (over: Partial<BoardItem>): BoardItem =>
-    ({
-      id: over.id ?? 'x',
-      boardId: 'b',
-      columnId: 'c',
-      position: 1,
-      title: over.title ?? 'T',
-      createdBy: 'user:default/alice',
-      createdAt: '',
-      updatedBy: 'user:default/alice',
-      updatedAt: '',
-      descriptionVersionCount: 0,
-      assignees: over.assignees ?? [],
-      tags: over.tags ?? [],
-      dueDate: over.dueDate,
-    } as BoardItem);
+  const mk = (over: Partial<BoardItem>): BoardItem => ({
+    id: 'x',
+    boardId: 'b',
+    columnId: 'c',
+    position: 1,
+    title: 'T',
+    createdBy: 'user:default/alice',
+    createdAt: '',
+    updatedBy: 'user:default/alice',
+    updatedAt: '',
+    descriptionVersionCount: 0,
+    assignees: [],
+    tags: [],
+    ...over,
+  });
 
   it('groups by due date with the undated group last', () => {
     const groups = groupItems(

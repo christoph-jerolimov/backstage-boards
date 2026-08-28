@@ -13,7 +13,7 @@ describe('BoardsPage', () => {
     boardsQueryClient.clear();
     const boardsApi = testBoardsApi({
       listBoards: jest.fn().mockResolvedValue([]),
-    } as any);
+    });
     renderWithProviders(<BoardsPage />, {
       apis: [[boardsApiRef, boardsApi]],
       mountedRoutes: { '/boards': rootRouteRef },

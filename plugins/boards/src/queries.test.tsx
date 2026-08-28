@@ -52,7 +52,7 @@ describe('query hooks', () => {
   it('loads the board list', async () => {
     const { boardsApi, wrapper } = setup({
       listBoards: jest.fn().mockResolvedValue([{ id: 'board-1' }]),
-    } as any);
+    });
     const { result } = renderHook(() => useBoardsQuery(), { wrapper });
     await waitFor(() =>
       expect(result.current.data).toEqual([{ id: 'board-1' }]),
@@ -63,7 +63,7 @@ describe('query hooks', () => {
   it('caches each widget setting combination separately', async () => {
     const { boardsApi, client, wrapper } = setup({
       listBoards: jest.fn().mockResolvedValue([{ id: 'board-1' }]),
-    } as any);
+    });
     const combinations = [
       { favoritesOnly: false, withCounts: false },
       { favoritesOnly: false, withCounts: true },
@@ -115,7 +115,7 @@ describe('query hooks', () => {
     const { boardsApi, wrapper } = setup({
       getBoard: jest.fn().mockResolvedValue({ id: 'board-1' }),
       listItems: jest.fn().mockResolvedValue(items),
-    } as any);
+    });
     const board = renderHook(() => useBoardQuery('board-1'), { wrapper });
     const list = renderHook(() => useItemsQuery('board-1'), { wrapper });
     await waitFor(() =>
@@ -144,7 +144,7 @@ describe('useMoveItem', () => {
   it('moves the card in the cache before the server answers', async () => {
     const { client, wrapper, boardsApi } = setup({
       moveItem: jest.fn().mockResolvedValue(undefined),
-    } as any);
+    });
     client.setQueryData(queryKeys.items('board-1'), items);
     const onError = jest.fn();
     const { result } = renderHook(() => useMoveItem('board-1', onError), {
@@ -173,7 +173,7 @@ describe('useMoveItem', () => {
   it('rolls the cache back and reports a rejection', async () => {
     const { client, wrapper } = setup({
       moveItem: jest.fn().mockRejectedValue(new Error('Column is locked')),
-    } as any);
+    });
     client.setQueryData(queryKeys.items('board-1'), items);
     const onError = jest.fn();
     const { result } = renderHook(() => useMoveItem('board-1', onError), {
@@ -194,7 +194,7 @@ describe('useRenameItem', () => {
   it('renames the card in the cache before the server answers', async () => {
     const { client, wrapper, boardsApi } = setup({
       updateItem: jest.fn().mockResolvedValue(undefined),
-    } as any);
+    });
     client.setQueryData(queryKeys.items('board-1'), items);
     const { result } = renderHook(() => useRenameItem('board-1', jest.fn()), {
       wrapper,
@@ -213,7 +213,7 @@ describe('useRenameItem', () => {
   it('rolls the cache back and reports a rejection', async () => {
     const { client, wrapper } = setup({
       updateItem: jest.fn().mockRejectedValue(new Error('Title too long')),
-    } as any);
+    });
     client.setQueryData(queryKeys.items('board-1'), items);
     const onError = jest.fn();
     const { result } = renderHook(() => useRenameItem('board-1', onError), {

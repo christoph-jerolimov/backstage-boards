@@ -123,21 +123,24 @@ export function readRemindersConfig(
  * remaining path is tried as one literal key (handles e.g.
  * `metadata.labels.boards/notifications`).
  */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
 export function entityField(entity: Entity, path: string): unknown {
   const segments = path.split('.');
   let current: unknown = entity;
   for (let i = 0; i < segments.length; i++) {
-    if (current === null || typeof current !== 'object') {
+    if (!isRecord(current)) {
       return undefined;
     }
-    const record = current as Record<string, unknown>;
     const segment = segments[i];
-    if (segment in record) {
-      current = record[segment];
+    if (segment in current) {
+      current = current[segment];
       continue;
     }
     const rest = segments.slice(i).join('.');
-    return rest in record ? record[rest] : undefined;
+    return rest in current ? current[rest] : undefined;
   }
   return current;
 }

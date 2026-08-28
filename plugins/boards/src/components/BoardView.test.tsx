@@ -2,11 +2,11 @@ import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { identityApiRef } from '@backstage/frontend-plugin-api';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
-import { BoardWithContext } from '@internal/plugin-boards-common';
 import { BoardView } from './BoardView';
 import {
   renderWithProviders,
   testActions,
+  testBoard,
   testColumn,
   testItem,
 } from './__testUtils__/testHelpers';
@@ -59,12 +59,7 @@ function renderBoard(
   } = {},
 ) {
   const actions = testActions();
-  const board = {
-    id: 'board-1',
-    name: 'Roadmap',
-    access: 'admin',
-    columns: over.columns ?? columns,
-  } as unknown as BoardWithContext;
+  const board = testBoard({ columns: over.columns ?? columns });
   renderWithProviders(
     <BoardView
       board={board}

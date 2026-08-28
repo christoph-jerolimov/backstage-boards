@@ -1,10 +1,11 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
-import { boardsApiRef } from '../api';
+import { boardsApiRef, BoardsApi } from '../api';
 import { BoardSettingsDialog } from './BoardSettingsDialog';
 import {
   renderWithProviders,
+  testBoard,
   testBoardsApi,
 } from './__testUtils__/testHelpers';
 
@@ -18,18 +19,16 @@ const catalogApi = {
   getEntitiesByRefs: jest.fn().mockResolvedValue({ items: [] }),
 };
 
-function renderDialog(over: { entityRefs?: string[]; boardsApi?: any } = {}) {
+function renderDialog(
+  over: { entityRefs?: string[]; boardsApi?: jest.Mocked<BoardsApi> } = {},
+) {
   const boardsApi = over.boardsApi ?? testBoardsApi();
   const onChanged = jest.fn().mockResolvedValue(undefined);
   renderWithProviders(
     <BoardSettingsDialog
-      board={
-        {
-          id: 'board-1',
-          name: 'Roadmap',
-          entityRefs: over.entityRefs ?? ['component:default/www'],
-        } as any
-      }
+      board={testBoard({
+        entityRefs: over.entityRefs ?? ['component:default/www'],
+      })}
       isOpen
       onOpenChange={jest.fn()}
       onChanged={onChanged}
@@ -88,7 +87,7 @@ describe('BoardSettingsDialog', () => {
   it('shows why saving failed', async () => {
     const boardsApi = testBoardsApi({
       updateBoard: jest.fn().mockRejectedValue(new Error('Not allowed')),
-    } as any);
+    });
     renderDialog({ boardsApi });
     await userEvent.click(
       screen.getByRole('button', {

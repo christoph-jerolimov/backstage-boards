@@ -25,7 +25,8 @@ describe('ColumnDot', () => {
     const { container } = render(
       <ColumnDot column={column({ color: 'red' })} size={14} />,
     );
-    const dot = container.firstElementChild as HTMLElement;
+    const dot = container.firstElementChild;
+    expect(dot).toBeInstanceOf(HTMLElement);
     expect(dot).toHaveAttribute('aria-hidden');
     expect(dot).toHaveStyle({
       width: '14px',

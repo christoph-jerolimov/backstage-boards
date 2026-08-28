@@ -1,11 +1,11 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
-import { BoardWithContext } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
 import { ItemDrawer } from './ItemDrawer';
 import {
   renderWithProviders,
+  testBoard,
   testBoardsApi,
   testColumn,
   testItem,
@@ -18,15 +18,12 @@ const catalogApi = {
   getEntitiesByRefs: jest.fn().mockResolvedValue({ items: [] }),
 };
 
-const board = {
-  id: 'board-1',
-  name: 'Roadmap',
-  access: 'admin',
+const board = testBoard({
   columns: [
     testColumn({ id: 'column-1', title: 'Todo' }),
     testColumn({ id: 'column-2', title: 'Done' }),
   ],
-} as unknown as BoardWithContext;
+});
 
 const timeline = [
   {
@@ -55,7 +52,7 @@ function renderDrawer(
 ) {
   const boardsApi = testBoardsApi({
     getTimeline: jest.fn().mockResolvedValue(timeline),
-  } as any);
+  });
   const onClose = jest.fn();
   const onChanged = jest.fn().mockResolvedValue(undefined);
   renderWithProviders(
