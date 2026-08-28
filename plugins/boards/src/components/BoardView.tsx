@@ -35,7 +35,7 @@ import { RowMenuHandle, useRowMenu } from './RowMenu';
 import { InlineAddField, InlineEdit } from './common';
 import { AssigneeAvatars } from './AssigneeAvatars';
 import { DueDateBadge } from './DueDate';
-import { ColumnDot } from './StatusBadge';
+import { ColorDot, ColumnDot } from './StatusBadge';
 
 const DRAG_TYPE = 'application/x-boards-item';
 
@@ -342,16 +342,7 @@ function ColumnLane(props: {
                           gap: 6,
                         }}
                       >
-                        <span
-                          aria-hidden
-                          style={{
-                            width: 10,
-                            height: 10,
-                            borderRadius: '50%',
-                            background: COLUMN_COLORS[color],
-                            display: 'inline-block',
-                          }}
-                        />
+                        <ColorDot color={color} />
                         {color}
                         {column.color === color ? ' ✓' : ''}
                       </span>

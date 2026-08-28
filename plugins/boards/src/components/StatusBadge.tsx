@@ -1,13 +1,27 @@
-import { BoardColumn, COLUMN_COLORS } from '@internal/plugin-boards-common';
+import {
+  BoardColumn,
+  COLUMN_COLORS,
+  ColumnColor,
+} from '@internal/plugin-boards-common';
 
+/** What a column without a color of its own is drawn in. */
 const NEUTRAL = '#8a8f98';
 
-export function columnColorHex(column?: BoardColumn): string {
-  return column?.color ? COLUMN_COLORS[column.color] : NEUTRAL;
+/** The hex a named color resolves to; neutral when there is none. */
+export function colorHex(color?: ColumnColor): string {
+  return color ? COLUMN_COLORS[color] : NEUTRAL;
 }
 
-/** Small colored dot representing a column's color. */
-export function ColumnDot(props: { column?: BoardColumn; size?: number }) {
+export function columnColorHex(column?: BoardColumn): string {
+  return colorHex(column?.color);
+}
+
+/**
+ * The small filled circle standing for a column color, wherever one is
+ * shown: beside a lane title, in the color picker, and inside a status
+ * chip.
+ */
+export function ColorDot(props: { color?: ColumnColor; size?: number }) {
   const size = props.size ?? 10;
   return (
     <span
@@ -17,11 +31,16 @@ export function ColumnDot(props: { column?: BoardColumn; size?: number }) {
         width: size,
         height: size,
         borderRadius: '50%',
-        background: columnColorHex(props.column),
+        background: colorHex(props.color),
         flexShrink: 0,
       }}
     />
   );
+}
+
+/** The dot for a column, which may or may not carry a color. */
+export function ColumnDot(props: { column?: BoardColumn; size?: number }) {
+  return <ColorDot color={props.column?.color} size={props.size} />;
 }
 
 /** Status badge (dot + column title) used in the table and item drawer. */

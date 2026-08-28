@@ -8,6 +8,7 @@ import {
 import { useBoardListQuery, useBoardsSignal } from '../queries';
 import { useBoardsBasePath } from '../routes';
 import { AsyncList, ErrorText } from './common';
+import { ColorDot } from './StatusBadge';
 
 export { BoardsWidgetProvider } from './widgetCommon';
 
@@ -43,17 +44,7 @@ function StatusCountChip(props: { count: BoardStatusCount }) {
         whiteSpace: 'nowrap',
       }}
     >
-      <span
-        aria-hidden
-        style={{
-          display: 'inline-block',
-          width: 6,
-          height: 6,
-          borderRadius: '50%',
-          background: hex,
-          flexShrink: 0,
-        }}
-      />
+      <ColorDot color={count.color} size={6} />
       {count.title} {count.count}
     </span>
   );
