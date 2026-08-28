@@ -87,6 +87,15 @@ export interface ItemTagRow {
   tag: string;
 }
 
+export interface ChecklistEntryRow {
+  item_id: string;
+  /** 0-based insertion order within the item's checklist. */
+  position: number;
+  text: string;
+  /** SQLite stores this as 0/1; readers must coerce to boolean. */
+  checked: boolean;
+}
+
 export interface CommentRow {
   id: string;
   item_id: string;
@@ -161,6 +170,7 @@ declare module 'knex/types/tables' {
     items: Table<ItemRow>;
     item_assignees: Table<ItemAssigneeRow>;
     item_tags: Table<ItemTagRow>;
+    item_checklist_entries: Table<ChecklistEntryRow>;
     comments: Table<CommentRow>;
     comment_versions: Table<CommentVersionRow>;
     item_description_versions: Table<ItemDescriptionVersionRow>;

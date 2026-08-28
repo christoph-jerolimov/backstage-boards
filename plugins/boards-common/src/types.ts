@@ -117,6 +117,12 @@ export interface BoardPermissionEntry {
   level: BoardPermissionLevel;
 }
 
+/** One entry of an item's checklist. */
+export interface ChecklistEntry {
+  text: string;
+  checked: boolean;
+}
+
 export interface BoardItem {
   id: string;
   boardId: string;
@@ -143,6 +149,8 @@ export interface BoardItem {
   dueDate?: string;
   /** Id of one of the board's priorities, when set. */
   priorityId?: string;
+  /** Ordered checklist entries; empty when the item has no checklist. */
+  checklist: ChecklistEntry[];
   watching?: boolean;
 }
 
@@ -213,6 +221,7 @@ export interface NewItem {
   assignees?: string[];
   tags?: string[];
   priorityId?: string;
+  checklist?: ChecklistEntry[];
   externalManager?: string;
 }
 
@@ -227,6 +236,8 @@ export interface ItemUpdate {
   dueDate?: string | null;
   /** Id of one of the board's priorities, or null to clear it. */
   priorityId?: string | null;
+  /** Replaces the full checklist; an empty array clears it. */
+  checklist?: ChecklistEntry[];
 }
 
 export interface BoardUpdate {

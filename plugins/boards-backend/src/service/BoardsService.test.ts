@@ -1641,6 +1641,147 @@ describe('BoardsService', () => {
     });
   });
 
+  describe('item checklists', () => {
+    it('round-trips entries with order and done states', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const item = await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Release',
+        checklist: [
+          { text: 'write docs', checked: false },
+          { text: 'update tests', checked: true },
+        ],
+      });
+      expect(item.checklist).toEqual([
+        { text: 'write docs', checked: false },
+        { text: 'update tests', checked: true },
+      ]);
+
+      const updated = await service.updateItem(alice, board.id, item.id, {
+        checklist: [
+          { text: 'update tests', checked: true },
+          { text: '  announce  ', checked: false },
+        ],
+      });
+      expect(updated.checklist).toEqual([
+        { text: 'update tests', checked: true },
+        { text: 'announce', checked: false },
+      ]);
+
+      const cleared = await service.updateItem(alice, board.id, item.id, {
+        checklist: [],
+      });
+      expect(cleared.checklist).toEqual([]);
+    });
+
+    it('defaults to an empty checklist', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const item = await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Plain',
+      });
+      expect(item.checklist).toEqual([]);
+    });
+
+    it('rejects empty entry labels and leaves the item unchanged', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const item = await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Release',
+        checklist: [{ text: 'write docs', checked: false }],
+      });
+      await expect(
+        service.updateItem(alice, board.id, item.id, {
+          checklist: [{ text: '   ', checked: false }],
+        }),
+      ).rejects.toThrow(/must not be empty/);
+      const unchanged = await service.getItem(alice, board.id, item.id);
+      expect(unchanged.checklist).toEqual([
+        { text: 'write docs', checked: false },
+      ]);
+      await expect(
+        service.createItem(alice, board.id, {
+          columnId: board.columns[0].id,
+          title: 'Bad',
+          checklist: [{ text: '', checked: false }],
+        }),
+      ).rejects.toThrow(/must not be empty/);
+    });
+
+    it('records checklist changes in the history', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const item = await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Release',
+        checklist: [{ text: 'write docs', checked: false }],
+      });
+      await service.updateItem(alice, board.id, item.id, {
+        checklist: [{ text: 'write docs', checked: true }],
+      });
+      // an unchanged checklist records nothing
+      await service.updateItem(alice, board.id, item.id, {
+        checklist: [{ text: 'write docs', checked: true }],
+      });
+      const timeline = await service.getTimeline(alice, board.id, item.id);
+      const checklistChanges = timeline.filter(
+        entry => entry.kind === 'change' && entry.change.field === 'checklist',
+      );
+      expect(checklistChanges).toHaveLength(1);
+      expect((checklistChanges[0] as any).change.actorRef).toBe(
+        'user:default/alice',
+      );
+    });
+
+    it('rejects checklist changes from read-only users and on external items', async () => {
+      const board = await service.createBoard(alice, {
+        name: 'B',
+        visibility: 'logged-in-read',
+      });
+      const item = await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Release',
+      });
+      await expect(
+        service.updateItem(bob, board.id, item.id, {
+          checklist: [{ text: 'sneaky', checked: false }],
+        }),
+      ).rejects.toThrow();
+      const external = await service.createItem(syncService, board.id, {
+        columnId: board.columns[0].id,
+        title: 'PR #1',
+        externalManager: 'github',
+      });
+      await expect(
+        service.updateItem(alice, board.id, external.id, {
+          checklist: [{ text: 'sneaky', checked: false }],
+        }),
+      ).rejects.toThrow(/read-only/);
+    });
+
+    it('copies checklists on board duplication', async () => {
+      const board = await service.createBoard(alice, { name: 'Source' });
+      await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Release',
+        checklist: [
+          { text: 'write docs', checked: true },
+          { text: 'update tests', checked: false },
+        ],
+      });
+      const copy = await service.duplicateBoard(alice, board.id, {
+        copyColumns: true,
+        copyItems: true,
+        copyPermissions: false,
+      });
+      const items = await service.listItems(alice, copy.id);
+      expect(items).toHaveLength(1);
+      expect(items[0].checklist).toEqual([
+        { text: 'write docs', checked: true },
+        { text: 'update tests', checked: false },
+      ]);
+    });
+  });
+
   describe('externally managed items', () => {
     it('only service callers may create external items', async () => {
       const board = await service.createBoard(alice, {

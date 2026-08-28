@@ -396,6 +396,7 @@ export async function createRouter(
         assignees: req.body.assignees,
         tags: req.body.tags,
         priorityId: req.body.priorityId,
+        checklist: req.body.checklist,
         externalManager: req.body.externalManager,
       }),
     );
@@ -423,6 +424,7 @@ export async function createRouter(
           tags: req.body.tags,
           dueDate: req.body.dueDate,
           priorityId: req.body.priorityId,
+          checklist: req.body.checklist,
         },
       ),
     );

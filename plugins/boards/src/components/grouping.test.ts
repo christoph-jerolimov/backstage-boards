@@ -27,6 +27,7 @@ function item(id: string, assignees: string[]): BoardItem {
     assignees,
     descriptionVersionCount: 0,
     tags: [],
+    checklist: [],
   };
 }
 
@@ -137,6 +138,7 @@ describe('groupItems', () => {
     descriptionVersionCount: 0,
     assignees: [],
     tags: [],
+    checklist: [],
     ...over,
   });
 

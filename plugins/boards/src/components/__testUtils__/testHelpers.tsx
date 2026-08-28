@@ -72,6 +72,7 @@ export function testItem(over: Partial<BoardItem> = {}): BoardItem {
     descriptionVersionCount: 0,
     assignees: [],
     tags: [],
+    checklist: [],
     ...over,
   };
 }

@@ -26,6 +26,7 @@ import {
   ItemMetadata,
 } from './ItemDrawerFields';
 import { Timeline } from './ItemTimeline';
+import { ChecklistEditor } from './ChecklistEditor';
 import { TagsEditor } from './TagsEditor';
 import { InlineEdit } from './common';
 import { PriorityChip, StatusBadge } from './StatusBadge';
@@ -244,6 +245,14 @@ export function ItemDrawer(props: {
               }
               versionsKey={queryKeys.descriptionVersions(board.id, item.id)}
               onSave={description => patchItem({ description })}
+            />
+          </DrawerField>
+
+          <DrawerField label="Checklist">
+            <ChecklistEditor
+              checklist={item.checklist}
+              canEdit={!readonly}
+              onChange={checklist => patchItem({ checklist })}
             />
           </DrawerField>
 
