@@ -2,20 +2,20 @@
 
 ## 1. Shared model (boards-common)
 
-- [ ] 1.1 Add `BoardPriority` type (`id`, `boardId`, `name`, `color?: ColumnColor`, `order`), `priorities: BoardPriority[]` on `BoardWithContext`, `priorityId?` on `BoardItem`/`NewItem`, `priorityId?: string | null` on `ItemUpdate`, and resolved `priority?` on `MyBoardItem` in `plugins/boards-common/src/types.ts`; verify with `yarn tsc`.
-- [ ] 1.2 Extend `ItemFilter` with `priorities: string[]` and `itemMatchesFilter`/`isEmptyFilter` with ANY-of priority matching in `plugins/boards-common/src/filter.ts`; verify with new cases in the existing filter unit tests.
+- [x] 1.1 Add `BoardPriority` type (`id`, `boardId`, `name`, `color?: ColumnColor`, `order`), `priorities: BoardPriority[]` on `BoardWithContext`, `priorityId?` on `BoardItem`/`NewItem`, `priorityId?: string | null` on `ItemUpdate`, and resolved `priority?` on `MyBoardItem` in `plugins/boards-common/src/types.ts`; verify with `yarn tsc`.
+- [x] 1.2 Extend `ItemFilter` with `priorities: string[]` and `itemMatchesFilter`/`isEmptyFilter` with ANY-of priority matching in `plugins/boards-common/src/filter.ts`; verify with new cases in the existing filter unit tests.
 
 ## 2. Backend storage and service
 
-- [ ] 2.1 Append a migration creating `board_priorities` (`id`, `board_id` FK cascade, `name`, `color` nullable, `ord` int) and nullable `items.priority_id` in `plugins/boards-backend/src/database/migrations.ts`, with row typings in `tables.ts`; verify `database/migrations.test.ts` asserts the new table/column and up/down both run.
-- [ ] 2.2 Load `priorities` (ordered by `ord`) into `getBoard`'s `BoardWithContext` and into item hydration/`listMyItems` (resolved `priority` on `MyBoardItem`); verify via `BoardsService.test.ts` assertions on board and my-items payloads.
-- [ ] 2.3 Implement `addPriority`/`updatePriority` (name, color, target `order` with contiguous renumbering) in `BoardsService`, gated on `requireBoard(…, 'admin')`, max 10, trimmed non-empty names, palette-validated color, `emitBoardSignal` on mutation; verify with service tests covering renumbering, the 11-limit, and write-level rejection.
-- [ ] 2.4 Implement `deletePriority` with `reassignTo`/`drop` resolution over all items including archived ones, `ConflictError` when used and no choice given, renumbering after removal; verify with service tests for reassign, drop, unused delete, and conflict.
-- [ ] 2.5 Seed `DEFAULT_PRIORITIES` (critical/red, high/orange, medium, low) in `createBoard`; verify a service test asserts a new board's priorities, names, colors, and orders 1–4.
-- [ ] 2.6 Accept and validate `priorityId` in item create/update (reject ids of other boards, reject on externally managed items, record a `priority` change with old/new names) and support repeated `priority` filter in `listItems`; verify with service tests for set/clear/foreign-id/history/filtering.
-- [ ] 2.7 Copy priorities in `duplicateBoard` when columns are copied and map item `priorityId` by order index in `copyItemsInto`; verify with a duplication service test.
-- [ ] 2.8 Add routes `POST/PATCH/DELETE /boards/:boardId/priorities[/:priorityId]` (delete with `reassignTo`/`drop` query) and the items `priority` query param in `router.ts`; verify with `router.test.ts` covering admin-only access and delete conflict status.
-- [ ] 2.9 Add `priorityId` to `add-item`/`update-item` inputs and `priority` filter to `list-items` in `actions.ts`; verify with `actions.test.ts`.
+- [x] 2.1 Append a migration creating `board_priorities` (`id`, `board_id` FK cascade, `name`, `color` nullable, `ord` int) and nullable `items.priority_id` in `plugins/boards-backend/src/database/migrations.ts`, with row typings in `tables.ts`; verify `database/migrations.test.ts` asserts the new table/column and up/down both run.
+- [x] 2.2 Load `priorities` (ordered by `ord`) into `getBoard`'s `BoardWithContext` and into item hydration/`listMyItems` (resolved `priority` on `MyBoardItem`); verify via `BoardsService.test.ts` assertions on board and my-items payloads.
+- [x] 2.3 Implement `addPriority`/`updatePriority` (name, color, target `order` with contiguous renumbering) in `BoardsService`, gated on `requireBoard(…, 'admin')`, max 10, trimmed non-empty names, palette-validated color, `emitBoardSignal` on mutation; verify with service tests covering renumbering, the 11-limit, and write-level rejection.
+- [x] 2.4 Implement `deletePriority` with `reassignTo`/`drop` resolution over all items including archived ones, `ConflictError` when used and no choice given, renumbering after removal; verify with service tests for reassign, drop, unused delete, and conflict.
+- [x] 2.5 Seed `DEFAULT_PRIORITIES` (critical/red, high/orange, medium, low) in `createBoard`; verify a service test asserts a new board's priorities, names, colors, and orders 1–4.
+- [x] 2.6 Accept and validate `priorityId` in item create/update (reject ids of other boards, reject on externally managed items, record a `priority` change with old/new names) and support repeated `priority` filter in `listItems`; verify with service tests for set/clear/foreign-id/history/filtering.
+- [x] 2.7 Copy priorities in `duplicateBoard` when columns are copied and map item `priorityId` by order index in `copyItemsInto`; verify with a duplication service test.
+- [x] 2.8 Add routes `POST/PATCH/DELETE /boards/:boardId/priorities[/:priorityId]` (delete with `reassignTo`/`drop` query) and the items `priority` query param in `router.ts`; verify with `router.test.ts` covering admin-only access and delete conflict status.
+- [x] 2.9 Add `priorityId` to `add-item`/`update-item` inputs and `priority` filter to `list-items` in `actions.ts`; verify with `actions.test.ts`.
 
 ## 3. Frontend API layer
 

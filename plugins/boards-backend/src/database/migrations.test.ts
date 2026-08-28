@@ -7,6 +7,7 @@ describe('migrations', () => {
     for (const table of [
       'boards',
       'board_columns',
+      'board_priorities',
       'board_permissions',
       'items',
       'item_assignees',
@@ -21,6 +22,7 @@ describe('migrations', () => {
     }
     // labels were removed
     expect(await knex.schema.hasTable('item_labels')).toBe(false);
+    expect(await knex.schema.hasColumn('items', 'priority_id')).toBe(true);
     await knex.destroy();
   });
 

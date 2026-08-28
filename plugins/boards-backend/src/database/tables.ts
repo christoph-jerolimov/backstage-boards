@@ -42,6 +42,15 @@ export interface ColumnRow {
   color: ColumnColor | null;
 }
 
+export interface PriorityRow {
+  id: string;
+  board_id: string;
+  name: string;
+  color: ColumnColor | null;
+  /** 1-based contiguous order; 1 is the highest priority. */
+  ord: number;
+}
+
 export interface PermissionRow {
   id: string;
   board_id: string;
@@ -65,6 +74,7 @@ export interface ItemRow {
   archived_at: string | null;
   archived_by: string | null;
   due_date: string | null;
+  priority_id: string | null;
 }
 
 export interface ItemAssigneeRow {
@@ -146,6 +156,7 @@ declare module 'knex/types/tables' {
     boards: Table<BoardRow>;
     board_entities: Table<BoardEntityRow>;
     board_columns: Table<ColumnRow>;
+    board_priorities: Table<PriorityRow>;
     board_permissions: Table<PermissionRow>;
     items: Table<ItemRow>;
     item_assignees: Table<ItemAssigneeRow>;

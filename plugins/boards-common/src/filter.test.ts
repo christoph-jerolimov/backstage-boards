@@ -25,6 +25,8 @@ describe('itemMatchesFilter', () => {
     expect(isEmptyFilter({ tags: ['x'] })).toBe(false);
     expect(isEmptyFilter({ assignees: [] })).toBe(true);
     expect(isEmptyFilter({ assignees: ['user:default/bob'] })).toBe(false);
+    expect(isEmptyFilter({ priorities: [] })).toBe(true);
+    expect(isEmptyFilter({ priorities: ['p1'] })).toBe(false);
   });
 
   it('searches title and description case-insensitively', () => {
@@ -62,6 +64,20 @@ describe('itemMatchesFilter', () => {
     expect(itemMatchesFilter(item, { assignees: ['user:default/bob'] })).toBe(
       false,
     );
+  });
+
+  it('matches any of the listed priorities', () => {
+    const prioritized = { ...item, priorityId: 'p1' };
+    expect(itemMatchesFilter(prioritized, { priorities: [] })).toBe(true);
+    expect(itemMatchesFilter(prioritized, { priorities: ['p1'] })).toBe(true);
+    expect(itemMatchesFilter(prioritized, { priorities: ['p2', 'p1'] })).toBe(
+      true,
+    );
+    expect(itemMatchesFilter(prioritized, { priorities: ['p2'] })).toBe(false);
+  });
+
+  it('never matches an item without priority on a priority filter', () => {
+    expect(itemMatchesFilter(item, { priorities: ['p1'] })).toBe(false);
   });
 
   it('combines filters with AND', () => {

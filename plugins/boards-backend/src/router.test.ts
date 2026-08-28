@@ -429,6 +429,67 @@ describe('createRouter', () => {
       .expect(403);
   });
 
+  it('manages priorities over http, admin-only, with delete choices', async () => {
+    const board = await service.createBoard(alice, { name: 'B' });
+    await service.addPermission(alice, board.id, {
+      principalRef: 'user:default/bob',
+      level: 'write',
+    });
+    // write access is not enough to manage the definitions
+    await request(app)
+      .post(`/boards/${board.id}/priorities`)
+      .set('x-test-user', 'bob')
+      .send({ name: 'blocker' })
+      .expect(403);
+    const added = await request(app)
+      .post(`/boards/${board.id}/priorities`)
+      .set('x-test-user', 'alice')
+      .send({ name: 'blocker', color: 'purple' })
+      .expect(201);
+    const priorityId = body<{ id: string }>(added).id;
+    const moved = await request(app)
+      .patch(`/boards/${board.id}/priorities/${priorityId}`)
+      .set('x-test-user', 'alice')
+      .send({ name: 'Blocker', order: 1 })
+      .expect(200);
+    expect(body<{ name: string; order: number }>(moved)).toMatchObject({
+      name: 'Blocker',
+      order: 1,
+    });
+    // items can carry the priority, and the filter finds them
+    const columnId = (await service.getBoard(alice, board.id)).columns[0].id;
+    const item = await request(app)
+      .post(`/boards/${board.id}/items`)
+      .set('x-test-user', 'bob')
+      .send({ columnId, title: 'Item', priorityId })
+      .expect(201);
+    expect(body<BoardItem>(item).priorityId).toBe(priorityId);
+    const filtered = await request(app)
+      .get(`/boards/${board.id}/items?priority=${priorityId}`)
+      .set('x-test-user', 'alice')
+      .expect(200);
+    expect(body<{ items: BoardItem[] }>(filtered).items).toHaveLength(1);
+    // a used priority cannot be deleted without a choice
+    await request(app)
+      .delete(`/boards/${board.id}/priorities/${priorityId}`)
+      .set('x-test-user', 'alice')
+      .expect(409);
+    await request(app)
+      .delete(`/boards/${board.id}/priorities/${priorityId}`)
+      .set('x-test-user', 'bob')
+      .expect(403);
+    await request(app)
+      .delete(`/boards/${board.id}/priorities/${priorityId}?drop=true`)
+      .set('x-test-user', 'alice')
+      .expect(204);
+    const cleared = await service.getItem(
+      alice,
+      board.id,
+      body<BoardItem>(item).id,
+    );
+    expect(cleared.priorityId).toBeUndefined();
+  });
+
   it('supports item lifecycle, comments, timeline, watch and favorites', async () => {
     const board = await service.createBoard(alice, { name: 'B' });
     const columnId = (await service.getBoard(alice, board.id)).columns[0].id;

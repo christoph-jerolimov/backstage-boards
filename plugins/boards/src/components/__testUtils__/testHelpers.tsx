@@ -120,6 +120,7 @@ export function testBoard(
     createdAt: '2026-08-01T10:00:00.000Z',
     updatedAt: '2026-08-02T10:00:00.000Z',
     columns: [],
+    priorities: [],
     access: 'admin',
     favorite: false,
     watching: false,
