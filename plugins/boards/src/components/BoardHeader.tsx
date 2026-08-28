@@ -29,23 +29,11 @@ import { queryKeys } from '../queries';
 import { useApi } from '@backstage/frontend-plugin-api';
 import { GroupByMode } from './grouping';
 import { InlineEdit } from './common';
+import { FavoriteButton } from './FavoriteButton';
 import { WatchButton } from './WatchButton';
 import { BoardDialogKind } from './BoardDialogs';
 
 export type BoardViewMode = 'board' | 'table';
-
-function StarIcon(props: { filled: boolean }) {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden>
-      <path
-        d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
-        fill={props.filled ? 'currentColor' : 'none'}
-        stroke="currentColor"
-        strokeWidth="1.5"
-      />
-    </svg>
-  );
-}
 
 function EntitySection(props: { entityRefs: string[] }) {
   if (props.entityRefs.length === 0) {
@@ -108,14 +96,9 @@ export function BoardHeader(props: {
               </Text>
             }
           />
-          <ButtonIcon
-            aria-label={
-              board.favorite ? 'Remove from favorites' : 'Add to favorites'
-            }
-            variant="tertiary"
-            size="small"
-            icon={<StarIcon filled={board.favorite} />}
-            onPress={() =>
+          <FavoriteButton
+            favorite={board.favorite}
+            onToggle={() =>
               guarded(() => boardsApi.setFavorite(board.id, !board.favorite))
             }
           />
