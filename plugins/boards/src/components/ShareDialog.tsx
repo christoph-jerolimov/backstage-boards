@@ -15,9 +15,11 @@ import {
   BoardVisibility,
   BoardWithContext,
 } from '@internal/plugin-boards-common';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { boardsApiRef } from '../api';
+import { queryKeys } from '../queries';
 import { PrincipalPicker } from './PrincipalPicker';
-import { RefDisplay, useAsyncData } from './common';
+import { RefDisplay } from './common';
 
 const VISIBILITY_OPTIONS: Array<{ value: BoardVisibility; label: string }> = [
   { value: 'private', label: 'Private – only people listed below' },
@@ -39,13 +41,15 @@ export function ShareDialog(props: {
   const [level, setLevel] = useState<BoardPermissionLevel>('read');
   const [error, setError] = useState<string | undefined>();
 
-  const { data: permissions, refresh } = useAsyncData(
-    () =>
-      isOpen && board.access === 'admin'
-        ? boardsApi.listPermissions(board.id)
-        : Promise.resolve([]),
-    [boardsApi, board.id, isOpen, board.access],
-  );
+  const queryClient = useQueryClient();
+  const permissionsKey = queryKeys.permissions(board.id);
+  const { data: permissions } = useQuery({
+    queryKey: permissionsKey,
+    enabled: isOpen && board.access === 'admin',
+    queryFn: () => boardsApi.listPermissions(board.id),
+  });
+  const refresh = () =>
+    queryClient.invalidateQueries({ queryKey: permissionsKey });
 
   const run = async (action: () => Promise<unknown>) => {
     setError(undefined);

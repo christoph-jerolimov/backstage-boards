@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Badge, Flex, Text, TextField } from '@backstage/ui';
 import { EntityRefLink } from '@backstage/plugin-catalog-react';
 import { isTextRef, textRefDisplay } from '@internal/plugin-boards-common';
@@ -180,47 +180,6 @@ export function InlineEdit(props: {
       }}
     />
   );
-}
-
-/** Simple load-once-with-refresh hook for API data. */
-export function useAsyncData<T>(
-  load: () => Promise<T>,
-  deps: unknown[],
-): {
-  data?: T;
-  error?: Error;
-  loading: boolean;
-  refresh: () => Promise<void>;
-} {
-  const [data, setData] = useState<T | undefined>(undefined);
-  const [error, setError] = useState<Error | undefined>(undefined);
-  const [loading, setLoading] = useState(true);
-  const generation = useRef(0);
-
-  const refresh = useCallback(async () => {
-    const current = ++generation.current;
-    try {
-      const result = await load();
-      if (generation.current === current) {
-        setData(result);
-        setError(undefined);
-        setLoading(false);
-      }
-    } catch (err) {
-      if (generation.current === current) {
-        setError(err as Error);
-        setLoading(false);
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
-
-  useEffect(() => {
-    setLoading(true);
-    refresh();
-  }, [refresh]);
-
-  return { data, error, loading, refresh };
 }
 
 /** Human wording for a change record, shared by timeline and change feed. */

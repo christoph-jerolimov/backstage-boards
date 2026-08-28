@@ -1,10 +1,4 @@
-import {
-  act,
-  render,
-  renderHook,
-  screen,
-  waitFor,
-} from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
   changeSummary,
@@ -13,7 +7,6 @@ import {
   MarkdownContent,
   RefChips,
   RefDisplay,
-  useAsyncData,
 } from './common';
 import { renderWithProviders } from './__testUtils__/testHelpers';
 
@@ -164,49 +157,6 @@ describe('InlineEdit', () => {
     await userEvent.type(screen.getByRole('textbox'), ' more');
     await userEvent.click(screen.getByRole('button', { name: 'elsewhere' }));
     expect(onCommit).toHaveBeenCalledWith('Old more');
-  });
-});
-
-describe('useAsyncData', () => {
-  it('loads data and exposes a refresh', async () => {
-    const load = jest
-      .fn()
-      .mockResolvedValueOnce('first')
-      .mockResolvedValueOnce('second');
-    const { result } = renderHook(() => useAsyncData(load, []));
-    expect(result.current.loading).toBe(true);
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.data).toBe('first');
-
-    await act(() => result.current.refresh());
-    expect(result.current.data).toBe('second');
-  });
-
-  it('captures load errors', async () => {
-    const load = jest.fn().mockRejectedValue(new Error('boom'));
-    const { result } = renderHook(() => useAsyncData(load, []));
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.error?.message).toBe('boom');
-    expect(result.current.data).toBeUndefined();
-  });
-
-  it('ignores results from superseded loads', async () => {
-    let resolveFirst: (value: string) => void = () => {};
-    const load = jest
-      .fn()
-      .mockImplementationOnce(
-        () => new Promise<string>(resolve => (resolveFirst = resolve)),
-      )
-      .mockResolvedValueOnce('newest');
-    const { result } = renderHook(() => useAsyncData(load, []));
-
-    await act(() => result.current.refresh());
-    expect(result.current.data).toBe('newest');
-
-    await act(async () => {
-      resolveFirst('stale');
-    });
-    expect(result.current.data).toBe('newest');
   });
 });
 

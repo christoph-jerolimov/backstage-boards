@@ -3,8 +3,9 @@ import { useApi } from '@backstage/frontend-plugin-api';
 import { Combobox } from '@backstage/ui';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
 import { stringifyEntityRef } from '@backstage/catalog-model';
+import { useQuery } from '@tanstack/react-query';
 import { TEXT_REF_PREFIX } from '@internal/plugin-boards-common';
-import { useAsyncData } from './common';
+import { queryKeys } from '../queries';
 
 /** The entity fields the option labels are built from. */
 const FIELDS = [
@@ -40,14 +41,18 @@ export function CatalogRefPicker(props: {
   const catalogApi = useApi(catalogApiRef);
   const [input, setInput] = useState('');
 
-  const { data: entities } = useAsyncData(async () => {
-    const response = await catalogApi.getEntities({
-      ...(kinds ? { filter: { kind: kinds } } : {}),
-      fields: FIELDS,
-    });
-    return response.items;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [catalogApi, kinds?.join(',')]);
+  const { data: entities } = useQuery({
+    queryKey: queryKeys.catalogEntities(kinds),
+    // the catalog changes far more slowly than a picker is opened
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const response = await catalogApi.getEntities({
+        ...(kinds ? { filter: { kind: kinds } } : {}),
+        fields: FIELDS,
+      });
+      return response.items;
+    },
+  });
 
   const options = useMemo(() => {
     const excluded = new Set(exclude ?? []);

@@ -25,6 +25,7 @@ import {
 import { EntityRefLink } from '@backstage/plugin-catalog-react';
 import { BoardWithContext } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
+import { queryKeys } from '../queries';
 import { useApi } from '@backstage/frontend-plugin-api';
 import { GroupByMode } from './grouping';
 import { InlineEdit } from './common';
@@ -127,6 +128,7 @@ export function BoardHeader(props: {
               guarded(() => boardsApi.setWatchBoard(board.id, watching))
             }
             loadWatchers={() => boardsApi.listBoardWatchers(board.id)}
+            watchersKey={queryKeys.boardWatchers(board.id)}
           />
           <Select
             aria-label="Group by"

@@ -15,20 +15,16 @@ import {
   ItemComment,
   TimelineEntry,
 } from '@internal/plugin-boards-common';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { boardsApiRef } from '../api';
+import { queryKeys } from '../queries';
 import { AssigneeAvatars } from './AssigneeAvatars';
 import { WatchButton } from './WatchButton';
 import { DueDateBadge } from './DueDate';
 import { EditableMarkdown } from './EditableMarkdown';
 import { PrincipalPicker } from './PrincipalPicker';
 import { TagsEditor } from './TagsEditor';
-import {
-  changeSummary,
-  formatDate,
-  InlineEdit,
-  RefDisplay,
-  useAsyncData,
-} from './common';
+import { changeSummary, formatDate, InlineEdit, RefDisplay } from './common';
 import { StatusBadge } from './StatusBadge';
 
 function CloseIcon() {
@@ -75,6 +71,7 @@ function CommentBlock(props: {
         loadVersions={() =>
           boardsApi.listCommentVersions(boardId, itemId, comment.id)
         }
+        versionsKey={queryKeys.commentVersions(boardId, itemId, comment.id)}
         onSave={async text => {
           await boardsApi.updateComment(boardId, itemId, comment.id, text);
           await onChanged();
@@ -132,14 +129,16 @@ export function ItemDrawer(props: {
   const readonly = !canWrite || !!item.externalManager;
   const [newComment, setNewComment] = useState('');
 
-  const { data: timeline, refresh: refreshTimeline } = useAsyncData(
-    () => boardsApi.getTimeline(board.id, item.id),
-    [boardsApi, board.id, item.id, item.updatedAt],
-  );
+  const queryClient = useQueryClient();
+  const timelineKey = queryKeys.timeline(board.id, item.id);
+  const { data: timeline } = useQuery({
+    queryKey: timelineKey,
+    queryFn: () => boardsApi.getTimeline(board.id, item.id),
+  });
 
   const changed = async () => {
     await onChanged();
-    await refreshTimeline();
+    await queryClient.invalidateQueries({ queryKey: timelineKey });
   };
 
   useEffect(() => {
@@ -233,6 +232,7 @@ export function ItemDrawer(props: {
                 await onChanged();
               }}
               loadWatchers={() => boardsApi.listItemWatchers(board.id, item.id)}
+              watchersKey={queryKeys.itemWatchers(board.id, item.id)}
             />
             {!readonly && (
               <Button
@@ -404,6 +404,7 @@ export function ItemDrawer(props: {
               loadVersions={() =>
                 boardsApi.listDescriptionVersions(board.id, item.id)
               }
+              versionsKey={queryKeys.descriptionVersions(board.id, item.id)}
               onSave={async text => {
                 await boardsApi.updateItem(board.id, item.id, {
                   description: text,

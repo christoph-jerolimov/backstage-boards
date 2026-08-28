@@ -11,8 +11,10 @@ import {
   TableRoot,
   Text,
 } from '@backstage/ui';
+import { useQuery } from '@tanstack/react-query';
 import { boardsApiRef } from '../api';
-import { changeSummary, formatDate, RefDisplay, useAsyncData } from './common';
+import { queryKeys } from '../queries';
+import { changeSummary, formatDate, RefDisplay } from './common';
 
 /** Board-wide feed of the most recent change records, newest first. */
 export function RecentChangesDialog(props: {
@@ -23,13 +25,11 @@ export function RecentChangesDialog(props: {
 }) {
   const { boardId, isOpen, onOpenChange, onOpenItem } = props;
   const boardsApi = useApi(boardsApiRef);
-  const { data: entries, loading } = useAsyncData(
-    () =>
-      isOpen
-        ? boardsApi.getBoardChanges(boardId, { limit: 50 })
-        : Promise.resolve(undefined),
-    [boardsApi, boardId, isOpen],
-  );
+  const { data: entries, isLoading: loading } = useQuery({
+    queryKey: queryKeys.changes(boardId),
+    enabled: isOpen,
+    queryFn: () => boardsApi.getBoardChanges(boardId, { limit: 50 }),
+  });
 
   let content;
   if (loading || entries === undefined) {

@@ -8,6 +8,7 @@ function renderButton(over: Partial<Parameters<typeof WatchButton>[0]> = {}) {
     watching: false,
     onToggle: jest.fn(),
     loadWatchers: jest.fn().mockResolvedValue([]),
+    watchersKey: ['test', 'watchers'],
     targetLabel: 'this board',
     ...over,
   };
