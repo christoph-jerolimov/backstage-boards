@@ -25,6 +25,16 @@ export default defineConfig({
 
   expect: {
     timeout: 30_000,
+
+    // Screenshot baselines live next to the test files (in
+    // `*-snapshots/` folders) and are compared with a small tolerance,
+    // since font rasterization differs slightly between browser builds
+    // and machines. Regenerate them with
+    // `yarn test:e2e --update-snapshots` after intentional UI changes.
+    toHaveScreenshot: {
+      maxDiffPixelRatio: 0.02,
+      threshold: 0.3,
+    },
   },
 
   // Run your local dev server before starting the tests

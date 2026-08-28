@@ -21,6 +21,7 @@ test('App should render the welcome page', async ({ page }) => {
 
   const enterButton = page.getByRole('button', { name: 'Enter' });
   await expect(enterButton).toBeVisible();
+  await expect(page).toHaveScreenshot('sign-in-page.png');
   await enterButton.click();
 
   const nav = page.getByRole('navigation', { name: 'sidebar nav' });
@@ -30,4 +31,10 @@ test('App should render the welcome page', async ({ page }) => {
   await expect(
     page.getByRole('link', { name: 'APIs', exact: true }),
   ).toBeVisible();
+
+  // the catalog table lists the example entities shipped in examples/
+  await expect(
+    page.getByRole('link', { name: 'example-website' }),
+  ).toBeVisible();
+  await expect(page).toHaveScreenshot('catalog-page.png');
 });
