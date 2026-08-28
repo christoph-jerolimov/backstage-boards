@@ -1,6 +1,6 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   BreadcrumbEntry,
   useApi,
@@ -13,7 +13,6 @@ import {
   Cell,
   Column,
   Flex,
-  Menu,
   MenuItem,
   Row,
   TableBody,
@@ -21,12 +20,24 @@ import {
   TableRoot,
   Text,
 } from '@backstage/ui';
-import { RiArrowRightLine, RiFileList2Line } from '@remixicon/react';
-import { MyBoardItem } from '@internal/plugin-boards-common';
+import { RiArrowRightLine } from '@remixicon/react';
+import {
+  BoardItem,
+  levelIncludes,
+  MyBoardItem,
+} from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
+import {
+  invalidateBoard,
+  invalidateMyItems,
+  queryKeys,
+  useBoardQuery,
+} from '../queries';
 import { rootRouteRef } from '../routes';
 import { DueDateBadge } from './DueDate';
-import { RowActionsMenu, RowContextMenu, useRowContextMenu } from './RowMenu';
+import { ItemActions, ItemContextMenu, ItemMenu } from './ItemMenu';
+import { RowActionsMenu, useRowContextMenu } from './RowMenu';
+import { StatusBadge } from './StatusBadge';
 
 interface BoardGroup {
   boardId: string;
@@ -51,45 +62,67 @@ function groupByBoard(entries: MyBoardItem[]): BoardGroup[] {
   return [...groups.values()];
 }
 
-/** The shared my-items actions menu: row button and right-click alike. */
-function MyItemMenu(props: {
-  entry: MyBoardItem;
-  onOpenItem: (entry: MyBoardItem) => void;
-  onOpenBoard: (entry: MyBoardItem) => void;
+function BoardGroupTable(props: {
+  group: BoardGroup;
+  basePath: string;
+  onError: (message?: string) => void;
 }) {
-  const { entry, onOpenItem, onOpenBoard } = props;
-  return (
-    <Menu aria-label={`Actions for ${entry.item.title}`}>
-      <MenuItem
-        iconStart={<RiFileList2Line size={16} />}
-        onAction={() => onOpenItem(entry)}
-      >
-        Open item
-      </MenuItem>
-      <MenuItem
-        iconStart={<RiArrowRightLine size={16} />}
-        onAction={() => onOpenBoard(entry)}
-      >
-        Open board
-      </MenuItem>
-    </Menu>
-  );
-}
-
-function BoardGroupTable(props: { group: BoardGroup; basePath: string }) {
-  const { group, basePath } = props;
+  const { group, basePath, onError } = props;
   const navigate = useNavigate();
-  const contextMenu = useRowContextMenu<MyBoardItem>();
-  const openItem = (entry: MyBoardItem) =>
-    navigate(`${basePath}/${entry.boardId}?item=${entry.item.id}`);
-  const openBoard = (entry: MyBoardItem) =>
-    navigate(`${basePath}/${entry.boardId}`);
-  const byId = new Map(group.entries.map(entry => [entry.item.id, entry]));
+  const boardsApi = useApi(boardsApiRef);
+  const queryClient = useQueryClient();
+  const contextMenu = useRowContextMenu<BoardItem>();
+  // the board carries the columns and the access level the item menu
+  // needs; it is cached and shared with the board page
+  const { data: board } = useBoardQuery(group.boardId);
+
+  const boardPath = `${basePath}/${group.boardId}`;
+  const openBoard = () => navigate(boardPath);
+  const columnOf = (columnId: string) =>
+    board?.columns.find(column => column.id === columnId);
+  const canWrite =
+    !!board && levelIncludes(board.access, 'write') && !board.archivedAt;
+  // only the user's own items are listed, so the quick-assign shortcuts
+  // are whoever shares them; the drawer offers the full picker
+  const assigneePool = [
+    ...new Set(group.entries.flatMap(entry => entry.item.assignees)),
+  ];
+
+  const guarded = async (action: () => Promise<unknown>) => {
+    onError(undefined);
+    try {
+      await action();
+    } catch (err) {
+      onError((err as Error).message);
+    }
+    // resync either way: on failure the listing may still be stale
+    await invalidateBoard(queryClient, group.boardId);
+    await invalidateMyItems(queryClient);
+  };
+
+  const actions: ItemActions = {
+    openItem: itemId => navigate(`${boardPath}?item=${itemId}`),
+    moveItem: (itemId, target) =>
+      guarded(() => boardsApi.moveItem(group.boardId, itemId, target)),
+    setItemDueDate: (itemId, dueDate) =>
+      guarded(() => boardsApi.updateItem(group.boardId, itemId, { dueDate })),
+    setAssignees: (itemId, assignees) =>
+      guarded(() => boardsApi.updateItem(group.boardId, itemId, { assignees })),
+    deleteItem: itemId =>
+      guarded(() => boardsApi.deleteItem(group.boardId, itemId)),
+  };
+
+  const openBoardItem = (
+    <MenuItem iconStart={<RiArrowRightLine size={16} />} onAction={openBoard}>
+      Open board
+    </MenuItem>
+  );
+
   return (
     <div>
       <Button
         variant="tertiary"
-        onPress={() => navigate(`${basePath}/${group.boardId}`)}
+        onPress={openBoard}
         aria-label={`Open board ${group.boardName}`}
       >
         <Text variant="body-large" weight="bold">
@@ -98,12 +131,7 @@ function BoardGroupTable(props: { group: BoardGroup; basePath: string }) {
       </Button>
       <TableRoot
         aria-label={`My items on ${group.boardName}`}
-        onRowAction={key => {
-          const entry = byId.get(String(key));
-          if (entry) {
-            openItem(entry);
-          }
-        }}
+        onRowAction={key => actions.openItem(String(key))}
       >
         <TableHeader>
           <Column isRowHeader>Item</Column>
@@ -118,12 +146,17 @@ function BoardGroupTable(props: { group: BoardGroup; basePath: string }) {
               key={entry.item.id}
               id={entry.item.id}
               onContextMenu={(event: React.MouseEvent) =>
-                contextMenu.open(entry, event)
+                contextMenu.open(entry.item, event)
               }
             >
               <Cell>{entry.item.title}</Cell>
               <Cell>
-                <Badge size="small">{entry.columnTitle}</Badge>
+                {columnOf(entry.item.columnId) ? (
+                  <StatusBadge column={columnOf(entry.item.columnId)} />
+                ) : (
+                  // until the board resolves, the listing's own title
+                  <Badge size="small">{entry.columnTitle}</Badge>
+                )}
               </Cell>
               <Cell>
                 <DueDateBadge dueDate={entry.item.dueDate} />
@@ -131,10 +164,13 @@ function BoardGroupTable(props: { group: BoardGroup; basePath: string }) {
               <Cell>{entry.item.tags.join(', ')}</Cell>
               <Cell>
                 <RowActionsMenu label={`Actions for ${entry.item.title}`}>
-                  <MyItemMenu
-                    entry={entry}
-                    onOpenItem={openItem}
-                    onOpenBoard={openBoard}
+                  <ItemMenu
+                    item={entry.item}
+                    columns={board?.columns ?? []}
+                    readonly={!canWrite || !!entry.item.externalManager}
+                    actions={actions}
+                    assigneePool={assigneePool}
+                    extraItems={openBoardItem}
                   />
                 </RowActionsMenu>
               </Cell>
@@ -142,19 +178,15 @@ function BoardGroupTable(props: { group: BoardGroup; basePath: string }) {
           ))}
         </TableBody>
       </TableRoot>
-      <RowContextMenu
+      <ItemContextMenu
         state={contextMenu.state}
         onClose={contextMenu.close}
-        label={entry => `Context menu for ${entry.item.title}`}
-      >
-        {entry => (
-          <MyItemMenu
-            entry={entry}
-            onOpenItem={openItem}
-            onOpenBoard={openBoard}
-          />
-        )}
-      </RowContextMenu>
+        columns={board?.columns ?? []}
+        readonly={!canWrite || !!contextMenu.state?.row.externalManager}
+        actions={actions}
+        assigneePool={assigneePool}
+        extraItems={openBoardItem}
+      />
     </div>
   );
 }
@@ -164,6 +196,7 @@ export function MyItemsList() {
   const boardsApi = useApi(boardsApiRef);
   const rootLink = useRouteRef(rootRouteRef);
   const basePath = rootLink?.() ?? '/boards';
+  const [actionError, setActionError] = useState<string | undefined>();
 
   const {
     data: entries,
@@ -171,7 +204,7 @@ export function MyItemsList() {
     error,
     refetch,
   } = useQuery({
-    queryKey: ['boards', 'my-items'],
+    queryKey: queryKeys.myItems,
     queryFn: () => boardsApi.listMyItems(),
   });
 
@@ -191,6 +224,9 @@ export function MyItemsList() {
           My items could not be loaded: {(error as Error).message}
         </Text>
       )}
+      {actionError && (
+        <Text style={{ color: 'var(--bui-fg-negative)' }}>{actionError}</Text>
+      )}
       {isLoading && <Text>Loading your items…</Text>}
       {!isLoading && !error && groups.length === 0 && (
         <Text color="secondary">Nothing is assigned to you on any board.</Text>
@@ -200,6 +236,7 @@ export function MyItemsList() {
           key={group.boardId}
           group={group}
           basePath={basePath}
+          onError={setActionError}
         />
       ))}
     </Flex>
