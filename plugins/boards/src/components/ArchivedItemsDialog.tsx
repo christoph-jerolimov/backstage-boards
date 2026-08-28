@@ -1,10 +1,16 @@
 import { useApi } from '@backstage/frontend-plugin-api';
 import {
   Button,
+  Cell,
+  Column,
   Dialog,
   DialogBody,
   DialogHeader,
   Flex,
+  Row,
+  TableBody,
+  TableHeader,
+  TableRoot,
   Text,
 } from '@backstage/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -47,32 +53,42 @@ export function ArchivedItemsDialog(props: {
           <Text variant="body-small" color="secondary">
             {`Archived items are removed permanently after ${RETENTION_DAYS} days.`}
           </Text>
-          {archived.map(item => (
-            <Flex key={item.id} align="center" gap="2" justify="between">
-              <div>
-                <Text variant="body-medium">{item.title}</Text>
-                <Text variant="body-x-small" color="secondary">
-                  archived {item.archivedAt ? formatDate(item.archivedAt) : ''}{' '}
-                  {item.archivedBy && (
-                    <>
-                      by <RefDisplay refString={item.archivedBy} />
-                    </>
-                  )}
-                </Text>
-              </div>
-              <Button
-                variant="secondary"
-                size="small"
-                onPress={async () => {
-                  await boardsApi.restoreItem(boardId, item.id);
-                  await refresh();
-                  await onChanged();
-                }}
-              >
-                Restore
-              </Button>
-            </Flex>
-          ))}
+          <TableRoot aria-label="Archived items">
+            <TableHeader>
+              <Column isRowHeader>Title</Column>
+              <Column>Archived by</Column>
+              <Column>Archived</Column>
+              <Column>Actions</Column>
+            </TableHeader>
+            <TableBody>
+              {archived.map(item => (
+                <Row key={item.id} id={item.id}>
+                  <Cell>{item.title}</Cell>
+                  <Cell>
+                    {item.archivedBy && (
+                      <RefDisplay refString={item.archivedBy} />
+                    )}
+                  </Cell>
+                  <Cell>
+                    {item.archivedAt ? formatDate(item.archivedAt) : ''}
+                  </Cell>
+                  <Cell>
+                    <Button
+                      variant="secondary"
+                      size="small"
+                      onPress={async () => {
+                        await boardsApi.restoreItem(boardId, item.id);
+                        await refresh();
+                        await onChanged();
+                      }}
+                    >
+                      Restore
+                    </Button>
+                  </Cell>
+                </Row>
+              ))}
+            </TableBody>
+          </TableRoot>
         </Flex>
       )}
     </AsyncList>
