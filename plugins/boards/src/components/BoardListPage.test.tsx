@@ -1,9 +1,13 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { BoardListEntry } from '@internal/plugin-boards-common';
-import { boardsApiRef, BoardsApi } from '../api';
+import {
+  BoardFilterOptions,
+  BoardListEntry,
+} from '@internal/plugin-boards-common';
+import { boardsApiRef, BoardsApi, BoardListQuery } from '../api';
 import { rootRouteRef } from '../routes';
 import { BoardListPage } from './BoardListPage';
+import { catalogApiRef } from '@backstage/plugin-catalog-react';
 import {
   renderWithProviders,
   testBoardListEntry,
@@ -32,13 +36,52 @@ const boards: BoardListEntry[] = [
   }),
 ];
 
+/**
+ * A listing double that actually filters and pages, so the page's own
+ * behaviour — which tab asks for what, where paging lands — is what the
+ * tests observe rather than a fixed answer.
+ */
+function listBoardsDouble(all: BoardListEntry[]) {
+  return jest.fn(async (query: BoardListQuery = {}) => {
+    const search = query.search?.trim().toLocaleLowerCase('en-US');
+    const matching = all.filter(board => {
+      if (query.favoritesOnly && !board.favorite) return false;
+      if (search && !board.name.toLocaleLowerCase('en-US').includes(search))
+        return false;
+      if (query.entityRef && !board.entityRefs.includes(query.entityRef))
+        return false;
+      if (query.createdBy && board.createdBy !== query.createdBy) return false;
+      return true;
+    });
+    const offset = query.offset ?? 0;
+    const limit = query.limit ?? matching.length;
+    return {
+      boards: matching.slice(offset, offset + limit),
+      total: matching.length,
+      limit,
+      offset,
+    };
+  });
+}
+
 function renderPage(
-  over: { boardsApi?: jest.Mocked<BoardsApi>; boards?: BoardListEntry[] } = {},
+  over: {
+    boardsApi?: jest.Mocked<BoardsApi>;
+    boards?: BoardListEntry[];
+    filterOptions?: Partial<BoardFilterOptions>;
+  } = {},
 ) {
+  const all = over.boards ?? boards;
   const boardsApi =
     over.boardsApi ??
     testBoardsApi({
-      listBoards: jest.fn().mockResolvedValue(over.boards ?? boards),
+      listBoards: listBoardsDouble(all),
+      listFilterOptions: jest.fn().mockResolvedValue({
+        total: all.length,
+        entityRefs: [...new Set(all.flatMap(board => board.entityRefs))],
+        creators: [...new Set(all.map(board => board.createdBy))],
+        ...over.filterOptions,
+      }),
     });
   renderWithProviders(<BoardListPage />, {
     apis: [[boardsApiRef, boardsApi]],
@@ -105,7 +148,8 @@ describe('BoardListPage', () => {
       }),
     );
     expect(boardsApi.setFavorite).toHaveBeenCalledWith('board-1', false);
-    await waitFor(() => expect(boardsApi.listBoards).toHaveBeenCalledTimes(2));
+    // both tabs are stale: the star moves the board between them
+    await waitFor(() => expect(boardsApi.listBoards).toHaveBeenCalledTimes(4));
   });
 
   it('opens a board when its row is activated', async () => {
@@ -158,7 +202,7 @@ describe('BoardListPage', () => {
 
   it('creates a board and opens it', async () => {
     const boardsApi = testBoardsApi({
-      listBoards: jest.fn().mockResolvedValue(boards),
+      listBoards: listBoardsDouble(boards),
       createBoard: jest.fn().mockResolvedValue({ id: 'board-3' }),
     });
     renderPage({ boardsApi });
@@ -186,7 +230,7 @@ describe('BoardListPage', () => {
 
   it('reports why creating failed', async () => {
     const boardsApi = testBoardsApi({
-      listBoards: jest.fn().mockResolvedValue(boards),
+      listBoards: listBoardsDouble(boards),
       createBoard: jest.fn().mockRejectedValue(new Error('Name taken')),
     });
     renderPage({ boardsApi });
@@ -200,5 +244,253 @@ describe('BoardListPage', () => {
     expect(
       await screen.findByText('Could not create board: Name taken'),
     ).toBeInTheDocument();
+  });
+
+  describe('filter bar and pagination', () => {
+    const many: BoardListEntry[] = [
+      testBoardListEntry({
+        id: 'board-1',
+        name: 'Payments',
+        entityRefs: ['system:default/payments'],
+        createdBy: 'user:default/alice',
+      }),
+      testBoardListEntry({
+        id: 'board-2',
+        name: 'Shipping',
+        createdBy: 'user:default/bob',
+      }),
+      testBoardListEntry({ id: 'board-3', name: 'Support' }),
+    ];
+
+    async function openAllTab() {
+      await userEvent.click(
+        await screen.findByRole('tab', { name: `All (${many.length})` }),
+      );
+    }
+
+    it('narrows the listing by the search field', async () => {
+      const { boardsApi } = renderPage({ boards: many });
+      await openAllTab();
+      await userEvent.type(
+        await screen.findByRole('searchbox', { name: 'Search boards' }),
+        'ship',
+      );
+      await waitFor(() =>
+        expect(boardsApi.listBoards).toHaveBeenCalledWith(
+          expect.objectContaining({ search: 'ship' }),
+        ),
+      );
+      expect(
+        await screen.findByRole('row', { name: /Shipping/ }),
+      ).toBeInTheDocument();
+      await waitFor(() =>
+        expect(
+          screen.queryByRole('row', { name: /Payments/ }),
+        ).not.toBeInTheDocument(),
+      );
+    });
+
+    it('keeps the All count on every readable board while filtering', async () => {
+      renderPage({ boards: many });
+      await openAllTab();
+      await userEvent.type(
+        await screen.findByRole('searchbox', { name: 'Search boards' }),
+        'ship',
+      );
+      await screen.findByText('1 of 3 boards');
+      // the tab counts what the user can reach, not what survives the filter
+      expect(screen.getByRole('tab', { name: 'All (3)' })).toBeInTheDocument();
+    });
+
+    it('offers only the entities and creators the listing reported', async () => {
+      renderPage({ boards: many });
+      await openAllTab();
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Entity' }),
+      );
+      expect(
+        await screen.findByRole('menuitem', { name: /payments/ }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getAllByRole('menuitem').map(item => item.textContent),
+      ).toEqual(['✓ All entities', 'payments']);
+    });
+
+    it('filters by creator and replaces the selection rather than adding to it', async () => {
+      const { boardsApi } = renderPage({ boards: many });
+      await openAllTab();
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Created by' }),
+      );
+      await userEvent.click(
+        await screen.findByRole('menuitem', { name: 'bob' }),
+      );
+      await waitFor(() =>
+        expect(boardsApi.listBoards).toHaveBeenCalledWith(
+          expect.objectContaining({ createdBy: 'user:default/bob' }),
+        ),
+      );
+
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Created by: bob' }),
+      );
+      await userEvent.click(
+        await screen.findByRole('menuitem', { name: 'alice' }),
+      );
+      await waitFor(() =>
+        expect(boardsApi.listBoards).toHaveBeenCalledWith(
+          expect.objectContaining({ createdBy: 'user:default/alice' }),
+        ),
+      );
+      expect(boardsApi.listBoards).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          createdBy: ['user:default/bob', 'user:default/alice'],
+        }),
+      );
+    });
+
+    it('says nothing matched, and clears back to the full list', async () => {
+      renderPage({ boards: many });
+      await openAllTab();
+      await userEvent.type(
+        await screen.findByRole('searchbox', { name: 'Search boards' }),
+        'nothing here',
+      );
+      expect(
+        await screen.findByText('No boards match your filters.'),
+      ).toBeInTheDocument();
+      // and not the message for a user who has no boards at all
+      expect(
+        screen.queryByText('No boards are accessible to you yet. Create one!'),
+      ).not.toBeInTheDocument();
+
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Clear filters' }),
+      );
+      expect(
+        await screen.findByRole('row', { name: /Payments/ }),
+      ).toBeInTheDocument();
+    });
+
+    it('pages through the listing and reports the range', async () => {
+      const { boardsApi } = renderPage({ boards: many });
+      await openAllTab();
+      await userEvent.click(
+        await screen.findByRole('button', { name: /Page size/ }),
+      );
+      await userEvent.click(
+        await screen.findByRole('option', { name: '10 per page' }),
+      );
+      expect(await screen.findByText('1–3 of 3 boards')).toBeInTheDocument();
+      // one page holds everything, so there is nowhere to step
+      expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+      await waitFor(() =>
+        expect(boardsApi.listBoards).toHaveBeenCalledWith(
+          expect.objectContaining({ limit: 10, offset: 0 }),
+        ),
+      );
+    });
+
+    /** Enough boards to page, few enough to keep the render cheap. */
+    const dozen = Array.from({ length: 12 }, (_, index) =>
+      testBoardListEntry({
+        id: `board-${index}`,
+        name: `Board ${String(index).padStart(2, '0')}`,
+      }),
+    );
+
+    /** Shrinks the page so twelve boards span two of them. */
+    async function choosePageSizeOfTen() {
+      await userEvent.click(
+        await screen.findByRole('button', { name: /Page size/ }),
+      );
+      await userEvent.click(
+        await screen.findByRole('option', { name: '10 per page' }),
+      );
+    }
+
+    it('steps to the next page and back', async () => {
+      renderPage({ boards: dozen });
+      await userEvent.click(
+        await screen.findByRole('tab', { name: 'All (12)' }),
+      );
+      await choosePageSizeOfTen();
+      expect(await screen.findByText('1–10 of 12 boards')).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Next' }));
+      expect(await screen.findByText('11–12 of 12 boards')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Previous' }));
+      expect(await screen.findByText('1–10 of 12 boards')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Previous' })).toBeDisabled();
+    });
+
+    it('returns to the first page when a filter changes', async () => {
+      renderPage({ boards: dozen });
+      await userEvent.click(
+        await screen.findByRole('tab', { name: 'All (12)' }),
+      );
+      await choosePageSizeOfTen();
+      await userEvent.click(screen.getByRole('button', { name: 'Next' }));
+      await screen.findByText('11–12 of 12 boards');
+
+      // the second page would be empty for this search, so paging has to
+      // fall back to the first rather than leave the user staring at it
+      await userEvent.type(
+        screen.getByRole('searchbox', { name: 'Search boards' }),
+        'Board 0',
+      );
+      expect(await screen.findByText(/^1–/)).toBeInTheDocument();
+    });
+
+    it('never asks the catalog for a list of users or entities', async () => {
+      const catalogApi = {
+        getEntitiesByRefs: jest.fn(
+          async (request: { entityRefs: string[] }) => ({
+            items: request.entityRefs.map(() => undefined),
+          }),
+        ),
+        getEntities: jest.fn(async () => ({ items: [] })),
+      };
+      const boardsApi = testBoardsApi({
+        listBoards: listBoardsDouble(many),
+        listFilterOptions: jest.fn().mockResolvedValue({
+          total: many.length,
+          entityRefs: ['system:default/payments'],
+          creators: ['user:default/alice', 'user:default/bob'],
+        }),
+      });
+      renderWithProviders(<BoardListPage />, {
+        apis: [
+          [boardsApiRef, boardsApi],
+          [catalogApiRef, catalogApi],
+        ],
+        mountedRoutes: { '/boards': rootRouteRef },
+      });
+      await userEvent.click(
+        await screen.findByRole('tab', { name: `All (${many.length})` }),
+      );
+      await userEvent.click(
+        await screen.findByRole('button', { name: 'Created by' }),
+      );
+      await screen.findByRole('menuitem', { name: /alice/ });
+
+      // the options come from the boards the user can read; the catalog is
+      // only ever asked to put a name on a ref it was already handed
+      expect(catalogApi.getEntities).not.toHaveBeenCalled();
+      expect(boardsApi.listFilterOptions).toHaveBeenCalled();
+    });
+
+    it('gives the favorites tab no filter bar', async () => {
+      renderPage({ boards: many });
+      expect(
+        await screen.findByRole('tab', { name: 'Favorites (0)' }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('searchbox', { name: 'Search boards' }),
+      ).not.toBeInTheDocument();
+    });
   });
 });

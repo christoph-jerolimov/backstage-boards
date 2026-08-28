@@ -1,4 +1,5 @@
 import {
+  keepPreviousData,
   QueryClient,
   useMutation,
   useQueries,
@@ -13,7 +14,7 @@ import {
   BoardWithContext,
   errorMessage,
 } from '@internal/plugin-boards-common';
-import { boardsApiRef } from './api';
+import { BoardListQuery, boardsApiRef } from './api';
 
 /**
  * Plugin-scoped query client. Provided by the boards pages themselves so
@@ -31,6 +32,9 @@ export const boardsQueryClient = new QueryClient({
 
 export const queryKeys = {
   boards: ['boards'] as const,
+  /** One page of the board list, keyed by its filters and paging. */
+  boardsPage: ['boards', 'page'] as const,
+  filterOptions: ['boards', 'filter-options'] as const,
   board: (boardId: string) => ['boards', boardId] as const,
   items: (boardId: string) => ['items', boardId] as const,
   myItems: ['boards', 'my-items'] as const,
@@ -53,11 +57,26 @@ export const queryKeys = {
   identity: ['boards', 'identity'] as const,
 };
 
-export function useBoardsQuery() {
+/**
+ * One page of the board list. Keyed by the whole request so each
+ * filter/page combination caches on its own, and the previous page stays
+ * on screen while the next one loads instead of the table flashing empty.
+ */
+export function useBoardsPageQuery(query: BoardListQuery) {
   const boardsApi = useApi(boardsApiRef);
   return useQuery({
-    queryKey: queryKeys.boards,
-    queryFn: () => boardsApi.listBoards(),
+    queryKey: [...queryKeys.boardsPage, query] as const,
+    queryFn: () => boardsApi.listBoards(query),
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** The options the board list's filter dropdowns offer. */
+export function useBoardFilterOptionsQuery() {
+  const boardsApi = useApi(boardsApiRef);
+  return useQuery({
+    queryKey: queryKeys.filterOptions,
+    queryFn: () => boardsApi.listFilterOptions(),
   });
 }
 
@@ -65,7 +84,8 @@ export function useBoardsQuery() {
  * The board listing behind the home page widget. Keyed by its options so
  * the four setting combinations stay cached side by side; freshness comes
  * from the `boards` signal channel rather than `invalidateBoard`, which
- * only invalidates the exact `queryKeys.boards` entry.
+ * only invalidates the exact `queryKeys.boards` entry. The widget renders
+ * a plain list, so the page wrapper is unwrapped here.
  */
 export function useBoardListQuery(options: {
   favoritesOnly: boolean;
@@ -79,6 +99,7 @@ export function useBoardListQuery(options: {
         favoritesOnly: options.favoritesOnly,
         withCounts: options.withCounts,
       }),
+    select: result => result.boards,
   });
 }
 
@@ -119,6 +140,7 @@ export function useBoardsByEntityQuery(entityRef: string) {
   return useQuery({
     queryKey: ['boards', 'byEntity', entityRef],
     queryFn: () => boardsApi.listBoards({ entityRef }),
+    select: result => result.boards,
   });
 }
 
@@ -175,6 +197,9 @@ export async function invalidateBoard(
     client.invalidateQueries({ queryKey: queryKeys.board(boardId) }),
     client.invalidateQueries({ queryKey: queryKeys.items(boardId) }),
     client.invalidateQueries({ queryKey: queryKeys.boards, exact: true }),
+    // the paged listing hangs off its own key, which the exact
+    // invalidation above cannot reach
+    client.invalidateQueries({ queryKey: queryKeys.boardsPage }),
   ]);
 }
 

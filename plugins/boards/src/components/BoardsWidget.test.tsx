@@ -35,7 +35,10 @@ function renderWidget(
 ) {
   const listBoards = over.error
     ? jest.fn().mockRejectedValue(over.error)
-    : jest.fn().mockResolvedValue(over.boards ?? boards);
+    : jest.fn().mockResolvedValue({
+        boards: over.boards ?? boards,
+        total: (over.boards ?? boards).length,
+      });
   const boardsApi = testBoardsApi({ listBoards });
   renderWithProviders(<BoardsContent {...props} />, {
     apis: [[boardsApiRef, boardsApi]],

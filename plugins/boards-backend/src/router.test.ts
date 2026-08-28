@@ -9,8 +9,10 @@ import express from 'express';
 import request from 'supertest';
 import { Knex } from 'knex';
 import {
+  BoardFilterOptions,
   BoardItem,
   BoardListEntry,
+  MAX_BOARD_PAGE_SIZE,
   BoardPermissionEntry,
   BoardWithContext,
   CommentVersion,
@@ -382,6 +384,94 @@ describe('createRouter', () => {
     expect({ ...countedBoards[0], statusCounts: undefined }).toEqual({
       ...plainBoards[0],
       statusCounts: undefined,
+    });
+  });
+
+  it('pages the listing and reports the total of matches', async () => {
+    for (const name of ['A', 'B', 'C']) {
+      await service.createBoard(alice, { name });
+    }
+    const page = await request(app)
+      .get('/boards?limit=2&offset=1')
+      .set('x-test-user', 'alice')
+      .expect(200);
+    const result = body<{
+      boards: BoardListEntry[];
+      total: number;
+      limit: number;
+      offset: number;
+    }>(page);
+    expect(result.boards.map(board => board.name)).toEqual(['B', 'C']);
+    expect(result).toMatchObject({ total: 3, limit: 2, offset: 1 });
+  });
+
+  it('returns every board and no paging fields without a limit', async () => {
+    for (const name of ['A', 'B']) {
+      await service.createBoard(alice, { name });
+    }
+    const all = await request(app)
+      .get('/boards')
+      .set('x-test-user', 'alice')
+      .expect(200);
+    const result = body<Record<string, unknown>>(all);
+    expect(result.total).toBe(2);
+    expect(Object.keys(result)).toEqual(['boards', 'total']);
+  });
+
+  it('filters the listing by search and creator', async () => {
+    await service.createBoard(alice, { name: 'Payments' });
+    await service.createBoard(alice, { name: 'Shipping' });
+    const search = await request(app)
+      .get('/boards?search=pay')
+      .set('x-test-user', 'alice')
+      .expect(200);
+    expect(
+      body<{ boards: BoardListEntry[] }>(search).boards.map(
+        board => board.name,
+      ),
+    ).toEqual(['Payments']);
+
+    const byOther = await request(app)
+      .get('/boards?createdBy=user%3Adefault%2Fbob')
+      .set('x-test-user', 'alice')
+      .expect(200);
+    expect(body<{ boards: BoardListEntry[] }>(byOther).boards).toEqual([]);
+  });
+
+  it('rejects paging parameters that are not numbers', async () => {
+    for (const query of ['limit=all', 'offset=-1', 'limit=0']) {
+      await request(app)
+        .get(`/boards?${query}`)
+        .set('x-test-user', 'alice')
+        .expect(400);
+    }
+  });
+
+  it('clamps a page larger than the maximum', async () => {
+    await service.createBoard(alice, { name: 'A' });
+    const response = await request(app)
+      .get('/boards?limit=5000')
+      .set('x-test-user', 'alice')
+      .expect(200);
+    expect(body<{ limit: number }>(response).limit).toBe(MAX_BOARD_PAGE_SIZE);
+  });
+
+  it('answers the filter options ahead of the board id route', async () => {
+    await service.createBoard(alice, {
+      name: 'Mine',
+      entityRefs: ['system:default/payments'],
+    });
+    await service.createBoard(bob, { name: 'Theirs' });
+
+    const response = await request(app)
+      .get('/boards/facets')
+      .set('x-test-user', 'alice')
+      .expect(200);
+    // a 404 here would mean ':boardId' matched 'facets' first
+    expect(body<BoardFilterOptions>(response)).toEqual({
+      total: 1,
+      entityRefs: ['system:default/payments'],
+      creators: ['user:default/alice'],
     });
   });
 

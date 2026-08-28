@@ -5,6 +5,7 @@ import {
   UserInfoService,
 } from '@backstage/backend-plugin-api';
 import { InputError } from '@backstage/errors';
+import { MAX_BOARD_PAGE_SIZE } from '@internal/plugin-boards-common';
 import express from 'express';
 import Router from 'express-promise-router';
 import { Request } from 'express';
@@ -34,6 +35,36 @@ export interface RouterOptions {
   auth: Pick<AuthService, 'isPrincipal'>;
   userInfo: Pick<UserInfoService, 'getUserInfo'>;
   logger: LoggerService;
+}
+
+/** A query parameter as a string, or undefined when it is absent or repeated. */
+function stringParam(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+/**
+ * A paging query parameter. Absent is undefined — the listing is then
+ * unpaged; anything that is not an integer within `bounds` is rejected
+ * rather than silently ignored, so a typo in a page link cannot quietly
+ * return the first page instead. A value beyond the upper bound is
+ * clamped, so no request can ask for an unbounded response.
+ */
+function pageNumber(
+  value: unknown,
+  name: string,
+  bounds: { min: number; max?: number },
+): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  const parsed =
+    typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : NaN;
+  if (Number.isNaN(parsed) || parsed < bounds.min) {
+    throw new InputError(
+      `${name} must be an integer of at least ${bounds.min}`,
+    );
+  }
+  return bounds.max === undefined ? parsed : Math.min(parsed, bounds.max);
 }
 
 export async function resolvePrincipal(
@@ -90,17 +121,29 @@ export async function createRouter(
 
   // ---- boards
 
+  // Registered before '/boards/:boardId', which would otherwise match
+  // 'facets' as a board id and answer 404 for every caller.
+  router.get('/boards/facets', async (req, res) => {
+    const principal = await principalOf(req);
+    res.json(await service.listFilterOptions(principal));
+  });
+
   router.get('/boards', async (req, res) => {
     const principal = await principalOf(req);
-    const boards = await service.listBoards(principal, {
-      favoritesOnly: req.query.favorites === 'true',
-      withCounts: req.query.counts === 'true',
-      entityRef:
-        typeof req.query.entityRef === 'string'
-          ? req.query.entityRef
-          : undefined,
-    });
-    res.json({ boards });
+    res.json(
+      await service.listBoards(principal, {
+        favoritesOnly: req.query.favorites === 'true',
+        withCounts: req.query.counts === 'true',
+        entityRef: stringParam(req.query.entityRef),
+        search: stringParam(req.query.search),
+        createdBy: stringParam(req.query.createdBy),
+        limit: pageNumber(req.query.limit, 'limit', {
+          min: 1,
+          max: MAX_BOARD_PAGE_SIZE,
+        }),
+        offset: pageNumber(req.query.offset, 'offset', { min: 0 }),
+      }),
+    );
   });
 
   router.post('/boards', async (req, res) => {
