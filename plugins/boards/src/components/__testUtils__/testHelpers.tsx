@@ -6,6 +6,7 @@ import {
   BoardColumn,
   BoardItem,
   BoardListEntry,
+  BoardWithContext,
   MyBoardItem,
 } from '@internal/plugin-boards-common';
 import { BoardsApi } from '../../api';
@@ -16,9 +17,12 @@ import { BoardActions } from '../BoardView';
  * catalog entity links need) with a fresh query client and any stubbed
  * APIs.
  */
+/** The options `renderInTestApp` accepts, so ours stay in step with it. */
+type TestAppOptions = NonNullable<Parameters<typeof renderInTestApp>[1]>;
+
 export function renderWithProviders(
   ui: ReactElement,
-  options?: { apis?: any[]; mountedRoutes?: Record<string, any> },
+  options?: Pick<TestAppOptions, 'apis' | 'mountedRoutes'>,
 ) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -87,6 +91,26 @@ export function testBoardListEntry(
   };
 }
 
+/** A board with its per-user context, with sensible defaults for tests. */
+export function testBoard(
+  over: Partial<BoardWithContext> = {},
+): BoardWithContext {
+  return {
+    id: 'board-1',
+    name: 'Roadmap',
+    entityRefs: [],
+    visibility: 'private',
+    createdBy: 'user:default/alice',
+    createdAt: '2026-08-01T10:00:00.000Z',
+    updatedAt: '2026-08-02T10:00:00.000Z',
+    columns: [],
+    access: 'admin',
+    favorite: false,
+    watching: false,
+    ...over,
+  };
+}
+
 export function testColumn(over: Partial<BoardColumn> = {}): BoardColumn {
   return {
     id: 'column-1',
@@ -112,12 +136,12 @@ export function testActions(): jest.Mocked<BoardActions> {
     setItemDueDate: jest.fn().mockResolvedValue(undefined),
     setAssignees: jest.fn().mockResolvedValue(undefined),
     deleteItem: jest.fn().mockResolvedValue(undefined),
-  } as unknown as jest.Mocked<BoardActions>;
+  };
 }
 
 /** A BoardsApi where every method is a jest mock with an empty result. */
 export function testBoardsApi(
-  over: Partial<BoardsApi> = {},
+  over: Partial<jest.Mocked<BoardsApi>> = {},
 ): jest.Mocked<BoardsApi> {
   return {
     listBoards: jest.fn().mockResolvedValue([]),
@@ -156,5 +180,5 @@ export function testBoardsApi(
     listDescriptionVersions: jest.fn().mockResolvedValue([]),
     getTimeline: jest.fn().mockResolvedValue([]),
     ...over,
-  } as unknown as jest.Mocked<BoardsApi>;
+  };
 }

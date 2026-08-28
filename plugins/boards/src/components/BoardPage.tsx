@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { BreadcrumbEntry } from '@backstage/frontend-plugin-api';
 import { Flex, Text } from '@backstage/ui';
-import { levelIncludes } from '@internal/plugin-boards-common';
+import { errorMessage, levelIncludes } from '@internal/plugin-boards-common';
 import { useBoardsBasePath } from '../routes';
 import {
   invalidateBoard,
@@ -66,7 +66,7 @@ export function BoardPageContent(props: {
     return (
       <Text style={{ padding: 16 }}>
         Board could not be loaded:{' '}
-        {(boardError as Error)?.message ?? 'not found'}
+        {boardError ? errorMessage(boardError) : 'not found'}
       </Text>
     );
   }

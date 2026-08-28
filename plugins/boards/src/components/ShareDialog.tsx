@@ -11,6 +11,7 @@ import {
 } from '@backstage/ui';
 import {
   ALL_LEVELS,
+  ALL_VISIBILITIES,
   BoardPermissionLevel,
   BoardVisibility,
   BoardWithContext,
@@ -20,15 +21,21 @@ import { boardsApiRef } from '../api';
 import { queryKeys } from '../queries';
 import { PrincipalPicker } from './PrincipalPicker';
 import { useAsyncAction } from './useAsyncAction';
-import { ErrorText, RefDisplay } from './common';
+import { ErrorText, RefDisplay, selectedOption } from './common';
 
-const VISIBILITY_OPTIONS: Array<{ value: BoardVisibility; label: string }> = [
-  { value: 'private', label: 'Private – only people listed below' },
-  { value: 'logged-in-read', label: 'Any logged-in user can view' },
-  { value: 'logged-in-write', label: 'Any logged-in user can edit' },
-  { value: 'public-read', label: 'Public – anyone can view (read-only)' },
-  { value: 'public-write', label: 'Public – anyone can edit' },
-];
+/** Exhaustive by construction: a new visibility must be labelled here. */
+const VISIBILITY_LABELS: Record<BoardVisibility, string> = {
+  private: 'Private – only people listed below',
+  'logged-in-read': 'Any logged-in user can view',
+  'logged-in-write': 'Any logged-in user can edit',
+  'public-read': 'Public – anyone can view (read-only)',
+  'public-write': 'Public – anyone can edit',
+};
+
+const VISIBILITY_OPTIONS = ALL_VISIBILITIES.map(visibility => ({
+  value: visibility,
+  label: VISIBILITY_LABELS[visibility],
+}));
 
 export function ShareDialog(props: {
   board: BoardWithContext;
@@ -68,13 +75,12 @@ export function ShareDialog(props: {
             label="Board visibility"
             options={VISIBILITY_OPTIONS}
             selectedKey={board.visibility}
-            onSelectionChange={key =>
-              save(() =>
-                boardsApi.updateBoard(board.id, {
-                  visibility: key as BoardVisibility,
-                }),
-              )
-            }
+            onSelectionChange={key => {
+              const visibility = selectedOption(key, ALL_VISIBILITIES);
+              if (visibility) {
+                save(() => boardsApi.updateBoard(board.id, { visibility }));
+              }
+            }}
           />
           <Text variant="body-medium" weight="bold">
             People and groups
@@ -89,15 +95,14 @@ export function ShareDialog(props: {
                   aria-label={`Access level for ${entry.principalRef}`}
                   options={ALL_LEVELS.map(l => ({ value: l, label: l }))}
                   selectedKey={entry.level}
-                  onSelectionChange={key =>
-                    save(() =>
-                      boardsApi.updatePermission(
-                        board.id,
-                        entry.id,
-                        key as BoardPermissionLevel,
-                      ),
-                    )
-                  }
+                  onSelectionChange={key => {
+                    const next = selectedOption(key, ALL_LEVELS);
+                    if (next) {
+                      save(() =>
+                        boardsApi.updatePermission(board.id, entry.id, next),
+                      );
+                    }
+                  }}
                 />
                 <Button
                   variant="tertiary"
@@ -130,7 +135,12 @@ export function ShareDialog(props: {
               aria-label="Level for new entry"
               options={ALL_LEVELS.map(l => ({ value: l, label: l }))}
               selectedKey={level}
-              onSelectionChange={key => setLevel(key as BoardPermissionLevel)}
+              onSelectionChange={key => {
+                const next = selectedOption(key, ALL_LEVELS);
+                if (next) {
+                  setLevel(next);
+                }
+              }}
             />
             <Button
               variant="primary"

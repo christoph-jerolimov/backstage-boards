@@ -23,15 +23,19 @@ export interface BoardColumn {
   color?: ColumnColor;
 }
 
-export type ColumnColor =
-  | 'gray'
-  | 'blue'
-  | 'green'
-  | 'yellow'
-  | 'orange'
-  | 'red'
-  | 'purple'
-  | 'teal';
+/** Every column colour, in palette order. */
+export const ALL_COLUMN_COLORS = [
+  'gray',
+  'blue',
+  'green',
+  'yellow',
+  'orange',
+  'red',
+  'purple',
+  'teal',
+] as const;
+
+export type ColumnColor = (typeof ALL_COLUMN_COLORS)[number];
 
 /** Fixed palette for column colors (name -> hex). */
 export const COLUMN_COLORS: Record<ColumnColor, string> = {

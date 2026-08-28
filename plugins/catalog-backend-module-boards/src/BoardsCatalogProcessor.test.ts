@@ -1,36 +1,48 @@
+import { LoggerService } from '@backstage/backend-plugin-api';
 import { Entity } from '@backstage/catalog-model';
 import { CatalogProcessorCache } from '@backstage/plugin-catalog-node';
-import { BoardsCatalogProcessor } from './BoardsCatalogProcessor';
+import { JsonValue } from '@backstage/types';
+import {
+  BoardsCatalogProcessor,
+  BoardsCatalogProcessorOptions,
+} from './BoardsCatalogProcessor';
 
-const logger = {
+const warn = jest.fn();
+
+const logger: LoggerService = {
   info: () => {},
-  warn: jest.fn(),
+  warn,
   error: () => {},
   debug: () => {},
-  child: function child() {
-    return this;
-  },
-} as any;
-
-const discovery = {
-  getBaseUrl: async () => 'http://localhost:7007/api/boards',
-  getExternalBaseUrl: async () => 'http://localhost:7007/api/boards',
+  child: () => logger,
 };
 
-const auth = {
-  getOwnServiceCredentials: async () => ({ principal: 'plugin:catalog' }),
+const discovery: BoardsCatalogProcessorOptions['discovery'] = {
+  getBaseUrl: async () => 'http://localhost:7007/api/boards',
+};
+
+const auth: BoardsCatalogProcessorOptions['auth'] = {
+  getOwnServiceCredentials: async () => ({
+    $$type: '@backstage/BackstageCredentials',
+    principal: { type: 'service', subject: 'plugin:catalog' },
+  }),
   getPluginRequestToken: async () => ({ token: 'token' }),
-} as any;
+};
 
 /** In-memory stand-in for the per-entity, per-processor cache. */
-function createCache(initial?: Record<string, unknown>): CatalogProcessorCache {
-  const store = new Map<string, unknown>(Object.entries(initial ?? {}));
+function createCache(
+  initial?: Record<string, JsonValue>,
+): CatalogProcessorCache {
+  const store = new Map<string, JsonValue>(Object.entries(initial ?? {}));
   return {
-    get: async (key: string) => store.get(key) as any,
-    set: async (key: string, value: unknown) => {
+    // the cache is keyed by string and holds any JSON, so reading an entry
+    // back as the type the caller asked for is what the interface promises
+    get: async <ItemType extends JsonValue>(key: string) =>
+      store.get(key) as ItemType | undefined,
+    set: async (key, value) => {
       store.set(key, value);
     },
-  } as CatalogProcessorCache;
+  };
 }
 
 function entityWithLabels(labels?: Record<string, string>): Entity {
@@ -46,30 +58,30 @@ function entityWithLabels(labels?: Record<string, string>): Entity {
   };
 }
 
-function mockResponse(referenced: boolean) {
-  return {
-    ok: true,
-    status: 200,
-    statusText: 'OK',
-    json: async () => ({ referenced }),
-  } as Response;
+/** A real response, so the processor parses it the way it would in production. */
+function jsonResponse(body: unknown, init?: ResponseInit): Response {
+  return new Response(JSON.stringify(body), {
+    headers: { 'Content-Type': 'application/json' },
+    ...init,
+  });
 }
 
 describe('BoardsCatalogProcessor', () => {
   let processor: BoardsCatalogProcessor;
-  let fetchMock: jest.SpyInstance;
+  let fetchMock: jest.SpyInstance<
+    ReturnType<typeof fetch>,
+    Parameters<typeof fetch>
+  >;
+
+  const location = { type: 'url', target: 'https://example.com/x.yaml' };
 
   const process = (entity: Entity, cache = createCache()) =>
-    processor.postProcessEntity(entity, {} as any, () => {}, cache);
+    processor.postProcessEntity(entity, location, () => {}, cache);
 
   beforeEach(() => {
-    processor = new BoardsCatalogProcessor({
-      discovery: discovery as any,
-      auth,
-      logger,
-    });
-    fetchMock = jest.spyOn(global, 'fetch' as any);
-    logger.warn.mockClear();
+    processor = new BoardsCatalogProcessor({ discovery, auth, logger });
+    fetchMock = jest.spyOn(global, 'fetch');
+    warn.mockClear();
   });
 
   afterEach(() => {
@@ -81,7 +93,7 @@ describe('BoardsCatalogProcessor', () => {
   });
 
   it('labels an entity a board references', async () => {
-    fetchMock.mockResolvedValue(mockResponse(true));
+    fetchMock.mockResolvedValue(jsonResponse({ referenced: true }));
     const result = await process(entityWithLabels());
     expect(result.metadata.labels).toEqual({
       'boards/is-referenced': 'auto-detected',
@@ -89,23 +101,23 @@ describe('BoardsCatalogProcessor', () => {
   });
 
   it('asks the boards backend for this entity, as a service', async () => {
-    fetchMock.mockResolvedValue(mockResponse(true));
+    fetchMock.mockResolvedValue(jsonResponse({ referenced: true }));
     await process(entityWithLabels());
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe(
       'http://localhost:7007/api/boards/service/entity-references?entityRef=component%3Adefault%2Fpayments',
     );
-    expect(init.headers).toEqual({ Authorization: 'Bearer token' });
+    expect(init?.headers).toEqual({ Authorization: 'Bearer token' });
   });
 
   it('leaves an unreferenced entity unlabelled and keeps other labels', async () => {
-    fetchMock.mockResolvedValue(mockResponse(false));
+    fetchMock.mockResolvedValue(jsonResponse({ referenced: false }));
     const result = await process(entityWithLabels({ tier: 'one' }));
     expect(result.metadata.labels).toEqual({ tier: 'one' });
   });
 
   it('strips a label the entity declared itself', async () => {
-    fetchMock.mockResolvedValue(mockResponse(false));
+    fetchMock.mockResolvedValue(jsonResponse({ referenced: false }));
     const result = await process(
       entityWithLabels({ 'boards/is-referenced': 'auto-detected' }),
     );
@@ -113,7 +125,7 @@ describe('BoardsCatalogProcessor', () => {
   });
 
   it('reuses the cached answer when the backend cannot be reached', async () => {
-    fetchMock.mockResolvedValue(mockResponse(true));
+    fetchMock.mockResolvedValue(jsonResponse({ referenced: true }));
     const cache = createCache();
     await process(entityWithLabels(), cache);
 
@@ -122,7 +134,7 @@ describe('BoardsCatalogProcessor', () => {
     expect(result.metadata.labels).toEqual({
       'boards/is-referenced': 'auto-detected',
     });
-    expect(logger.warn).toHaveBeenCalledWith(
+    expect(warn).toHaveBeenCalledWith(
       expect.stringContaining('keeping the last known state'),
     );
   });
@@ -131,22 +143,19 @@ describe('BoardsCatalogProcessor', () => {
     fetchMock.mockRejectedValue(new Error('connection refused'));
     const result = await process(entityWithLabels());
     expect(result.metadata.labels).toBeUndefined();
-    expect(logger.warn).toHaveBeenCalledWith(
+    expect(warn).toHaveBeenCalledWith(
       expect.stringContaining('leaving the entity unlabelled'),
     );
   });
 
   it('treats a non-ok response as a failure', async () => {
-    fetchMock.mockResolvedValue({
-      ok: false,
-      status: 403,
-      statusText: 'Forbidden',
-      json: async () => ({}),
-    } as Response);
+    fetchMock.mockResolvedValue(
+      jsonResponse({}, { status: 403, statusText: 'Forbidden' }),
+    );
     const result = await process(
       entityWithLabels({ 'boards/is-referenced': 'auto-detected' }),
     );
     expect(result.metadata.labels).toEqual({});
-    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('403'));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('403'));
   });
 });

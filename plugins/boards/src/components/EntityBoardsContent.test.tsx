@@ -59,7 +59,7 @@ function renderTab(assigned: ReturnType<typeof board>[]) {
         assigned.find(entry => entry.id === id),
       ),
     listItems: jest.fn().mockResolvedValue([]),
-  } as any);
+  });
   renderWithProviders(<EntityBoardsContent />, {
     apis: [
       [boardsApiRef, boardsApi],

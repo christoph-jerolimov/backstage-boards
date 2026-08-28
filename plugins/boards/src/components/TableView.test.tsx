@@ -2,11 +2,11 @@ import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { identityApiRef } from '@backstage/frontend-plugin-api';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
-import { BoardWithContext } from '@internal/plugin-boards-common';
 import { TableView } from './TableView';
 import {
   renderWithProviders,
   testActions,
+  testBoard,
   testColumn,
   testItem,
 } from './__testUtils__/testHelpers';
@@ -23,15 +23,12 @@ const catalogApi = {
   getEntitiesByRefs: jest.fn().mockResolvedValue({ items: [] }),
 };
 
-const board = {
-  id: 'board-1',
-  name: 'Roadmap',
-  access: 'admin',
+const board = testBoard({
   columns: [
     testColumn({ id: 'column-1', title: 'Todo' }),
     testColumn({ id: 'column-2', title: 'Done', position: 2000 }),
   ],
-} as unknown as BoardWithContext;
+});
 
 const items = [
   testItem({
@@ -110,7 +107,7 @@ describe('TableView', () => {
 
   it('marks externally managed items in the title', () => {
     renderTable({
-      items: [testItem({ title: 'Synced', externalManager: 'jira' })] as any,
+      items: [testItem({ title: 'Synced', externalManager: 'jira' })],
     });
     expect(screen.getByText('Synced (via jira)')).toBeInTheDocument();
   });

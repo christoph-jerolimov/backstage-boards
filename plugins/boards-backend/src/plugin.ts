@@ -2,7 +2,6 @@ import {
   coreServices,
   createBackendPlugin,
 } from '@backstage/backend-plugin-api';
-import { Knex } from 'knex';
 import { actionsRegistryServiceRef } from '@backstage/backend-plugin-api/alpha';
 import { catalogServiceRef } from '@backstage/plugin-catalog-node';
 import { notificationService } from '@backstage/plugin-notifications-node';
@@ -52,8 +51,7 @@ export const boardsPlugin = createBackendPlugin({
         signals,
         actionsRegistry,
       }) {
-        // the framework bundles its own copy of the knex types
-        const knex = (await database.getClient()) as unknown as Knex;
+        const knex = await database.getClient();
         await applyDatabaseMigrations(knex);
 
         const refreshEntities = async (entityRefs: string[]) => {

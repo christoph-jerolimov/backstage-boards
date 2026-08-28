@@ -1,6 +1,7 @@
 import { createExtensionTester } from '@backstage/frontend-test-utils';
 import { EntityContentBlueprint } from '@backstage/plugin-catalog-react/alpha';
 import { Entity } from '@backstage/catalog-model';
+import { FilterPredicate } from '@backstage/filter-predicates';
 import { boardsPlugin } from './plugin';
 
 // Lives in its own file: instantiating an extension tester in the same file
@@ -16,10 +17,10 @@ function entity(labels?: Record<string, string>): Entity {
 }
 
 describe('entity boards content filter', () => {
-  const filterFor = (config?: { filter?: unknown }) => {
+  const filterFor = (config?: { filter: FilterPredicate }) => {
     const filter = createExtensionTester(
       boardsPlugin.getExtension('entity-content:boards/entity')!,
-      config ? { config: config as any } : undefined,
+      config ? { config } : undefined,
     ).get(EntityContentBlueprint.dataRefs.filterFunction);
     if (!filter) {
       throw new Error('the boards entity content declares no entity filter');

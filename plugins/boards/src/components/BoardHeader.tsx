@@ -26,13 +26,16 @@ import { BoardWithContext, purgeDate } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
 import { queryKeys } from '../queries';
 import { useApi } from '@backstage/frontend-plugin-api';
-import { GroupByMode } from './grouping';
-import { EntityRefList, InlineEdit } from './common';
+import { ALL_GROUP_BY_MODES, GroupByMode } from './grouping';
+import { EntityRefList, InlineEdit, selectedOption } from './common';
 import { FavoriteButton } from './FavoriteButton';
 import { WatchButton } from './WatchButton';
 import { BoardDialogKind } from './BoardDialogs';
 
-export type BoardViewMode = 'board' | 'table';
+/** Every layout the board page can be shown in. */
+export const ALL_BOARD_VIEW_MODES = ['board', 'table'] as const;
+
+export type BoardViewMode = (typeof ALL_BOARD_VIEW_MODES)[number];
 
 function EntitySection(props: { entityRefs: string[] }) {
   if (props.entityRefs.length === 0) {
@@ -118,7 +121,7 @@ export function BoardHeader(props: {
             ]}
             selectedKey={groupBy}
             onSelectionChange={key =>
-              onGroupByChange((key as GroupByMode) ?? 'none')
+              onGroupByChange(selectedOption(key, ALL_GROUP_BY_MODES) ?? 'none')
             }
           />
           <ToggleButtonGroup
@@ -128,7 +131,8 @@ export function BoardHeader(props: {
             selectedKeys={[view]}
             onSelectionChange={keys => {
               const [key] = [...keys];
-              if (key) onViewChange(key as BoardViewMode);
+              const next = selectedOption(key, ALL_BOARD_VIEW_MODES);
+              if (next) onViewChange(next);
             }}
           >
             <ToggleButton id="board" aria-label="Board view">

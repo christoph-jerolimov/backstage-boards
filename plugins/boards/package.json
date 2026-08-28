@@ -49,6 +49,7 @@
   },
   "devDependencies": {
     "@backstage/cli": "^0.36.5",
+    "@backstage/filter-predicates": "^0.1.4",
     "@backstage/frontend-test-utils": "^0.6.0",
     "@playwright/test": "^1.32.3",
     "@testing-library/dom": "^10.0.0",

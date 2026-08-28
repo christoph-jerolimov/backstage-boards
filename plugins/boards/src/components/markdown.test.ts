@@ -1,4 +1,17 @@
-import { autolinkEntities, parseMarkdown } from './markdown';
+import {
+  autolinkEntities,
+  BlockToken,
+  InlineToken,
+  parseMarkdown,
+} from './markdown';
+
+/** The inline tokens of a paragraph, failing the test for any other block. */
+function paragraphChildren(block: BlockToken): InlineToken[] {
+  if (block.type !== 'paragraph') {
+    throw new Error(`Expected a paragraph block, got '${block.type}'`);
+  }
+  return block.children;
+}
 
 describe('autolinkEntities', () => {
   it('links catalog entity refs with namespace', () => {
@@ -78,10 +91,9 @@ describe('parseMarkdown', () => {
       ],
     });
     const [nonLink] = parseMarkdown('[x](javascript:alert(1))');
-    expect(nonLink.type).toBe('paragraph');
-    expect((nonLink as any).children.some((t: any) => t.type === 'link')).toBe(
-      false,
-    );
+    expect(
+      paragraphChildren(nonLink).some(token => token.type === 'link'),
+    ).toBe(false);
   });
 
   it('parses code blocks verbatim without linking', () => {
@@ -118,7 +130,7 @@ describe('parseMarkdown', () => {
 
   it('auto-links entities inside paragraphs', () => {
     const [block] = parseMarkdown('deployed to system:default/payments');
-    expect((block as any).children).toContainEqual({
+    expect(paragraphChildren(block)).toContainEqual({
       type: 'entity',
       entityRef: 'system:default/payments',
     });

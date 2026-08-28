@@ -9,6 +9,7 @@ import {
 } from '@backstage/plugin-home-react/alpha';
 import { boardsApiRef } from './api';
 import { boardsPlugin } from './plugin';
+import { testBoardsApi } from './components/__testUtils__/testHelpers';
 
 describe('boardsPlugin', () => {
   it('registers the api, the page and the entity content', () => {
@@ -32,15 +33,15 @@ describe('boardsPlugin', () => {
       'Boards',
       ['scope', 'showCounts'],
     ],
-  ])(
+  ] as const)(
     'contributes %s as a home page widget with its settings schema',
     (id, name, title, properties) => {
-      const extension = boardsPlugin.getExtension(id as any);
+      const extension = boardsPlugin.getExtension(id);
       expect(extension).toBeDefined();
 
-      const widget = createExtensionTester(extension!).get(
+      const widget: HomePageWidgetData = createExtensionTester(extension!).get(
         homePageWidgetDataRef,
-      ) as HomePageWidgetData;
+      );
       // the name is what app-config's home defaultConfig references
       expect(widget.name).toBe(name);
       expect(widget.title).toBe(title);
@@ -63,9 +64,7 @@ describe('boardsPlugin', () => {
     renderTestApp({
       features: [boardsPlugin],
       initialRouteEntries: ['/boards'],
-      apis: [
-        [boardsApiRef, { listBoards: jest.fn().mockResolvedValue([]) } as any],
-      ],
+      apis: [[boardsApiRef, testBoardsApi()]],
     });
     expect(
       await screen.findByRole('tab', { name: 'Favorites (0)' }),

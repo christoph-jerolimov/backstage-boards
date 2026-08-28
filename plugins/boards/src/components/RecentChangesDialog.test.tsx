@@ -35,7 +35,7 @@ const changes = [
 function renderDialog(over: { isOpen?: boolean; entries?: unknown[] } = {}) {
   const boardsApi = testBoardsApi({
     getBoardChanges: jest.fn().mockResolvedValue(over.entries ?? changes),
-  } as any);
+  });
   const onOpenChange = jest.fn();
   const onOpenItem = jest.fn();
   renderWithProviders(

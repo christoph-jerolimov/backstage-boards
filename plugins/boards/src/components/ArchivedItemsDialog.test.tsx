@@ -23,7 +23,7 @@ function renderDialog(
   const boardsApi = testBoardsApi({
     listArchivedItems: jest.fn().mockResolvedValue(over.items ?? archived),
     restoreItem: jest.fn().mockResolvedValue(undefined),
-  } as any);
+  });
   const onChanged = jest.fn().mockResolvedValue(undefined);
   renderWithProviders(
     <ArchivedItemsDialog

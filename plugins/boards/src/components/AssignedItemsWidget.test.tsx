@@ -52,7 +52,7 @@ function renderWidget(
   const listMyItems = over.error
     ? jest.fn().mockRejectedValue(over.error)
     : jest.fn().mockResolvedValue(over.items ?? entries);
-  const boardsApi = testBoardsApi({ listMyItems } as any);
+  const boardsApi = testBoardsApi({ listMyItems });
   renderWithProviders(<AssignedItemsContent {...props} />, {
     apis: [[boardsApiRef, boardsApi]],
     mountedRoutes: { '/boards': rootRouteRef },

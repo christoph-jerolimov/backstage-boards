@@ -24,7 +24,7 @@ import {
   TextField,
 } from '@backstage/ui';
 import { RiArrowRightLine } from '@remixicon/react';
-import { BoardListEntry } from '@internal/plugin-boards-common';
+import { BoardListEntry, errorMessage } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
 import {
   boardsQueryClient,
@@ -137,7 +137,7 @@ export function BoardListPage() {
     pending: creating,
     run,
   } = useAsyncAction({
-    formatError: err => `Could not create board: ${err.message}`,
+    formatError: err => `Could not create board: ${errorMessage(err)}`,
   });
 
   const {

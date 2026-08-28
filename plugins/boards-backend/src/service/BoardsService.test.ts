@@ -6,15 +6,17 @@ import {
   bob,
   carol,
   createTestService,
+  recipientRefs,
   syncService,
+  TestService,
 } from './testUtils';
 
 describe('BoardsService', () => {
   let knex: Knex;
   let service: BoardsService;
-  let notifications: { send: jest.Mock };
-  let signals: { publish: jest.Mock };
-  let onEntityRefsChanged: jest.Mock;
+  let notifications: TestService['notifications'];
+  let signals: TestService['signals'];
+  let onEntityRefsChanged: TestService['onEntityRefsChanged'];
 
   beforeEach(async () => {
     ({ knex, service, notifications, signals, onEntityRefsChanged } =
@@ -1452,7 +1454,7 @@ describe('BoardsService', () => {
       await service.setWatchBoard(carol, board.id, true);
       await service.updateItem(alice, board.id, item.id, { title: 'New' });
       expect(notifications.send).toHaveBeenCalledTimes(1);
-      expect(notifications.send.mock.calls[0][0].recipients.entityRef).toEqual([
+      expect(recipientRefs(notifications.send.mock.calls[0][0])).toEqual([
         'user:default/carol',
       ]);
     });
@@ -1470,7 +1472,7 @@ describe('BoardsService', () => {
       await service.setWatchItem(carol, board.id, item.id, true);
       await service.updateItem(alice, board.id, item.id, { title: 'New' });
       expect(notifications.send).toHaveBeenCalledTimes(1);
-      expect(notifications.send.mock.calls[0][0].recipients.entityRef).toEqual([
+      expect(recipientRefs(notifications.send.mock.calls[0][0])).toEqual([
         'user:default/carol',
       ]);
     });
@@ -1524,7 +1526,7 @@ describe('BoardsService', () => {
       );
       expect(notifications.send).toHaveBeenCalledTimes(1);
       const call = notifications.send.mock.calls[0][0];
-      expect(call.recipients.entityRef).toEqual(['user:default/carol']);
+      expect(recipientRefs(call)).toEqual(['user:default/carol']);
       expect(call.payload.title).toMatch(/mentioned/i);
       expect(call.payload.link).toContain(`item=${item.id}`);
     });
@@ -1541,7 +1543,7 @@ describe('BoardsService', () => {
       // carol: only the mention; alice: nothing despite self-mention
       expect(notifications.send).toHaveBeenCalledTimes(1);
       const call = notifications.send.mock.calls[0][0];
-      expect(call.recipients.entityRef).toEqual(['user:default/carol']);
+      expect(recipientRefs(call)).toEqual(['user:default/carol']);
       expect(call.payload.title).toMatch(/mentioned/i);
     });
 
@@ -1551,9 +1553,9 @@ describe('BoardsService', () => {
         description: 'owned by @group:default/guests',
       });
       const mentionCall = notifications.send.mock.calls.find(
-        (call: any[]) => call[0].payload.title === 'You were mentioned',
+        ([options]) => options.payload.title === 'You were mentioned',
       );
-      expect(mentionCall?.[0].recipients.entityRef).toEqual([
+      expect(mentionCall && recipientRefs(mentionCall[0])).toEqual([
         'group:default/guests',
       ]);
     });

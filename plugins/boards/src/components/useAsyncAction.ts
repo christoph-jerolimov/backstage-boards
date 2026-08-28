@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { errorMessage } from '@internal/plugin-boards-common';
 
 export interface AsyncActionHandle {
   /** The message of the last failure, until the next run starts. */
@@ -22,7 +23,7 @@ export interface AsyncActionHandle {
  */
 export function useAsyncAction(options?: {
   /** The message shown for a failure; defaults to the error's own. */
-  formatError?: (error: Error) => string;
+  formatError?: (error: unknown) => string;
 }): AsyncActionHandle {
   const [error, setError] = useState<string | undefined>();
   const [pending, setPending] = useState(false);
@@ -36,7 +37,7 @@ export function useAsyncAction(options?: {
         await action();
         return undefined;
       } catch (err) {
-        const message = formatError?.(err as Error) ?? (err as Error).message;
+        const message = formatError?.(err) ?? errorMessage(err);
         setError(message);
         return message;
       } finally {

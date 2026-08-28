@@ -27,6 +27,14 @@ export type ReminderScope = (typeof REMINDER_SCOPES)[number];
 export const REMINDER_GROUPINGS = ['combined', 'per-board'] as const;
 export type ReminderGrouping = (typeof REMINDER_GROUPINGS)[number];
 
+function isReminderScope(value: string): value is ReminderScope {
+  return REMINDER_SCOPES.some(scope => scope === value);
+}
+
+function isReminderGrouping(value: string): value is ReminderGrouping {
+  return REMINDER_GROUPINGS.some(grouping => grouping === value);
+}
+
 export interface ReminderConfig {
   id: string;
   /** Standard Backstage scheduler configuration. */
@@ -65,17 +73,16 @@ export function readRemindersConfig(
         `boards.reminders '${id}' has an invalid 'schedule': ${error}`,
       );
     }
-    const scope = (entry.getOptionalString('scope') ?? 'all') as ReminderScope;
-    if (!REMINDER_SCOPES.includes(scope)) {
+    const scope = entry.getOptionalString('scope') ?? 'all';
+    if (!isReminderScope(scope)) {
       throw new Error(
         `boards.reminders '${id}' has invalid scope '${scope}' (expected one of ${REMINDER_SCOPES.join(
           ', ',
         )})`,
       );
     }
-    const grouping = (entry.getOptionalString('grouping') ??
-      'combined') as ReminderGrouping;
-    if (!REMINDER_GROUPINGS.includes(grouping)) {
+    const grouping = entry.getOptionalString('grouping') ?? 'combined';
+    if (!isReminderGrouping(grouping)) {
       throw new Error(
         `boards.reminders '${id}' has invalid grouping '${grouping}' (expected one of ${REMINDER_GROUPINGS.join(
           ', ',
@@ -116,21 +123,24 @@ export function readRemindersConfig(
  * remaining path is tried as one literal key (handles e.g.
  * `metadata.labels.boards/notifications`).
  */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
 export function entityField(entity: Entity, path: string): unknown {
   const segments = path.split('.');
   let current: unknown = entity;
   for (let i = 0; i < segments.length; i++) {
-    if (current === null || typeof current !== 'object') {
+    if (!isRecord(current)) {
       return undefined;
     }
-    const record = current as Record<string, unknown>;
     const segment = segments[i];
-    if (segment in record) {
-      current = record[segment];
+    if (segment in current) {
+      current = current[segment];
       continue;
     }
     const rest = segments.slice(i).join('.');
-    return rest in record ? record[rest] : undefined;
+    return rest in current ? current[rest] : undefined;
   }
   return current;
 }
@@ -193,8 +203,9 @@ function describe(entries: MyBoardItem[], withBoard: boolean): string {
 export interface ReminderRunOptions {
   reminder: ReminderConfig;
   service: BoardsService;
-  catalog: CatalogService;
-  auth: AuthService;
+  /** Only the entity lookup is used; naming it keeps stubs honest. */
+  catalog: Pick<CatalogService, 'getEntities'>;
+  auth: Pick<AuthService, 'getOwnServiceCredentials'>;
   notifications: NotificationService;
   logger: LoggerService;
   /** Base path for links in notifications; defaults to `/boards`. */

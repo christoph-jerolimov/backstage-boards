@@ -20,7 +20,7 @@ import {
   BoardColumn,
   BoardItem,
   BoardWithContext,
-  COLUMN_COLORS,
+  ALL_COLUMN_COLORS,
   ColumnColor,
 } from '@internal/plugin-boards-common';
 import {
@@ -45,7 +45,10 @@ export interface BoardActions extends ItemActions {
   reorderColumn: (columnId: string, position: number) => Promise<void>;
   /** Appends a column when `position` is omitted, inserts it there otherwise. */
   addColumn: (title: string, position?: number) => Promise<void>;
-  setColumnColor: (columnId: string, color: string | null) => Promise<void>;
+  setColumnColor: (
+    columnId: string,
+    color: ColumnColor | null,
+  ) => Promise<void>;
   deleteColumn: (columnId: string, moveItemsTo?: string) => Promise<void>;
   renameItem: (itemId: string, title: string) => Promise<void>;
 }
@@ -329,7 +332,7 @@ function ColumnLane(props: {
               <SubmenuTrigger>
                 <MenuItem>Color</MenuItem>
                 <Menu>
-                  {(Object.keys(COLUMN_COLORS) as ColumnColor[]).map(color => (
+                  {ALL_COLUMN_COLORS.map(color => (
                     <MenuItem
                       key={color}
                       textValue={color}

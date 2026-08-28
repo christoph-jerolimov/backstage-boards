@@ -1,70 +1,141 @@
 import {
-  AuthService,
   BackstageCredentials,
-  UserInfoService,
+  BackstagePrincipalTypes,
 } from '@backstage/backend-plugin-api';
 import { Knex } from 'knex';
-import { registerActions } from './actions';
+import { z } from 'zod/v3';
+import {
+  ActionsOptions,
+  BoardsActionsRegistry,
+  registerActions,
+} from './actions';
 import { BoardsService } from './service/BoardsService';
-import { createTestService } from './service/testUtils';
+import { createTestService, testLogger } from './service/testUtils';
 
-const auth = {
-  isPrincipal: (credentials: any, type: string) =>
-    credentials.principal?.type === type,
-} as unknown as AuthService;
+/** The principal shapes this harness hands out. */
+type TestPrincipal =
+  | { type: 'user'; userEntityRef: string }
+  | { type: 'service'; subject: string };
 
-const userInfo = {
-  getUserInfo: async (credentials: any) => ({
-    userEntityRef: credentials.principal.userEntityRef,
-    ownershipEntityRefs: [credentials.principal.userEntityRef],
-  }),
-} as unknown as UserInfoService;
+function credentialsOf(principal: TestPrincipal): BackstageCredentials {
+  return { $$type: '@backstage/BackstageCredentials', principal };
+}
 
-const aliceCredentials = {
-  $$type: '@backstage/BackstageCredentials',
-  principal: { type: 'user', userEntityRef: 'user:default/alice' },
-} as unknown as BackstageCredentials;
+function testPrincipal(
+  credentials: BackstageCredentials,
+): TestPrincipal | undefined {
+  const { principal } = credentials;
+  if (typeof principal !== 'object' || principal === null) {
+    return undefined;
+  }
+  if (
+    'userEntityRef' in principal &&
+    typeof principal.userEntityRef === 'string'
+  ) {
+    return { type: 'user', userEntityRef: principal.userEntityRef };
+  }
+  if ('subject' in principal && typeof principal.subject === 'string') {
+    return { type: 'service', subject: principal.subject };
+  }
+  return undefined;
+}
 
-const bobCredentials = {
-  $$type: '@backstage/BackstageCredentials',
-  principal: { type: 'user', userEntityRef: 'user:default/bob' },
-} as unknown as BackstageCredentials;
+const auth: ActionsOptions['auth'] = {
+  isPrincipal: <TType extends keyof BackstagePrincipalTypes>(
+    credentials: BackstageCredentials,
+    type: TType,
+  ): credentials is BackstageCredentials<BackstagePrincipalTypes[TType]> =>
+    testPrincipal(credentials)?.type === type,
+};
 
-const serviceCredentials = {
-  $$type: '@backstage/BackstageCredentials',
-  principal: { type: 'service', subject: 'external:github-sync' },
-} as unknown as BackstageCredentials;
+const userInfo: ActionsOptions['userInfo'] = {
+  getUserInfo: async credentials => {
+    const principal = testPrincipal(credentials);
+    if (principal?.type !== 'user') {
+      throw new Error('not a user principal');
+    }
+    return {
+      userEntityRef: principal.userEntityRef,
+      ownershipEntityRefs: [principal.userEntityRef],
+    };
+  },
+};
 
+const aliceCredentials = credentialsOf({
+  type: 'user',
+  userEntityRef: 'user:default/alice',
+});
+
+const bobCredentials = credentialsOf({
+  type: 'user',
+  userEntityRef: 'user:default/bob',
+});
+
+const serviceCredentials = credentialsOf({
+  type: 'service',
+  subject: 'external:github-sync',
+});
+
+/**
+ * A registered action with its schema types erased — the registry holds
+ * actions of many shapes, so each one validates its own input and output
+ * on the way through instead.
+ */
 type RegisteredAction = {
   name: string;
-  action: (ctx: {
-    input: any;
-    credentials: BackstageCredentials;
-  }) => Promise<any>;
+  run: (input: unknown, credentials: BackstageCredentials) => Promise<unknown>;
 };
 
 function createRegistry() {
   const actions = new Map<string, RegisteredAction>();
-  return {
-    registry: {
-      register: (options: any) => {
-        actions.set(options.name, options);
-      },
+  const registry: BoardsActionsRegistry = {
+    register(options) {
+      const inputSchema = options.schema.input(z);
+      const outputSchema = options.schema.output(z);
+      actions.set(options.name, {
+        name: options.name,
+        run: async (input, credentials) => {
+          const result: unknown = await options.action({
+            input: inputSchema.parse(input),
+            secrets: undefined,
+            logger: testLogger,
+            credentials,
+          });
+          const output =
+            typeof result === 'object' && result !== null && 'output' in result
+              ? result.output
+              : undefined;
+          return outputSchema.parse(output);
+        },
+      });
     },
-    invoke: async (
+  };
+  return {
+    registry,
+    /**
+     * Runs a registered action. Dispatch is by name, so the output shape is
+     * not known statically — it is validated against the action's own output
+     * schema before being read as `TOutput`.
+     */
+    invoke: async <TOutput>(
       name: string,
-      input: any,
+      input: unknown,
       credentials: BackstageCredentials,
-    ) => {
+    ): Promise<TOutput> => {
       const action = actions.get(name);
       if (!action) {
         throw new Error(`action ${name} not registered`);
       }
-      return action.action({ input, credentials } as any);
+      return (await action.run(input, credentials)) as TOutput;
     },
     actions,
   };
 }
+
+/** The output shapes the tests below read. */
+type BoardOutput = { id: string; name: string };
+type IdOutput = { id: string };
+type ItemsOutput = { items: Array<{ id: string; title: string }> };
 
 describe('actions', () => {
   let knex: Knex;
@@ -77,7 +148,7 @@ describe('actions', () => {
     service = testService.service;
     registry = createRegistry();
     registerActions({
-      actionsRegistry: registry.registry as any,
+      actionsRegistry: registry.registry,
       service,
       auth,
       userInfo,
@@ -89,7 +160,7 @@ describe('actions', () => {
   });
 
   it('list-items honors filters and permissions', async () => {
-    const { output: board } = await registry.invoke(
+    const board = await registry.invoke<BoardOutput>(
       'create-board',
       { name: 'B' },
       aliceCredentials,
@@ -110,12 +181,12 @@ describe('actions', () => {
       { boardId: board.id, columnId: columns[0].id, title: 'Untagged' },
       aliceCredentials,
     );
-    const { output } = await registry.invoke(
+    const listed = await registry.invoke<ItemsOutput>(
       'list-items',
       { boardId: board.id, tags: ['bug'] },
       aliceCredentials,
     );
-    expect(output.items.map((i: any) => i.title)).toEqual(['Tagged']);
+    expect(listed.items.map(entry => entry.title)).toEqual(['Tagged']);
     await expect(
       registry.invoke('list-items', { boardId: board.id }, bobCredentials),
     ).rejects.toThrow(/not found/);
@@ -143,12 +214,12 @@ describe('actions', () => {
   });
 
   it('create-board behaves like the UI path', async () => {
-    const { output } = await registry.invoke(
+    const board = await registry.invoke<BoardOutput>(
       'create-board',
       { name: 'Via Action' },
       aliceCredentials,
     );
-    expect(output.id).toBeTruthy();
+    expect(board.id).toBeTruthy();
     const boards = await knex('boards');
     expect(boards).toHaveLength(1);
     const permissions = await knex('board_permissions');
@@ -161,7 +232,7 @@ describe('actions', () => {
   });
 
   it('actions enforce the same permission rules as the REST path', async () => {
-    const { output: board } = await registry.invoke(
+    const board = await registry.invoke<BoardOutput>(
       'create-board',
       { name: 'B' },
       aliceCredentials,
@@ -180,13 +251,13 @@ describe('actions', () => {
   });
 
   it('item actions write the same change records as the service', async () => {
-    const { output: board } = await registry.invoke(
+    const board = await registry.invoke<BoardOutput>(
       'create-board',
       { name: 'B' },
       aliceCredentials,
     );
     const columns = await knex('board_columns').where('board_id', board.id);
-    const { output: item } = await registry.invoke(
+    const item = await registry.invoke<IdOutput>(
       'add-item',
       { boardId: board.id, columnId: columns[0].id, title: 'Item' },
       aliceCredentials,
@@ -212,18 +283,18 @@ describe('actions', () => {
   });
 
   it('comment actions keep versions like the UI path', async () => {
-    const { output: board } = await registry.invoke(
+    const board = await registry.invoke<BoardOutput>(
       'create-board',
       { name: 'B' },
       aliceCredentials,
     );
     const columns = await knex('board_columns').where('board_id', board.id);
-    const { output: item } = await registry.invoke(
+    const item = await registry.invoke<IdOutput>(
       'add-item',
       { boardId: board.id, columnId: columns[0].id, title: 'Item' },
       aliceCredentials,
     );
-    const { output: comment } = await registry.invoke(
+    const comment = await registry.invoke<IdOutput>(
       'add-comment',
       { boardId: board.id, itemId: item.id, text: 'v1' },
       aliceCredentials,
@@ -241,13 +312,13 @@ describe('actions', () => {
   });
 
   it('service callers can create external read-only items via actions', async () => {
-    const { output: board } = await registry.invoke(
+    const board = await registry.invoke<BoardOutput>(
       'create-board',
       { name: 'B', admins: ['user:default/alice'] },
       serviceCredentials,
     );
     const columns = await knex('board_columns').where('board_id', board.id);
-    const { output: item } = await registry.invoke(
+    const item = await registry.invoke<IdOutput>(
       'add-item',
       {
         boardId: board.id,

@@ -22,6 +22,7 @@ import {
   BoardVisibility,
   BoardWithContext,
   ChangeRecord,
+  ChangeType,
   CommentVersion,
   ItemComment,
   ItemFilter,
@@ -41,66 +42,21 @@ import {
 } from '@internal/plugin-boards-common';
 import { Knex } from 'knex';
 import { randomUUID as uuid } from 'crypto';
+import {
+  BoardRow,
+  ChangeRow,
+  CommentRow,
+  ColumnRow,
+  ItemRow,
+  PermissionRow,
+} from '../database/tables';
 import { BoardsPrincipal, actorRef, computeEffectiveLevel } from './access';
 
 const DEFAULT_COLUMNS = ['To do', 'In progress', 'Done'];
+
+/** One row of the grouped item count per board column. */
+type ColumnItemCount = { column_id: string; total: string | number };
 const POSITION_STEP = 1000;
-
-type BoardRow = {
-  id: string;
-  name: string;
-  visibility: BoardVisibility;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-  archived_at: string | null;
-  archived_by: string | null;
-};
-
-type ColumnRow = {
-  id: string;
-  board_id: string;
-  title: string;
-  position: number;
-  color: string | null;
-};
-
-type PermissionRow = {
-  id: string;
-  board_id: string;
-  principal_ref: string;
-  level: BoardPermissionLevel;
-};
-
-type ItemRow = {
-  id: string;
-  board_id: string;
-  column_id: string;
-  position: number;
-  title: string;
-  created_by: string;
-  created_at: string;
-  updated_by: string;
-  updated_at: string;
-  creator_ref: string | null;
-  external_manager: string | null;
-  description: string | null;
-  archived_at: string | null;
-  archived_by: string | null;
-  due_date: string | null;
-};
-
-type ChangeRow = {
-  id: string;
-  item_id: string;
-  board_id: string;
-  actor_ref: string;
-  at: string;
-  type: string;
-  field: string | null;
-  old_value: string | null;
-  new_value: string | null;
-};
 
 function now(): string {
   return new Date().toISOString();
@@ -137,14 +93,20 @@ function toColumn(row: ColumnRow): BoardColumn {
     boardId: row.board_id,
     title: row.title,
     position: row.position,
-    color: (row.color as ColumnColor) ?? undefined,
+    color: row.color ?? undefined,
   };
 }
 
-function assertColumnColor(color: string): asserts color is ColumnColor {
-  if (!Object.keys(COLUMN_COLORS).includes(color)) {
+function isColumnColor(value: string): value is ColumnColor {
+  return Object.keys(COLUMN_COLORS).includes(value);
+}
+
+/** Narrows a caller-supplied colour name to the fixed palette. */
+function parseColumnColor(color: string): ColumnColor {
+  if (!isColumnColor(color)) {
     throw new InputError(`Invalid column color '${color}'`);
   }
+  return color;
 }
 
 function toPermission(row: PermissionRow): BoardPermissionEntry {
@@ -163,7 +125,7 @@ function toChange(row: ChangeRow): ChangeRecord {
     boardId: row.board_id,
     actorRef: row.actor_ref,
     at: row.at,
-    type: row.type as ChangeRecord['type'],
+    type: row.type,
     field: row.field ?? undefined,
     oldValue: row.old_value === null ? undefined : JSON.parse(row.old_value),
     newValue: row.new_value === null ? undefined : JSON.parse(row.new_value),
@@ -247,10 +209,7 @@ export class BoardsService {
   // ---------------------------------------------------------------- access
 
   private async permissionRows(boardId: string): Promise<PermissionRow[]> {
-    return this.knex<PermissionRow>('board_permissions').where(
-      'board_id',
-      boardId,
-    );
+    return this.knex('board_permissions').where('board_id', boardId);
   }
 
   private async effectiveLevel(
@@ -277,9 +236,7 @@ export class BoardsService {
     boardId: string,
     required: BoardPermissionLevel,
   ): Promise<{ board: BoardRow; level: BoardPermissionLevel }> {
-    const board = await this.knex<BoardRow>('boards')
-      .where('id', boardId)
-      .first();
+    const board = await this.knex('boards').where('id', boardId).first();
     if (!board) {
       throw new NotFoundError(`Board ${boardId} not found`);
     }
@@ -348,7 +305,7 @@ export class BoardsService {
         : DEFAULT_COLUMNS;
 
     await this.knex.transaction(async trx => {
-      await trx<BoardRow>('boards').insert({
+      await trx('boards').insert({
         id: boardId,
         name,
         visibility: options.visibility ?? 'private',
@@ -361,7 +318,7 @@ export class BoardsService {
           entityRefs.map(ref => ({ board_id: boardId, entity_ref: ref })),
         );
       }
-      await trx<ColumnRow>('board_columns').insert(
+      await trx('board_columns').insert(
         columnTitles.map((title, index) => ({
           id: uuid(),
           board_id: boardId,
@@ -382,7 +339,7 @@ export class BoardsService {
         }
       }
       if (adminRefs.size > 0) {
-        await trx<PermissionRow>('board_permissions').insert(
+        await trx('board_permissions').insert(
           [...adminRefs].map(ref => ({
             id: uuid(),
             board_id: boardId,
@@ -407,7 +364,7 @@ export class BoardsService {
       boardId,
       'read',
     );
-    const columns = await this.knex<ColumnRow>('board_columns')
+    const columns = await this.knex('board_columns')
       .where('board_id', boardId)
       .orderBy('position');
     const userRef = principal.type === 'user' ? principal.userRef : undefined;
@@ -480,9 +437,7 @@ export class BoardsService {
       withCounts?: boolean;
     },
   ): Promise<BoardListEntry[]> {
-    const query = this.knex<BoardRow>('boards')
-      .whereNull('archived_at')
-      .orderBy('name');
+    const query = this.knex('boards').whereNull('archived_at').orderBy('name');
     if (options?.entityRef) {
       const entityRef = options.entityRef;
       query.whereExists(function entityMatch() {
@@ -545,20 +500,17 @@ export class BoardsService {
     if (boardIds.length === 0) {
       return map;
     }
-    const columns = await this.knex<ColumnRow>('board_columns')
+    const columns = await this.knex('board_columns')
       .whereIn('board_id', boardIds)
       .orderBy(['board_id', 'position']);
-    // knex types an aggregate query's rows as the aggregate alone, so the
-    // grouped column has to be reintroduced here
-    const countRows = (await this.knex('items')
+    // knex infers an aggregate query's rows as the aggregate alone, so the
+    // grouped column has to be named again in the result type
+    const countRows = await this.knex('items')
       .whereIn('board_id', boardIds)
       .whereNull('archived_at')
       .groupBy('column_id')
       .select('column_id')
-      .count({ total: '*' })) as unknown as Array<{
-      column_id: string;
-      total: string | number;
-    }>;
+      .count<{ total: string }, ColumnItemCount[]>({ total: '*' });
     const counts = new Map<string, number>(
       countRows.map(row => [row.column_id, Number(row.total)]),
     );
@@ -568,7 +520,7 @@ export class BoardsService {
         {
           columnId: column.id,
           title: column.title,
-          color: (column.color as ColumnColor) ?? undefined,
+          color: column.color ?? undefined,
           count: counts.get(column.id) ?? 0,
         },
       ]);
@@ -610,7 +562,7 @@ export class BoardsService {
       }
       patch.visibility = update.visibility;
     }
-    await this.knex<BoardRow>('boards').where('id', boardId).update(patch);
+    await this.knex('boards').where('id', boardId).update(patch);
     await this.emitBoardSignal(boardId);
     return this.getBoard(principal, boardId);
   }
@@ -705,7 +657,7 @@ export class BoardsService {
       .whereNotNull('archived_at')
       .where('archived_at', '<', olderThan.toISOString())
       .select('id');
-    const ids = rows.map(row => row.id as string);
+    const ids = rows.map(row => row.id);
     if (ids.length > 0) {
       await this.cascadeDeleteBoards(ids);
       this.logger.info(`Purged ${ids.length} archived boards`);
@@ -764,7 +716,7 @@ export class BoardsService {
     if (principal.type === 'anonymous') {
       throw new NotAllowedError('Duplicating a board requires authentication');
     }
-    const sourceColumns = await this.knex<ColumnRow>('board_columns')
+    const sourceColumns = await this.knex('board_columns')
       .where('board_id', boardId)
       .orderBy('position');
     const created = await this.createBoard(principal, {
@@ -779,7 +731,7 @@ export class BoardsService {
     });
     if (options.copyColumns) {
       // carry over the colors, matching source order to created order
-      const newColumns = await this.knex<ColumnRow>('board_columns')
+      const newColumns = await this.knex('board_columns')
         .where('board_id', created.id)
         .orderBy('position');
       for (let index = 0; index < newColumns.length; index += 1) {
@@ -838,7 +790,7 @@ export class BoardsService {
   ): Promise<void> {
     const actor = actorRef(principal);
     const timestamp = now();
-    const items = await this.knex<ItemRow>('items')
+    const items = await this.knex('items')
       .where('board_id', sourceBoardId)
       .whereNull('archived_at');
     const itemIds = items.map(item => item.id);
@@ -860,7 +812,7 @@ export class BoardsService {
           continue;
         }
         const newId = uuid();
-        await trx<ItemRow>('items').insert({
+        await trx('items').insert({
           id: newId,
           board_id: targetBoardId,
           column_id: targetColumnId,
@@ -877,7 +829,7 @@ export class BoardsService {
           archived_by: null,
           due_date: item.due_date,
         });
-        const links = (rows: Array<Record<string, unknown>>) =>
+        const links = <TRow extends { item_id: string }>(rows: TRow[]) =>
           rows
             .filter(row => row.item_id === item.id)
             .map(row => ({ ...row, item_id: newId }));
@@ -922,7 +874,7 @@ export class BoardsService {
       );
     }
     this.assertLevel(entry.level);
-    const existing = await this.knex<PermissionRow>('board_permissions')
+    const existing = await this.knex('board_permissions')
       .where({ board_id: boardId, principal_ref: entry.principalRef })
       .first();
     if (existing) {
@@ -948,7 +900,7 @@ export class BoardsService {
   ): Promise<BoardPermissionEntry> {
     await this.requireBoard(principal, boardId, 'admin');
     this.assertLevel(level);
-    const row = await this.knex<PermissionRow>('board_permissions')
+    const row = await this.knex('board_permissions')
       .where({ id: permissionId, board_id: boardId })
       .first();
     if (!row) {
@@ -969,7 +921,7 @@ export class BoardsService {
     permissionId: string,
   ): Promise<void> {
     await this.requireBoard(principal, boardId, 'admin');
-    const row = await this.knex<PermissionRow>('board_permissions')
+    const row = await this.knex('board_permissions')
       .where({ id: permissionId, board_id: boardId })
       .first();
     if (!row) {
@@ -1011,9 +963,7 @@ export class BoardsService {
     if (!title) {
       throw new InputError('Column title must not be empty');
     }
-    if (options.color) {
-      assertColumnColor(options.color);
-    }
+    const color = options.color ? parseColumnColor(options.color) : null;
     let position = options.position;
     if (position === undefined) {
       const max = await this.knex('board_columns')
@@ -1027,7 +977,7 @@ export class BoardsService {
       board_id: boardId,
       title,
       position,
-      color: options.color ?? null,
+      color,
     };
     await this.knex('board_columns').insert(row);
     await this.emitBoardSignal(boardId);
@@ -1041,7 +991,7 @@ export class BoardsService {
     update: { title?: string; position?: number; color?: string | null },
   ): Promise<BoardColumn> {
     await this.requireBoard(principal, boardId, 'write');
-    const row = await this.knex<ColumnRow>('board_columns')
+    const row = await this.knex('board_columns')
       .where({ id: columnId, board_id: boardId })
       .first();
     if (!row) {
@@ -1059,10 +1009,7 @@ export class BoardsService {
       patch.position = update.position;
     }
     if (update.color !== undefined) {
-      if (update.color) {
-        assertColumnColor(update.color);
-      }
-      patch.color = update.color;
+      patch.color = update.color ? parseColumnColor(update.color) : null;
     }
     if (Object.keys(patch).length > 0) {
       await this.knex('board_columns').where('id', columnId).update(patch);
@@ -1078,7 +1025,7 @@ export class BoardsService {
     options?: { moveItemsTo?: string },
   ): Promise<void> {
     await this.requireBoard(principal, boardId, 'write');
-    const row = await this.knex<ColumnRow>('board_columns')
+    const row = await this.knex('board_columns')
       .where({ id: columnId, board_id: boardId })
       .first();
     if (!row) {
@@ -1102,7 +1049,7 @@ export class BoardsService {
       if (target === columnId) {
         throw new InputError('Target column must differ from the deleted one');
       }
-      const targetRow = await this.knex<ColumnRow>('board_columns')
+      const targetRow = await this.knex('board_columns')
         .where({ id: target, board_id: boardId })
         .first();
       if (!targetRow) {
@@ -1185,7 +1132,7 @@ export class BoardsService {
     filter?: ItemFilter,
   ): Promise<BoardItem[]> {
     await this.requireBoard(principal, boardId, 'read');
-    const query = this.knex<ItemRow>('items')
+    const query = this.knex('items')
       .where('items.board_id', boardId)
       .whereNull('items.archived_at')
       .orderBy('position');
@@ -1229,15 +1176,15 @@ export class BoardsService {
       await this.knex('item_assignees')
         .whereIn('assignee_ref', refs)
         .select('item_id')
-    ).map(row => row.item_id as string);
+    ).map(row => row.item_id);
     if (itemIds.length === 0) {
       return [];
     }
-    const rows = await this.knex<ItemRow>('items')
+    const rows = await this.knex('items')
       .whereIn('id', itemIds)
       .whereNull('archived_at');
     const boardIds = [...new Set(rows.map(row => row.board_id))];
-    const boards = await this.knex<BoardRow>('boards')
+    const boards = await this.knex('boards')
       .whereIn('id', boardIds)
       .whereNull('archived_at');
     const readable = new Map<string, BoardRow>();
@@ -1250,7 +1197,7 @@ export class BoardsService {
     if (visible.length === 0) {
       return [];
     }
-    const columns = await this.knex<ColumnRow>('board_columns').whereIn('id', [
+    const columns = await this.knex('board_columns').whereIn('id', [
       ...new Set(visible.map(row => row.column_id)),
     ]);
     const columnTitles = new Map(columns.map(col => [col.id, col.title]));
@@ -1285,7 +1232,7 @@ export class BoardsService {
     itemId: string,
   ): Promise<BoardItem> {
     await this.requireBoard(principal, boardId, 'read');
-    const row = await this.knex<ItemRow>('items')
+    const row = await this.knex('items')
       .where({ id: itemId, board_id: boardId })
       .first();
     if (!row) {
@@ -1323,7 +1270,7 @@ export class BoardsService {
         'Only service callers may create externally managed items',
       );
     }
-    const column = await this.knex<ColumnRow>('board_columns')
+    const column = await this.knex('board_columns')
       .where({ id: item.columnId, board_id: boardId })
       .first();
     if (!column) {
@@ -1347,7 +1294,7 @@ export class BoardsService {
     const actor = actorRef(principal);
     const itemId = uuid();
     await this.knex.transaction(async trx => {
-      await trx<ItemRow>('items').insert({
+      await trx('items').insert({
         id: itemId,
         board_id: boardId,
         column_id: item.columnId,
@@ -1416,7 +1363,7 @@ export class BoardsService {
     options?: { allowArchived?: boolean },
   ): Promise<ItemRow> {
     await this.requireBoard(principal, boardId, 'write');
-    const row = await this.knex<ItemRow>('items')
+    const row = await this.knex('items')
       .where({ id: itemId, board_id: boardId })
       .first();
     if (!row) {
@@ -1531,7 +1478,7 @@ export class BoardsService {
             edited_at: timestamp,
           });
         }
-        await this.writeAssociations(trx, itemId, update as NewItem);
+        await this.writeAssociations(trx, itemId, update);
         for (const change of changes) {
           await this.recordChange(trx, {
             itemId,
@@ -1578,7 +1525,7 @@ export class BoardsService {
     target: { columnId: string; position?: number },
   ): Promise<BoardItem> {
     const row = await this.requireMutableItem(principal, boardId, itemId);
-    const targetColumn = await this.knex<ColumnRow>('board_columns')
+    const targetColumn = await this.knex('board_columns')
       .where({ id: target.columnId, board_id: boardId })
       .first();
     if (!targetColumn) {
@@ -1602,7 +1549,7 @@ export class BoardsService {
         updated_at: now(),
       });
       if (movedColumns) {
-        const oldColumn = await trx<ColumnRow>('board_columns')
+        const oldColumn = await trx('board_columns')
           .where('id', row.column_id)
           .first();
         await this.recordChange(trx, {
@@ -1667,7 +1614,7 @@ export class BoardsService {
     boardId: string,
   ): Promise<BoardItem[]> {
     await this.requireBoard(principal, boardId, 'write');
-    const rows = await this.knex<ItemRow>('items')
+    const rows = await this.knex('items')
       .where('board_id', boardId)
       .whereNotNull('archived_at')
       .orderBy('archived_at', 'desc');
@@ -1722,7 +1669,7 @@ export class BoardsService {
       .whereNotNull('archived_at')
       .where('archived_at', '<', cutoff)
       .select('id');
-    const ids = rows.map(row => row.id as string);
+    const ids = rows.map(row => row.id);
     if (ids.length === 0) {
       return 0;
     }
@@ -1746,7 +1693,7 @@ export class BoardsService {
     text: string,
   ): Promise<ItemComment> {
     await this.requireBoard(principal, boardId, 'write');
-    const item = await this.knex<ItemRow>('items')
+    const item = await this.knex('items')
       .where({ id: itemId, board_id: boardId })
       .first();
     if (!item) {
@@ -1825,13 +1772,13 @@ export class BoardsService {
     boardId: string,
     itemId: string,
     commentId: string,
-  ): Promise<{ comment: any; itemTitle: string }> {
+  ): Promise<{ comment: CommentRow; itemTitle: string }> {
     const { board, level } = await this.requireBoard(
       principal,
       boardId,
       'write',
     );
-    const item = await this.knex<ItemRow>('items')
+    const item = await this.knex('items')
       .where({ id: itemId, board_id: board.id })
       .first();
     if (!item) {
@@ -1965,7 +1912,7 @@ export class BoardsService {
     itemId: string,
   ): Promise<TimelineEntry[]> {
     await this.requireBoard(principal, boardId, 'read');
-    const item = await this.knex<ItemRow>('items')
+    const item = await this.knex('items')
       .where({ id: itemId, board_id: boardId })
       .first();
     if (!item) {
@@ -1973,10 +1920,7 @@ export class BoardsService {
     }
     const commentRows = await this.knex('comments').where('item_id', itemId);
     const comments = await this.hydrateComments(commentRows.map(row => row.id));
-    const changeRows = await this.knex<ChangeRow>('changes').where(
-      'item_id',
-      itemId,
-    );
+    const changeRows = await this.knex('changes').where('item_id', itemId);
     const entries: TimelineEntry[] = [
       ...comments.map(comment => ({
         kind: 'comment' as const,
@@ -2072,7 +2016,7 @@ export class BoardsService {
       .where({ target_type: 'board', target_id: boardId })
       .orderBy('user_ref')
       .select('user_ref');
-    return rows.map(row => row.user_ref as string);
+    return rows.map(row => row.user_ref);
   }
 
   async listItemWatchers(
@@ -2091,7 +2035,7 @@ export class BoardsService {
       .where({ target_type: 'item', target_id: itemId })
       .orderBy('user_ref')
       .select('user_ref');
-    return rows.map(row => row.user_ref as string);
+    return rows.map(row => row.user_ref);
   }
 
   /** Watchers of the item or its board, excluding the actor. */
@@ -2107,7 +2051,7 @@ export class BoardsService {
           .orWhere({ target_type: 'board', target_id: boardId }),
       )
       .select('user_ref');
-    return [...new Set(rows.map(row => row.user_ref as string))].filter(
+    return [...new Set(rows.map(row => row.user_ref))].filter(
       ref => ref !== actor && !isTextRef(ref),
     );
   }
@@ -2197,7 +2141,7 @@ export class BoardsService {
       itemId: string;
       boardId: string;
       actor: string;
-      type: string;
+      type: ChangeType;
       field?: string;
       oldValue?: unknown;
       newValue?: unknown;

@@ -13,6 +13,9 @@ import {
   BOARDS_ENTITY_IS_REFERENCED_LABEL_VALUE,
 } from '@internal/plugin-boards-common';
 
+/** The hook's own parameter types, so the signature matches the interface. */
+type PostProcessEntity = NonNullable<CatalogProcessor['postProcessEntity']>;
+
 /** Cache key holding the last successfully resolved answer for an entity. */
 const CACHE_KEY = 'referenced';
 
@@ -38,6 +41,13 @@ function withBoardsLabel(entity: Entity, referenced: boolean): Entity {
   return { ...entity, metadata: { ...entity.metadata, labels } };
 }
 
+/** The service methods this processor uses, and nothing more. */
+export interface BoardsCatalogProcessorOptions {
+  discovery: Pick<DiscoveryService, 'getBaseUrl'>;
+  auth: Pick<AuthService, 'getOwnServiceCredentials' | 'getPluginRequestToken'>;
+  logger: LoggerService;
+}
+
 /**
  * Labels every entity that at least one non-archived board references with
  * `boards/is-referenced: "auto-detected"`, and removes that label from every
@@ -50,15 +60,11 @@ function withBoardsLabel(entity: Entity, referenced: boolean): Entity {
  * @public
  */
 export class BoardsCatalogProcessor implements CatalogProcessor {
-  private readonly discovery: DiscoveryService;
-  private readonly auth: AuthService;
+  private readonly discovery: BoardsCatalogProcessorOptions['discovery'];
+  private readonly auth: BoardsCatalogProcessorOptions['auth'];
   private readonly logger: LoggerService;
 
-  constructor(options: {
-    discovery: DiscoveryService;
-    auth: AuthService;
-    logger: LoggerService;
-  }) {
+  constructor(options: BoardsCatalogProcessorOptions) {
     this.discovery = options.discovery;
     this.auth = options.auth;
     this.logger = options.logger;
@@ -70,8 +76,8 @@ export class BoardsCatalogProcessor implements CatalogProcessor {
 
   async postProcessEntity(
     entity: Entity,
-    _location: unknown,
-    _emit: unknown,
+    _location: Parameters<PostProcessEntity>[1],
+    _emit: Parameters<PostProcessEntity>[2],
     cache: CatalogProcessorCache,
   ): Promise<Entity> {
     const entityRef = stringifyEntityRef(entity);
