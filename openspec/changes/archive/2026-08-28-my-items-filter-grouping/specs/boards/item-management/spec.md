@@ -52,6 +52,13 @@ to the sub-page is not required.
   row menu, and no group of theirs is assigned to that item
 - **THEN** the row disappears from the listing
 
+#### Scenario: Read-only board offers navigation only
+
+- **WHEN** the user opens the row menu for an item on a board they can
+  only read, or for an externally managed item
+- **THEN** the menu offers to open the item's details and its board, and
+  no action that would modify the item
+
 #### Scenario: Row actions across a mixed group
 
 - **WHEN** the grouping puts items from two different boards in one group
