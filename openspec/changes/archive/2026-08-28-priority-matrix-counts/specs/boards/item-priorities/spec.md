@@ -10,7 +10,7 @@ The matrix SHALL carry a trailing sum column giving each priority row's total ac
 
 The status headers and the priority headers SHALL be clickable badges that toggle that status or priority between selected and unselected; everything SHALL start selected, and a toggle SHALL be reversible. An unselected status or priority SHALL be excluded from the sum column, the sum row, and the overall total, and SHALL be visibly marked as unselected; its cells' own counts SHALL remain visible.
 
-#### Scenario: Cells show counts
+#### Scenario: Matrix shows items per status and priority
 
 - **WHEN** a user opens the matrix dialog on a board with columns "Todo"/"Done" and priorities "critical"/"low", where two items are Todo+critical
 - **THEN** the Todo × critical cell shows 2 and no item titles or buttons appear in any cell
