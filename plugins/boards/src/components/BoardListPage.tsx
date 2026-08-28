@@ -24,7 +24,6 @@ import {
   TextField,
 } from '@backstage/ui';
 import { RiArrowRightLine } from '@remixicon/react';
-import { EntityRefLink } from '@backstage/plugin-catalog-react';
 import { BoardListEntry } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
 import {
@@ -35,7 +34,7 @@ import {
 } from '../queries';
 import { MyItemsList } from './MyItemsPage';
 import { useRowMenu } from './RowMenu';
-import { ErrorText } from './common';
+import { EntityRefList, ErrorText } from './common';
 import { FavoriteButton, FavoriteStar } from './FavoriteButton';
 import { useAsyncAction } from './useAsyncAction';
 
@@ -114,12 +113,7 @@ function BoardsTable(props: {
               </Cell>
               <Cell>{board.name}</Cell>
               <Cell>
-                {board.entityRefs.map((ref, index) => (
-                  <span key={ref}>
-                    {index > 0 && ', '}
-                    <EntityRefLink entityRef={ref} />
-                  </span>
-                ))}
+                <EntityRefList entityRefs={board.entityRefs} />
               </Cell>
               <Cell>{board.access}</Cell>
               <Cell>{rowMenu.rowActions(board)}</Cell>

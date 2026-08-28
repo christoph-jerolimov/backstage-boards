@@ -22,13 +22,12 @@ import {
   ToggleButton,
   ToggleButtonGroup,
 } from '@backstage/ui';
-import { EntityRefLink } from '@backstage/plugin-catalog-react';
 import { BoardWithContext } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
 import { queryKeys } from '../queries';
 import { useApi } from '@backstage/frontend-plugin-api';
 import { GroupByMode } from './grouping';
-import { InlineEdit } from './common';
+import { EntityRefList, InlineEdit } from './common';
 import { FavoriteButton } from './FavoriteButton';
 import { WatchButton } from './WatchButton';
 import { BoardDialogKind } from './BoardDialogs';
@@ -45,12 +44,7 @@ function EntitySection(props: { entityRefs: string[] }) {
   }
   return (
     <Text variant="body-small">
-      {props.entityRefs.map((ref, index) => (
-        <span key={ref}>
-          {index > 0 && ', '}
-          <EntityRefLink entityRef={ref} />
-        </span>
-      ))}
+      <EntityRefList entityRefs={props.entityRefs} />
     </Text>
   );
 }
