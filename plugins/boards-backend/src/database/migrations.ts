@@ -384,6 +384,28 @@ const boardPriorities: Migration = {
   },
 };
 
+const itemChecklists: Migration = {
+  name: '20260828_02_item_checklists',
+  async up(knex) {
+    await knex.schema.createTable('item_checklist_entries', table => {
+      table
+        .string('item_id')
+        .notNullable()
+        .references('id')
+        .inTable('items')
+        .onDelete('CASCADE');
+      // 0-based insertion order within the item's checklist
+      table.integer('position').notNullable();
+      table.string('text').notNullable();
+      table.boolean('checked').notNullable().defaultTo(false);
+      table.primary(['item_id', 'position']);
+    });
+  },
+  async down(knex) {
+    await knex.schema.dropTableIfExists('item_checklist_entries');
+  },
+};
+
 const migrations: Migration[] = [
   initial,
   itemDescriptions,
@@ -394,9 +416,10 @@ const migrations: Migration[] = [
   boardEntities,
   dropItemLabels,
   boardPriorities,
+  itemChecklists,
 ];
 
-class BoardsMigrationSource implements Knex.MigrationSource<Migration> {
+export class BoardsMigrationSource implements Knex.MigrationSource<Migration> {
   async getMigrations(): Promise<Migration[]> {
     return migrations;
   }

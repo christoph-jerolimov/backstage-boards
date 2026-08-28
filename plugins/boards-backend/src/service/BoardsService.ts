@@ -25,6 +25,7 @@ import {
   BoardWithContext,
   ChangeRecord,
   ChangeType,
+  ChecklistEntry,
   CommentVersion,
   ItemComment,
   ItemFilter,
@@ -56,6 +57,20 @@ import {
 import { BoardsPrincipal, actorRef, computeEffectiveLevel } from './access';
 
 const DEFAULT_COLUMNS = ['To do', 'In progress', 'Done'];
+
+/** Trims entry labels, rejecting empty ones; keeps the given order. */
+function normalizeChecklist(entries: ChecklistEntry[]): ChecklistEntry[] {
+  if (!Array.isArray(entries)) {
+    throw new InputError('checklist must be an array of entries');
+  }
+  return entries.map(entry => {
+    const text = typeof entry?.text === 'string' ? entry.text.trim() : '';
+    if (!text) {
+      throw new InputError('Checklist entries must not be empty');
+    }
+    return { text, checked: !!entry.checked };
+  });
+}
 
 /** Priorities every new board starts with, in order (1 = highest). */
 const DEFAULT_PRIORITIES: Array<{ name: string; color: ColumnColor | null }> = [
@@ -868,9 +883,10 @@ export class BoardsService {
       .where('board_id', sourceBoardId)
       .whereNull('archived_at');
     const itemIds = items.map(item => item.id);
-    const [assignees, tags] = await Promise.all([
+    const [assignees, tags, checklistEntries] = await Promise.all([
       this.knex('item_assignees').whereIn('item_id', itemIds),
       this.knex('item_tags').whereIn('item_id', itemIds),
+      this.knex('item_checklist_entries').whereIn('item_id', itemIds),
     ]);
     const columnIdMap = new Map<string, string>();
     sourceColumns.forEach((column, index) => {
@@ -924,6 +940,10 @@ export class BoardsService {
         const newTags = links(tags);
         if (newTags.length > 0) {
           await trx('item_tags').insert(newTags);
+        }
+        const newChecklistEntries = links(checklistEntries);
+        if (newChecklistEntries.length > 0) {
+          await trx('item_checklist_entries').insert(newChecklistEntries);
         }
         await this.recordChange(trx, {
           itemId: newId,
@@ -1332,6 +1352,10 @@ export class BoardsService {
     const tags = await this.knex('item_tags')
       .whereIn('item_id', ids)
       .select('item_id', 'tag');
+    const checklistEntries = await this.knex('item_checklist_entries')
+      .whereIn('item_id', ids)
+      .orderBy('position')
+      .select('item_id', 'position', 'text', 'checked');
     const watches = userRef
       ? await this.knex('watches')
           .where({ user_ref: userRef, target_type: 'item' })
@@ -1371,6 +1395,9 @@ export class BoardsService {
         .filter(a => a.item_id === row.id)
         .map(a => a.assignee_ref),
       tags: tags.filter(t => t.item_id === row.id).map(t => t.tag),
+      checklist: checklistEntries
+        .filter(entry => entry.item_id === row.id)
+        .map(entry => ({ text: entry.text, checked: !!entry.checked })),
       watching: watchedIds.has(row.id),
     }));
   }
@@ -1560,6 +1587,10 @@ export class BoardsService {
     if (item.priorityId) {
       await this.requirePriority(boardId, item.priorityId);
     }
+    const checklist =
+      item.checklist !== undefined
+        ? normalizeChecklist(item.checklist)
+        : undefined;
 
     let position = item.position;
     if (position === undefined) {
@@ -1588,7 +1619,7 @@ export class BoardsService {
         external_manager: item.externalManager ?? null,
         priority_id: item.priorityId ?? null,
       });
-      await this.writeAssociations(trx, itemId, item);
+      await this.writeAssociations(trx, itemId, { ...item, checklist });
       await this.recordChange(trx, {
         itemId,
         boardId,
@@ -1613,7 +1644,11 @@ export class BoardsService {
   private async writeAssociations(
     trx: Knex.Transaction,
     itemId: string,
-    item: { assignees?: string[]; tags?: string[] },
+    item: {
+      assignees?: string[];
+      tags?: string[];
+      checklist?: ChecklistEntry[];
+    },
   ): Promise<void> {
     if (item.assignees !== undefined) {
       await trx('item_assignees').where('item_id', itemId).delete();
@@ -1632,6 +1667,19 @@ export class BoardsService {
       if (tags.length > 0) {
         await trx('item_tags').insert(
           tags.map(tag => ({ item_id: itemId, tag })),
+        );
+      }
+    }
+    if (item.checklist !== undefined) {
+      await trx('item_checklist_entries').where('item_id', itemId).delete();
+      if (item.checklist.length > 0) {
+        await trx('item_checklist_entries').insert(
+          item.checklist.map((entry, position) => ({
+            item_id: itemId,
+            position,
+            text: entry.text,
+            checked: entry.checked,
+          })),
         );
       }
     }
@@ -1762,6 +1810,18 @@ export class BoardsService {
         });
       }
     }
+    let checklist: ChecklistEntry[] | undefined;
+    if (update.checklist !== undefined) {
+      const next = normalizeChecklist(update.checklist);
+      if (JSON.stringify(next) !== JSON.stringify(before.checklist)) {
+        checklist = next;
+        changes.push({
+          field: 'checklist',
+          oldValue: before.checklist,
+          newValue: next,
+        });
+      }
+    }
     if (update.priorityId !== undefined) {
       const next = update.priorityId;
       if ((next ?? null) !== row.priority_id) {
@@ -1797,7 +1857,7 @@ export class BoardsService {
             edited_at: timestamp,
           });
         }
-        await this.writeAssociations(trx, itemId, update);
+        await this.writeAssociations(trx, itemId, { ...update, checklist });
         for (const change of changes) {
           await this.recordChange(trx, {
             itemId,

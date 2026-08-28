@@ -117,6 +117,41 @@ describe('BoardView lanes', () => {
     expect(screen.getByText('Managed by jira (read-only)')).toBeInTheDocument();
   });
 
+  it('shows checklist progress on cards with a checklist', () => {
+    renderBoard({
+      items: [
+        testItem({
+          id: 'item-4',
+          title: 'In progress',
+          checklist: [
+            { text: 'a', checked: true },
+            { text: 'b', checked: false },
+            { text: 'c', checked: false },
+          ],
+        }),
+        testItem({
+          id: 'item-5',
+          title: 'All done',
+          columnId: 'column-2',
+          checklist: [
+            { text: 'a', checked: true },
+            { text: 'b', checked: true },
+            { text: 'c', checked: true },
+          ],
+        }),
+        items[2],
+      ],
+    });
+    const partial = screen.getByLabelText('Checklist: 1 of 3 done');
+    expect(partial).toHaveTextContent('1/3');
+    expect(partial).toHaveAttribute('data-checklist-state', 'in-progress');
+    const complete = screen.getByLabelText('Checklist: 3 of 3 done');
+    expect(complete).toHaveTextContent('3/3');
+    expect(complete).toHaveAttribute('data-checklist-state', 'complete');
+    // 'Shipped' has no checklist, so exactly the two badges exist
+    expect(screen.getAllByLabelText(/Checklist:/)).toHaveLength(2);
+  });
+
   it('renames an item inline', async () => {
     const { actions } = renderBoard();
     await userEvent.click(

@@ -35,6 +35,7 @@ import { ItemActions, ItemMenu } from './ItemMenu';
 import { RowMenuHandle, useRowMenu } from './RowMenu';
 import { InlineAddField, InlineEdit } from './common';
 import { AssigneeAvatars } from './AssigneeAvatars';
+import { ChecklistBadge } from './ChecklistEditor';
 import { DueDateBadge } from './DueDate';
 import { ColorDot, ColumnDot, PriorityChip } from './StatusBadge';
 
@@ -153,6 +154,7 @@ function ItemCard(props: {
         </div>
       )}
       <DueDateBadge dueDate={item.dueDate} />
+      <ChecklistBadge checklist={item.checklist} />
       <AssigneeAvatars refs={item.assignees} />
       {item.tags.length > 0 && (
         <Text variant="body-x-small" color="secondary">

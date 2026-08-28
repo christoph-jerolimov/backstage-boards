@@ -214,6 +214,48 @@ describe('ItemDrawer', () => {
     });
   });
 
+  it('saves checklist changes', async () => {
+    const { boardsApi } = renderDrawer({
+      item: testItem({
+        checklist: [{ text: 'write docs', checked: false }],
+      }),
+    });
+    await userEvent.click(
+      screen.getByRole('checkbox', { name: /"write docs" as done/ }),
+    );
+    expect(boardsApi.updateItem).toHaveBeenCalledWith('board-1', 'item-1', {
+      checklist: [{ text: 'write docs', checked: true }],
+    });
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Add checklist entry' }),
+    );
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Add checklist entry' }),
+      'announce{Enter}',
+    );
+    expect(boardsApi.updateItem).toHaveBeenCalledWith('board-1', 'item-1', {
+      checklist: [
+        { text: 'write docs', checked: false },
+        { text: 'announce', checked: false },
+      ],
+    });
+  });
+
+  it('shows the checklist read-only on externally managed items', () => {
+    renderDrawer({
+      item: testItem({
+        externalManager: 'jira',
+        checklist: [{ text: 'write docs', checked: true }],
+      }),
+    });
+    expect(
+      screen.getByRole('checkbox', { name: /"write docs" as not done/ }),
+    ).toBeDisabled();
+    expect(
+      screen.queryByRole('button', { name: 'Add checklist entry' }),
+    ).not.toBeInTheDocument();
+  });
+
   it('deletes the item and closes', async () => {
     const { boardsApi, onClose } = renderDrawer();
     await userEvent.click(screen.getByRole('button', { name: 'Delete item' }));

@@ -490,6 +490,52 @@ describe('createRouter', () => {
     expect(cleared.priorityId).toBeUndefined();
   });
 
+  it('persists checklists through the item endpoints', async () => {
+    const board = await service.createBoard(alice, { name: 'B' });
+    const columnId = (await service.getBoard(alice, board.id)).columns[0].id;
+    const created = body<BoardItem>(
+      await request(app)
+        .post(`/boards/${board.id}/items`)
+        .set('x-test-user', 'alice')
+        .send({
+          columnId,
+          title: 'Release',
+          checklist: [{ text: 'write docs', checked: false }],
+        })
+        .expect(201),
+    );
+    expect(created.checklist).toEqual([
+      { text: 'write docs', checked: false },
+    ]);
+    const patched = body<BoardItem>(
+      await request(app)
+        .patch(`/boards/${board.id}/items/${created.id}`)
+        .set('x-test-user', 'alice')
+        .send({
+          checklist: [
+            { text: 'write docs', checked: true },
+            { text: 'update tests', checked: false },
+          ],
+        })
+        .expect(200),
+    );
+    expect(patched.checklist).toEqual([
+      { text: 'write docs', checked: true },
+      { text: 'update tests', checked: false },
+    ]);
+    // invalid entries are rejected as input errors
+    await request(app)
+      .patch(`/boards/${board.id}/items/${created.id}`)
+      .set('x-test-user', 'alice')
+      .send({ checklist: [{ text: ' ', checked: false }] })
+      .expect(400);
+    await request(app)
+      .patch(`/boards/${board.id}/items/${created.id}`)
+      .set('x-test-user', 'alice')
+      .send({ checklist: 'not-a-list' })
+      .expect(400);
+  });
+
   it('supports item lifecycle, comments, timeline, watch and favorites', async () => {
     const board = await service.createBoard(alice, { name: 'B' });
     const columnId = (await service.getBoard(alice, board.id)).columns[0].id;
