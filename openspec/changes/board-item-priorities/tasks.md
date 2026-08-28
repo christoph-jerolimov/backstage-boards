@@ -49,5 +49,5 @@
 
 ## 9. Verification
 
-- [ ] 9.1 Run `yarn tsc`, `yarn lint`, and `yarn test` across the repo and fix fallout; verify all pass.
-- [ ] 9.2 Walk the spec scenarios end to end against a running app (defaults on a new board, config CRUD incl. reassignment, card/table/filter/grouping, drawer/menu edits, widget, matrix) and confirm boards without priorities show no priority UI.
+- [x] 9.1 Run `yarn tsc`, `yarn lint`, and `yarn test` across the repo and fix fallout; verify all pass.
+- [x] 9.2 Walk the spec scenarios end to end against a running app (defaults on a new board, config CRUD incl. reassignment, card/table/filter/grouping, drawer/menu edits, widget, matrix) and confirm boards without priorities show no priority UI.
