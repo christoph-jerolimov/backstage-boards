@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react';
-import { screen, waitFor } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { identityApiRef } from '@backstage/frontend-plugin-api';
 import { Button, MenuItem, MenuTrigger } from '@backstage/ui';
 import { BoardItem } from '@internal/plugin-boards-common';
-import { ItemContextMenu, ItemMenu } from './ItemMenu';
+import { ItemMenu } from './ItemMenu';
 import {
   renderWithProviders,
   testActions,
@@ -185,50 +185,5 @@ describe('ItemMenu', () => {
     const me = await screen.findByRole('menuitem', { name: '✓ Me' });
     await userEvent.click(me);
     expect(actions.setAssignees).toHaveBeenCalledWith(item.id, []);
-  });
-});
-
-describe('ItemContextMenu', () => {
-  it('renders nothing without a pointer position', () => {
-    renderWithProviders(
-      <div data-testid="host">
-        <ItemContextMenu
-          state={undefined}
-          onClose={jest.fn()}
-          columns={columns}
-          readonly={false}
-          actions={testActions()}
-          assigneePool={[]}
-        />
-      </div>,
-      { apis: [[identityApiRef, identityApi]] },
-    );
-    expect(screen.getByTestId('host')).toBeEmptyDOMElement();
-  });
-
-  it('opens the menu at the pointer and closes on dismiss', async () => {
-    const onClose = jest.fn();
-    const item = testItem({ title: 'Right-clicked' });
-    renderWithProviders(
-      <ItemContextMenu
-        state={{ row: item, x: 120, y: 80 }}
-        onClose={onClose}
-        columns={columns}
-        readonly={false}
-        actions={testActions()}
-        assigneePool={[]}
-      />,
-      { apis: [[identityApiRef, identityApi]] },
-    );
-    await screen.findByRole('menuitem', { name: 'Open details' });
-    // the trigger is hidden from assistive tech while the menu owns the
-    // focus scope, so it is only reachable through the DOM
-    const anchor = document.querySelector(
-      '[aria-label="Context menu for Right-clicked"]',
-    );
-    expect(anchor).toHaveStyle({ left: '120px', top: '80px' });
-
-    await userEvent.keyboard('{Escape}');
-    await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 });

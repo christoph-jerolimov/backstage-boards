@@ -26,8 +26,8 @@ import {
 } from '@internal/plugin-boards-common';
 import { GroupByMode, groupItems, positionBefore } from './grouping';
 import { GroupLabel } from './GroupLabel';
-import { ItemActions, ItemContextMenu, ItemMenu } from './ItemMenu';
-import { useRowContextMenu } from './RowMenu';
+import { ItemActions, ItemMenu } from './ItemMenu';
+import { RowMenuHandle, useRowMenu } from './RowMenu';
 import { InlineEdit } from './common';
 import { AssigneeAvatars } from './AssigneeAvatars';
 import { DueDateBadge } from './DueDate';
@@ -48,14 +48,12 @@ export interface BoardActions extends ItemActions {
 
 function ItemCard(props: {
   item: BoardItem;
-  columns: BoardColumn[];
   canWrite: boolean;
   actions: BoardActions;
-  assigneePool: string[];
+  rowMenu: RowMenuHandle<BoardItem>;
   onDropBefore: (droppedItemId: string) => void;
-  onContextMenu: (event: React.MouseEvent) => void;
 }) {
-  const { item, columns, canWrite, actions } = props;
+  const { item, canWrite, actions, rowMenu } = props;
   const readonly = !canWrite || !!item.externalManager;
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -103,7 +101,7 @@ function ItemCard(props: {
         cursor: 'pointer',
       }}
       onClick={() => actions.openItem(item.id)}
-      onContextMenu={props.onContextMenu}
+      onContextMenu={event => rowMenu.onContextMenu(item, event)}
     >
       <Flex align="center" gap="2" justify="between">
         {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions,jsx-a11y/click-events-have-key-events */}
@@ -132,21 +130,7 @@ function ItemCard(props: {
         </div>
         {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions,jsx-a11y/click-events-have-key-events */}
         <div onClick={event => event.stopPropagation()}>
-          <MenuTrigger>
-            <ButtonIcon
-              aria-label={`Actions for ${item.title}`}
-              variant="tertiary"
-              size="small"
-              icon={<RiMore2Fill size={16} />}
-            />
-            <ItemMenu
-              item={item}
-              columns={columns}
-              readonly={readonly}
-              actions={actions}
-              assigneePool={props.assigneePool}
-            />
-          </MenuTrigger>
+          {rowMenu.rowActions(item)}
         </div>
       </Flex>
       {item.externalManager && (
@@ -232,8 +216,7 @@ function ColumnLane(props: {
   onRequestDelete: (column: BoardColumn, hasItems: boolean) => void;
   onInsertBefore: () => void;
   onInsertAfter: () => void;
-  onItemContextMenu: (item: BoardItem, event: React.MouseEvent) => void;
-  assigneePool: string[];
+  rowMenu: RowMenuHandle<BoardItem>;
 }) {
   const { board, column, items, canWrite, actions, groupBy } = props;
   const laneRef = useRef<HTMLDivElement>(null);
@@ -260,10 +243,9 @@ function ColumnLane(props: {
     <ItemCard
       key={`${item.id}`}
       item={item}
-      columns={board.columns}
       canWrite={canWrite}
       actions={actions}
-      assigneePool={props.assigneePool}
+      rowMenu={props.rowMenu}
       onDropBefore={droppedItemId => {
         const itemIndex = sorted.findIndex(entry => entry.id === item.id);
         actions.moveItem(droppedItemId, {
@@ -271,7 +253,6 @@ function ColumnLane(props: {
           position: positionBefore(sorted, itemIndex),
         });
       }}
-      onContextMenu={event => props.onItemContextMenu(item, event)}
     />
   );
 
@@ -420,7 +401,18 @@ export function BoardView(props: {
 }) {
   const { board, items, canWrite, actions, groupBy } = props;
   const assigneePool = [...new Set(items.flatMap(item => item.assignees))];
-  const contextMenu = useRowContextMenu<BoardItem>();
+  const rowMenu = useRowMenu<BoardItem>({
+    name: item => item.title,
+    children: item => (
+      <ItemMenu
+        item={item}
+        columns={board.columns}
+        readonly={!canWrite || !!item.externalManager}
+        actions={actions}
+        assigneePool={assigneePool}
+      />
+    ),
+  });
   const [deleteTarget, setDeleteTarget] = useState<BoardColumn | undefined>();
   const [moveItemsTo, setMoveItemsTo] = useState<string | undefined>();
   // the slot the new column goes into, as an index into board.columns:
@@ -485,8 +477,7 @@ export function BoardView(props: {
             canWrite={canWrite}
             actions={actions}
             groupBy={groupBy}
-            assigneePool={assigneePool}
-            onItemContextMenu={contextMenu.open}
+            rowMenu={rowMenu}
             onInsertBefore={() => setInsertAt(index)}
             onInsertAfter={() => setInsertAt(index + 1)}
             onRequestDelete={(target, hasItems) => {
@@ -510,14 +501,7 @@ export function BoardView(props: {
           + Add column
         </Button>
       )}
-      <ItemContextMenu
-        state={contextMenu.state}
-        onClose={contextMenu.close}
-        columns={board.columns}
-        readonly={!canWrite || !!contextMenu.state?.row.externalManager}
-        actions={actions}
-        assigneePool={assigneePool}
-      />
+      {rowMenu.contextMenu}
       <Dialog
         isOpen={deleteTarget !== undefined}
         onOpenChange={open => {

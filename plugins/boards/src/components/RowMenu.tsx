@@ -59,6 +59,46 @@ export function RowContextMenu<T>(props: {
   );
 }
 
+/**
+ * Both ways into a row's menu: the three-dot button in its actions cell
+ * and the right-click menu at the pointer. Every surface with row
+ * actions needs the pair, and both must show the same menu.
+ */
+export interface RowMenuHandle<T> {
+  /** Wire to a row's `onContextMenu`. */
+  onContextMenu: (row: T, event: MouseEvent) => void;
+  /** The contents of the row's actions cell. */
+  rowActions: (row: T) => ReactNode;
+  /** Mount once beside the rows. */
+  contextMenu: ReactNode;
+}
+
+export function useRowMenu<T>(options: {
+  /** Names the row in both menus' labels, e.g. the board or item title. */
+  name: (row: T) => string;
+  children: (row: T) => ReactNode;
+}): RowMenuHandle<T> {
+  const contextMenu = useRowContextMenu<T>();
+  const { name, children } = options;
+  return {
+    onContextMenu: contextMenu.open,
+    rowActions: (row: T) => (
+      <RowActionsMenu label={`Actions for ${name(row)}`}>
+        {children(row)}
+      </RowActionsMenu>
+    ),
+    contextMenu: (
+      <RowContextMenu
+        state={contextMenu.state}
+        onClose={contextMenu.close}
+        label={row => `Context menu for ${name(row)}`}
+      >
+        {children}
+      </RowContextMenu>
+    ),
+  };
+}
+
 /** The three-dot button for a table row's trailing actions cell. */
 export function RowActionsMenu(props: { label: string; children: ReactNode }) {
   return (
