@@ -4,6 +4,7 @@ import {
   UserInfoService,
 } from '@backstage/backend-plugin-api';
 import { ActionsRegistryActionOptions } from '@backstage/backend-plugin-api/alpha';
+import { RETENTION_DAYS } from '@internal/plugin-boards-common';
 import { AnyZodObject } from 'zod/v3';
 import { BoardsService } from './service/BoardsService';
 import { BoardsPrincipal } from './service/access';
@@ -131,8 +132,7 @@ export function registerActions(options: ActionsOptions): void {
   actionsRegistry.register({
     name: 'delete-board',
     title: 'Delete Board',
-    description:
-      'Archives a board; it becomes read-only for admins and is permanently deleted after 30 days.',
+    description: `Archives a board; it becomes read-only for admins and is permanently deleted after ${RETENTION_DAYS} days.`,
     attributes: { destructive: true },
     schema: {
       input: z => z.object({ boardId: z.string() }),

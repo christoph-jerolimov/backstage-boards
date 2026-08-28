@@ -32,6 +32,20 @@ export function RefDisplay(props: { refString: string }) {
   return <EntityRefLink entityRef={refString} />;
 }
 
+/** A comma-separated run of entity links, as a board's references read. */
+export function EntityRefList(props: { entityRefs: string[] }) {
+  return (
+    <>
+      {props.entityRefs.map((ref, index) => (
+        <span key={ref}>
+          {index > 0 && ', '}
+          <EntityRefLink entityRef={ref} />
+        </span>
+      ))}
+    </>
+  );
+}
+
 /** One ref as a chip: a catalog ref links, a `text:` ref reads plainly. */
 function RefChip(props: {
   refString: string;

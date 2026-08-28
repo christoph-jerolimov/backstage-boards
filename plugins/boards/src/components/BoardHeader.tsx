@@ -22,13 +22,12 @@ import {
   ToggleButton,
   ToggleButtonGroup,
 } from '@backstage/ui';
-import { EntityRefLink } from '@backstage/plugin-catalog-react';
-import { BoardWithContext } from '@internal/plugin-boards-common';
+import { BoardWithContext, purgeDate } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
 import { queryKeys } from '../queries';
 import { useApi } from '@backstage/frontend-plugin-api';
 import { ALL_GROUP_BY_MODES, GroupByMode } from './grouping';
-import { InlineEdit, selectedOption } from './common';
+import { EntityRefList, InlineEdit, selectedOption } from './common';
 import { FavoriteButton } from './FavoriteButton';
 import { WatchButton } from './WatchButton';
 import { BoardDialogKind } from './BoardDialogs';
@@ -48,12 +47,7 @@ function EntitySection(props: { entityRefs: string[] }) {
   }
   return (
     <Text variant="body-small">
-      {props.entityRefs.map((ref, index) => (
-        <span key={ref}>
-          {index > 0 && ', '}
-          <EntityRefLink entityRef={ref} />
-        </span>
-      ))}
+      <EntityRefList entityRefs={props.entityRefs} />
     </Text>
   );
 }
@@ -228,16 +222,14 @@ export function ArchivedBoardAlert(props: {
 }) {
   const { board, isAdmin, guarded, onRequestDelete } = props;
   const boardsApi = useApi(boardsApiRef);
-  const purgeDate = board.archivedAt
-    ? new Date(
-        new Date(board.archivedAt).getTime() + 30 * 24 * 60 * 60 * 1000,
-      ).toLocaleDateString()
+  const purgedOn = board.archivedAt
+    ? purgeDate(board.archivedAt).toLocaleDateString()
     : undefined;
   return (
     <Alert
       status="warning"
       title="This board is archived and read-only"
-      description={`It is no longer listed and will be permanently deleted on ${purgeDate}. Until then only admins can view it via this link.`}
+      description={`It is no longer listed and will be permanently deleted on ${purgedOn}. Until then only admins can view it via this link.`}
       customActions={
         isAdmin ? (
           <Flex gap="2">

@@ -8,7 +8,10 @@ import {
   Flex,
   Text,
 } from '@backstage/ui';
-import { BoardWithContext } from '@internal/plugin-boards-common';
+import {
+  BoardWithContext,
+  RETENTION_DAYS,
+} from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
 import { ArchivedItemsDialog } from './ArchivedItemsDialog';
 import { BoardSettingsDialog } from './BoardSettingsDialog';
@@ -95,7 +98,7 @@ export function BoardDialogs(props: {
           <Text>
             {archived
               ? 'This permanently deletes the board with all items, comments, and history right now. This cannot be undone.'
-              : 'The board becomes read-only, disappears from all lists, and stays reachable for admins via its link. It is permanently deleted after 30 days.'}
+              : `The board becomes read-only, disappears from all lists, and stays reachable for admins via its link. It is permanently deleted after ${RETENTION_DAYS} days.`}
           </Text>
         </DialogBody>
         <DialogFooter>

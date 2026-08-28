@@ -8,13 +8,14 @@ import {
   Text,
 } from '@backstage/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { RETENTION_DAYS } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
 import { queryKeys } from '../queries';
 import { AsyncList, formatDate, RefDisplay } from './common';
 
 /**
  * Archived (soft-deleted) items of a board with restore. Items are
- * purged permanently 30 days after archival.
+ * purged permanently once the shared retention period is up.
  */
 export function ArchivedItemsDialog(props: {
   boardId: string;
@@ -44,7 +45,7 @@ export function ArchivedItemsDialog(props: {
       {archived => (
         <Flex direction="column" gap="2">
           <Text variant="body-small" color="secondary">
-            Archived items are removed permanently after 30 days.
+            {`Archived items are removed permanently after ${RETENTION_DAYS} days.`}
           </Text>
           {archived.map(item => (
             <Flex key={item.id} align="center" gap="2" justify="between">
