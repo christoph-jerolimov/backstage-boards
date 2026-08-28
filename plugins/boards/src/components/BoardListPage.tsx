@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApi } from '@backstage/frontend-plugin-api';
-import { useSignal } from '@backstage/plugin-signals-react';
 import {
   Button,
   Cell,
@@ -28,7 +27,12 @@ import { RiArrowRightLine } from '@remixicon/react';
 import { EntityRefLink } from '@backstage/plugin-catalog-react';
 import { BoardListEntry } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
-import { useBoardsQuery, boardsQueryClient, queryKeys } from '../queries';
+import {
+  boardsQueryClient,
+  queryKeys,
+  useBoardsQuery,
+  useBoardsSignal,
+} from '../queries';
 import { MyItemsList } from './MyItemsPage';
 import { RowActionsMenu, RowContextMenu, useRowContextMenu } from './RowMenu';
 import { ErrorText } from './common';
@@ -159,15 +163,12 @@ export function BoardListPage() {
     refetch: refresh,
   } = useBoardsQuery();
 
-  const { lastSignal } = useSignal('boards');
-  useEffect(() => {
-    if (lastSignal) {
-      boardsQueryClient.invalidateQueries({
-        queryKey: queryKeys.boards,
-        exact: true,
-      });
-    }
-  }, [lastSignal]);
+  useBoardsSignal(() =>
+    boardsQueryClient.invalidateQueries({
+      queryKey: queryKeys.boards,
+      exact: true,
+    }),
+  );
 
   const favorites = useMemo(
     () => (boards ?? []).filter(board => board.favorite),
