@@ -172,6 +172,15 @@ The item details drawer SHALL let users with write access pick one of the board'
 - **WHEN** a user with only read access opens the drawer or item menu
 - **THEN** no priority-changing control is offered
 
+### Requirement: Duplication copies priorities
+
+Duplicating a board with its columns SHALL also copy the board's priority definitions (names, colors, order). When items are copied too, each copied item SHALL carry the copied priority corresponding to its source item's priority.
+
+#### Scenario: Priorities copied with columns
+
+- **WHEN** a board with priorities critical/high is duplicated with copy columns and copy items, and an item has priority "high"
+- **THEN** the copy defines critical and high in the same order and colors, and the copied item references the copy's "high"
+
 ### Requirement: Status and priority matrix dialog
 
 The board menu SHALL offer, on boards that define at least one priority, a matrix dialog showing all of the board's columns (statuses) as one axis and all its priorities — ordered by order number ascending, plus a "No priority" row when items without a priority exist — as the other. Each cell SHALL show the board's non-archived items that have that status and that priority, respecting the currently active filters. Items in the matrix SHALL open their details when activated.
