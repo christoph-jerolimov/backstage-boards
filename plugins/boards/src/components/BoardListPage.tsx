@@ -32,6 +32,7 @@ import { boardsApiRef } from '../api';
 import { useBoardsQuery, boardsQueryClient, queryKeys } from '../queries';
 import { MyItemsList } from './MyItemsPage';
 import { RowActionsMenu, RowContextMenu, useRowContextMenu } from './RowMenu';
+import { useAsyncAction } from './useAsyncAction';
 
 function StarIcon(props: { filled: boolean }) {
   return (
@@ -166,8 +167,13 @@ export function BoardListPage() {
   const [tab, setTab] = useState<string>('favorites');
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState('');
-  const [creating, setCreating] = useState(false);
-  const [error, setError] = useState<string | undefined>();
+  const {
+    error,
+    pending: creating,
+    run,
+  } = useAsyncAction({
+    formatError: err => `Could not create board: ${err.message}`,
+  });
 
   const {
     data: boards,
@@ -199,18 +205,12 @@ export function BoardListPage() {
     if (!newName.trim() || creating) {
       return;
     }
-    setCreating(true);
-    setError(undefined);
-    try {
+    await run(async () => {
       const board = await boardsApi.createBoard({ name: newName.trim() });
       setCreateOpen(false);
       setNewName('');
       navigate(board.id);
-    } catch (err) {
-      setError(`Could not create board: ${(err as Error).message}`);
-    } finally {
-      setCreating(false);
-    }
+    });
   };
 
   return (

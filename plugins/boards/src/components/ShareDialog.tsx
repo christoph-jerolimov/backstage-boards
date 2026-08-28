@@ -19,6 +19,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { boardsApiRef } from '../api';
 import { queryKeys } from '../queries';
 import { PrincipalPicker } from './PrincipalPicker';
+import { useAsyncAction } from './useAsyncAction';
 import { RefDisplay } from './common';
 
 const VISIBILITY_OPTIONS: Array<{ value: BoardVisibility; label: string }> = [
@@ -39,7 +40,7 @@ export function ShareDialog(props: {
   const boardsApi = useApi(boardsApiRef);
   const [principalRef, setPrincipalRef] = useState('');
   const [level, setLevel] = useState<BoardPermissionLevel>('read');
-  const [error, setError] = useState<string | undefined>();
+  const { error, run } = useAsyncAction();
 
   const queryClient = useQueryClient();
   const permissionsKey = queryKeys.permissions(board.id);
@@ -51,16 +52,12 @@ export function ShareDialog(props: {
   const refresh = () =>
     queryClient.invalidateQueries({ queryKey: permissionsKey });
 
-  const run = async (action: () => Promise<unknown>) => {
-    setError(undefined);
-    try {
+  const save = (action: () => Promise<unknown>) =>
+    run(async () => {
       await action();
       await refresh();
       await onChanged();
-    } catch (err) {
-      setError((err as Error).message);
-    }
-  };
+    });
 
   return (
     <Dialog isOpen={isOpen} onOpenChange={onOpenChange}>
@@ -72,7 +69,7 @@ export function ShareDialog(props: {
             options={VISIBILITY_OPTIONS}
             selectedKey={board.visibility}
             onSelectionChange={key =>
-              run(() =>
+              save(() =>
                 boardsApi.updateBoard(board.id, {
                   visibility: key as BoardVisibility,
                 }),
@@ -93,7 +90,7 @@ export function ShareDialog(props: {
                   options={ALL_LEVELS.map(l => ({ value: l, label: l }))}
                   selectedKey={entry.level}
                   onSelectionChange={key =>
-                    run(() =>
+                    save(() =>
                       boardsApi.updatePermission(
                         board.id,
                         entry.id,
@@ -106,7 +103,7 @@ export function ShareDialog(props: {
                   variant="tertiary"
                   size="small"
                   onPress={() =>
-                    run(() => boardsApi.removePermission(board.id, entry.id))
+                    save(() => boardsApi.removePermission(board.id, entry.id))
                   }
                 >
                   Remove
@@ -140,7 +137,7 @@ export function ShareDialog(props: {
               size="small"
               isDisabled={!principalRef.trim()}
               onPress={() =>
-                run(async () => {
+                save(async () => {
                   await boardsApi.addPermission(board.id, {
                     principalRef: principalRef.trim(),
                     level,

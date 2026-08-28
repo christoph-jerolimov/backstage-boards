@@ -38,6 +38,7 @@ import { DueDateBadge } from './DueDate';
 import { ItemActions, ItemContextMenu, ItemMenu } from './ItemMenu';
 import { RowActionsMenu, useRowContextMenu } from './RowMenu';
 import { StatusBadge } from './StatusBadge';
+import { useAsyncAction } from './useAsyncAction';
 
 interface BoardGroup {
   boardId: string;
@@ -75,6 +76,7 @@ function BoardGroupTable(props: {
   // the board carries the columns and the access level the item menu
   // needs; it is cached and shared with the board page
   const { data: board } = useBoardQuery(group.boardId);
+  const { run } = useAsyncAction();
 
   const boardPath = `${basePath}/${group.boardId}`;
   const openBoard = () => navigate(boardPath);
@@ -89,12 +91,7 @@ function BoardGroupTable(props: {
   ];
 
   const guarded = async (action: () => Promise<unknown>) => {
-    onError(undefined);
-    try {
-      await action();
-    } catch (err) {
-      onError((err as Error).message);
-    }
+    onError(await run(action));
     // resync either way: on failure the listing may still be stale
     await invalidateBoard(queryClient, group.boardId);
     await invalidateMyItems(queryClient);

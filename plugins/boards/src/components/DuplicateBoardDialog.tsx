@@ -18,6 +18,7 @@ import {
 } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
 import { rootRouteRef } from '../routes';
+import { useAsyncAction } from './useAsyncAction';
 
 /** Duplicates a board's structure and optionally its items. */
 export function DuplicateBoardDialog(props: {
@@ -43,13 +44,10 @@ export function DuplicateBoardDialog(props: {
       setCopyItems(false);
     }
   };
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | undefined>();
+  const { error, pending, run } = useAsyncAction();
 
-  const duplicate = async () => {
-    setPending(true);
-    setError(undefined);
-    try {
+  const duplicate = () =>
+    run(async () => {
       const copy = await boardsApi.duplicateBoard(board.id, {
         name: name.trim() || undefined,
         copyColumns,
@@ -59,12 +57,7 @@ export function DuplicateBoardDialog(props: {
       });
       onOpenChange(false);
       navigate(`${rootLink?.() ?? '/boards'}/${copy.id}`);
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setPending(false);
-    }
-  };
+    });
 
   return (
     <Dialog isOpen={isOpen} onOpenChange={onOpenChange}>
