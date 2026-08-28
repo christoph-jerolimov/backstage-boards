@@ -49,8 +49,9 @@ None.
 
 ## Impact
 
-- **Frontend.** `plugins/boards/src/components/BoardPage.tsx`: the filter
-  bar and one more piece of filter state. `AssigneeAvatars.tsx`: its
+- **Frontend.** `plugins/boards/src/components/BoardFilterBar.tsx`:
+  `useItemFilter` gains the assignee state and the labelled options,
+  `BoardFilterBar` renders the dropdown. `AssigneeAvatars.tsx`: its
   private `useProfiles` hook moves to a shared module so the dropdown
   labels and the card avatars resolve names the same way.
 - **Common.** `plugins/boards-common/src/filter.ts`: `ItemFilter`,

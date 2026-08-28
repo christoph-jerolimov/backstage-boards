@@ -3,15 +3,23 @@ import { BoardItem } from './types';
 /**
  * Filter over a board's items. Filters combine with AND: an item matches
  * only if it satisfies the text search (title or description,
- * case-insensitive) and carries ALL listed tags.
+ * case-insensitive), carries ALL listed tags, and is assigned to at
+ * least ONE of the listed assignees. Assignees are any-of because a
+ * person is on a card or not — asking for the items two people hold
+ * jointly is not the question the filter bar asks.
  */
 export interface ItemFilter {
   text?: string;
   tags?: string[];
+  assignees?: string[];
 }
 
 export function isEmptyFilter(filter: ItemFilter): boolean {
-  return !filter.text?.trim() && !(filter.tags && filter.tags.length > 0);
+  return (
+    !filter.text?.trim() &&
+    !(filter.tags && filter.tags.length > 0) &&
+    !(filter.assignees && filter.assignees.length > 0)
+  );
 }
 
 export function itemMatchesFilter(
@@ -31,6 +39,13 @@ export function itemMatchesFilter(
     if (!item.tags.includes(tag)) {
       return false;
     }
+  }
+  const assignees = filter.assignees ?? [];
+  if (
+    assignees.length > 0 &&
+    !assignees.some(assignee => item.assignees.includes(assignee))
+  ) {
+    return false;
   }
   return true;
 }

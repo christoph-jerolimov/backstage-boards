@@ -313,6 +313,7 @@ export async function createRouter(
       items: await service.listItems(principal, req.params.boardId, {
         text: typeof req.query.text === 'string' ? req.query.text : undefined,
         tags: asArray(req.query.tag),
+        assignees: asArray(req.query.assignee),
       }),
     });
   });

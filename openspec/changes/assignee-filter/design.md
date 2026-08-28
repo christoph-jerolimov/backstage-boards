@@ -4,12 +4,14 @@ See `proposal.md` — Why. The pieces this change assembles all exist:
 
 - `ItemFilter` (`plugins/boards-common/src/filter.ts`) is `{ text?, tags? }`
   with `itemMatchesFilter` and `isEmptyFilter` beside it. It is the one
-  filter shape shared by the client (`BoardPage.tsx:215`) and the server
-  (`BoardsService.listItems`, `BoardsService.ts:1182`).
-- The filter bar in `BoardPage.tsx` holds `filterText` and `filterTags`
-  in component state, derives `allTags` from the loaded items, renders
-  the tag dropdown as a `MenuTrigger` + `Menu` with `✓`-prefixed items,
-  and shows the counter plus "Clear filters" while `filterActive`.
+  filter shape shared by the client (`useItemFilter`) and the server
+  (`BoardsService.listItems`).
+- `BoardFilterBar.tsx` splits the bar in two: `useItemFilter(items)` owns
+  the text and tag state, derives `allTags` and `filteredItems`, and
+  hands `BoardPage` an `ItemFilterHandle`; `BoardFilterBar` renders the
+  search field, the tag dropdown (`MenuTrigger` + `Menu` with
+  `✓`-prefixed entries) and the counter plus "Clear filters" while the
+  filter is active.
 - `groupByAssignee` (`grouping.ts`) already walks `item.assignees` and
   treats an item with several assignees as belonging to each of them —
   the same fan-out the filter needs, one item matching if any of its
@@ -17,11 +19,12 @@ See `proposal.md` — Why. The pieces this change assembles all exist:
 - `useProfiles` in `AssigneeAvatars.tsx` batch-resolves refs to
   `{ displayName, picture }` through `catalogApi.getEntitiesByRefs`,
   keyed on the sorted ref list with a 5 minute `staleTime`, and falls
-  back to the ref's name when the catalog has nothing. It is currently
+  back to `refDisplayName` when the catalog has nothing. It is currently
   module-private.
-- `isTextRef` / `textRefDisplay` (`refs.ts`) separate free-text
-  assignees from catalog refs; `AssigneeAvatars` renders the former as
-  badges.
+- `isTextRef` tells free-text assignees from catalog refs (the former
+  are not in the catalog and must not be looked up there), and
+  `refDisplayName` (`refs.ts`) already reads a `text:` ref as its text
+  and any other ref as the entity's bare name.
 - The router already parses `?text=` and repeated `?tag=` into an
   `ItemFilter` via `asArray` (`router.ts:299`).
 
@@ -72,21 +75,25 @@ parallel `AssigneeFilter` threaded separately would mean two things to
 combine at every call site and two things for the API to parse.
 
 **Extract `useProfiles` into `plugins/boards/src/components/useProfiles.ts`
-and import it in both `AssigneeAvatars` and `BoardPage`.**
+and import it in both `AssigneeAvatars` and `useItemFilter`.**
 Copying the hook would give the dropdown its own catalog query and its
 own fallback logic, so a card could say "Alice Smith" while the dropdown
-said "alice". Sharing it also shares the react-query cache: the card
-avatars have usually already fetched the very refs the dropdown needs
-(same sorted-ref query key), so opening the dropdown normally costs no
-request. The hook keeps its current signature and behavior; only its
-home changes.
+said "alice". The query key is the sorted ref list, so the board-wide
+set is its own cache entry rather than a reuse of the per-card ones:
+the page pays one extra batched `getEntitiesByRefs` on load — which is
+also what makes the options sortable by label before the menu is ever
+opened — and opening the menu costs nothing. The hook keeps its current
+signature and behavior; only its home changes.
 
-**Derive the option list from the loaded items, next to `allTags`.**
+**Derive the option list inside `useItemFilter`, next to `allTags`.**
 `allAssignees = [...new Set(items.flatMap(item => item.assignees))]`,
-sorted by resolved label with `localeCompare`, mirrors the existing
-`allTags` line and needs no new API call — the board page already holds
-every item. Sorting by label rather than by ref puts "Alice Smith"
-before "Bob" regardless of their `user:default/...` refs.
+labelled through `useProfiles` (falling back to `refDisplayName`, which
+also covers `text:` assignees) and sorted by label with `localeCompare`,
+mirrors the existing `allTags` line and needs no new item fetch — the
+hook already holds every item. Sorting by label rather than by ref puts
+"Alice Smith" before "Bob" regardless of their `user:default/...` refs.
+Keeping it in the hook leaves `BoardFilterBar` presentational, as the
+tag dropdown already is.
 
 **Do not prune selections that leave the board.**
 If the last item assigned to Bob is reassigned while "Bob" is selected,

@@ -1141,6 +1141,7 @@ describe('BoardsService', () => {
         columnId,
         title: 'Fix login bug',
         tags: ['bug', 'urgent'],
+        assignees: ['user:default/bob'],
       });
       const withDescription = await service.createItem(alice, board.id, {
         columnId,
@@ -1149,6 +1150,7 @@ describe('BoardsService', () => {
       });
       await service.updateItem(alice, board.id, withDescription.id, {
         description: 'covers the LOGIN flow',
+        assignees: ['text:Jane'],
       });
       await service.createItem(alice, board.id, { columnId, title: 'Chore' });
       return board;
@@ -1175,6 +1177,49 @@ describe('BoardsService', () => {
       expect(
         await service.listItems(alice, board.id, {
           tags: ['bug', 'missing'],
+        }),
+      ).toHaveLength(0);
+    });
+
+    it('matches any of the requested assignees', async () => {
+      const board = await seedFilterBoard();
+      expect(
+        (
+          await service.listItems(alice, board.id, {
+            assignees: ['user:default/bob'],
+          })
+        ).map(i => i.title),
+      ).toEqual(['Fix login bug']);
+      expect(
+        (
+          await service.listItems(alice, board.id, {
+            assignees: ['user:default/bob', 'text:Jane'],
+          })
+        )
+          .map(i => i.title)
+          .sort(),
+      ).toEqual(['Fix login bug', 'Improve docs']);
+      expect(
+        await service.listItems(alice, board.id, {
+          assignees: ['user:default/carol'],
+        }),
+      ).toHaveLength(0);
+    });
+
+    it('intersects assignees with the other filters', async () => {
+      const board = await seedFilterBoard();
+      expect(
+        (
+          await service.listItems(alice, board.id, {
+            tags: ['bug'],
+            assignees: ['user:default/bob', 'text:Jane'],
+          })
+        ).map(i => i.title),
+      ).toEqual(['Fix login bug']);
+      expect(
+        await service.listItems(alice, board.id, {
+          tags: ['docs'],
+          assignees: ['user:default/bob'],
         }),
       ).toHaveLength(0);
     });
