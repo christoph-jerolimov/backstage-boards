@@ -34,7 +34,7 @@ import {
   useBoardsSignal,
 } from '../queries';
 import { MyItemsList } from './MyItemsPage';
-import { RowActionsMenu, RowContextMenu, useRowContextMenu } from './RowMenu';
+import { useRowMenu } from './RowMenu';
 import { ErrorText } from './common';
 import { FavoriteButton, FavoriteStar } from './FavoriteButton';
 import { useAsyncAction } from './useAsyncAction';
@@ -72,8 +72,17 @@ function BoardsTable(props: {
 }) {
   const { label, boards, onToggleFavorite, emptyText } = props;
   const navigate = useNavigate();
-  const contextMenu = useRowContextMenu<BoardListEntry>();
   const openBoard = (board: BoardListEntry) => navigate(board.id);
+  const rowMenu = useRowMenu<BoardListEntry>({
+    name: board => board.name,
+    children: board => (
+      <BoardMenu
+        board={board}
+        onOpen={openBoard}
+        onToggleFavorite={onToggleFavorite}
+      />
+    ),
+  });
   if (boards.length === 0) {
     return <Text>{emptyText}</Text>;
   }
@@ -93,7 +102,7 @@ function BoardsTable(props: {
               key={board.id}
               id={board.id}
               onContextMenu={(event: React.MouseEvent) =>
-                contextMenu.open(board, event)
+                rowMenu.onContextMenu(board, event)
               }
             >
               <Cell>
@@ -113,32 +122,12 @@ function BoardsTable(props: {
                 ))}
               </Cell>
               <Cell>{board.access}</Cell>
-              <Cell>
-                <RowActionsMenu label={`Actions for ${board.name}`}>
-                  <BoardMenu
-                    board={board}
-                    onOpen={openBoard}
-                    onToggleFavorite={onToggleFavorite}
-                  />
-                </RowActionsMenu>
-              </Cell>
+              <Cell>{rowMenu.rowActions(board)}</Cell>
             </Row>
           ))}
         </TableBody>
       </TableRoot>
-      <RowContextMenu
-        state={contextMenu.state}
-        onClose={contextMenu.close}
-        label={board => `Context menu for ${board.name}`}
-      >
-        {board => (
-          <BoardMenu
-            board={board}
-            onOpen={openBoard}
-            onToggleFavorite={onToggleFavorite}
-          />
-        )}
-      </RowContextMenu>
+      {rowMenu.contextMenu}
     </>
   );
 }

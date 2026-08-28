@@ -35,8 +35,8 @@ import {
 } from '../queries';
 import { rootRouteRef } from '../routes';
 import { DueDateBadge } from './DueDate';
-import { ItemActions, ItemContextMenu, ItemMenu } from './ItemMenu';
-import { RowActionsMenu, useRowContextMenu } from './RowMenu';
+import { ItemActions, ItemMenu } from './ItemMenu';
+import { useRowMenu } from './RowMenu';
 import { AsyncList, ErrorText } from './common';
 import { StatusBadge } from './StatusBadge';
 import { useAsyncAction } from './useAsyncAction';
@@ -73,7 +73,6 @@ function BoardGroupTable(props: {
   const navigate = useNavigate();
   const boardsApi = useApi(boardsApiRef);
   const queryClient = useQueryClient();
-  const contextMenu = useRowContextMenu<BoardItem>();
   // the board carries the columns and the access level the item menu
   // needs; it is cached and shared with the board page
   const { data: board } = useBoardQuery(group.boardId);
@@ -116,6 +115,20 @@ function BoardGroupTable(props: {
     </MenuItem>
   );
 
+  const rowMenu = useRowMenu<BoardItem>({
+    name: item => item.title,
+    children: item => (
+      <ItemMenu
+        item={item}
+        columns={board?.columns ?? []}
+        readonly={!canWrite || !!item.externalManager}
+        actions={actions}
+        assigneePool={assigneePool}
+        extraItems={openBoardItem}
+      />
+    ),
+  });
+
   return (
     <div>
       <Button
@@ -144,7 +157,7 @@ function BoardGroupTable(props: {
               key={entry.item.id}
               id={entry.item.id}
               onContextMenu={(event: React.MouseEvent) =>
-                contextMenu.open(entry.item, event)
+                rowMenu.onContextMenu(entry.item, event)
               }
             >
               <Cell>{entry.item.title}</Cell>
@@ -160,31 +173,12 @@ function BoardGroupTable(props: {
                 <DueDateBadge dueDate={entry.item.dueDate} />
               </Cell>
               <Cell>{entry.item.tags.join(', ')}</Cell>
-              <Cell>
-                <RowActionsMenu label={`Actions for ${entry.item.title}`}>
-                  <ItemMenu
-                    item={entry.item}
-                    columns={board?.columns ?? []}
-                    readonly={!canWrite || !!entry.item.externalManager}
-                    actions={actions}
-                    assigneePool={assigneePool}
-                    extraItems={openBoardItem}
-                  />
-                </RowActionsMenu>
-              </Cell>
+              <Cell>{rowMenu.rowActions(entry.item)}</Cell>
             </Row>
           ))}
         </TableBody>
       </TableRoot>
-      <ItemContextMenu
-        state={contextMenu.state}
-        onClose={contextMenu.close}
-        columns={board?.columns ?? []}
-        readonly={!canWrite || !!contextMenu.state?.row.externalManager}
-        actions={actions}
-        assigneePool={assigneePool}
-        extraItems={openBoardItem}
-      />
+      {rowMenu.contextMenu}
     </div>
   );
 }

@@ -16,8 +16,8 @@ import {
   sortItems,
 } from './grouping';
 import { GroupLabel } from './GroupLabel';
-import { ItemContextMenu, ItemMenu } from './ItemMenu';
-import { RowActionsMenu, useRowContextMenu } from './RowMenu';
+import { ItemMenu } from './ItemMenu';
+import { RowMenuHandle, useRowMenu } from './RowMenu';
 import type { BoardActions } from './BoardView';
 import { formatDate, RefDisplay } from './common';
 import { AssigneeAvatars } from './AssigneeAvatars';
@@ -27,16 +27,12 @@ import { StatusBadge } from './StatusBadge';
 function ItemsTable(props: {
   board: BoardWithContext;
   items: BoardItem[];
-  canWrite: boolean;
-  actions: BoardActions;
-  assigneePool: string[];
   openItem: (itemId: string) => void;
-  onItemContextMenu: (item: BoardItem, event: React.MouseEvent) => void;
+  rowMenu: RowMenuHandle<BoardItem>;
   sort: ItemSortDescriptor | undefined;
   onSortChange: (descriptor: ItemSortDescriptor) => void;
 }) {
-  const { board, items, canWrite, actions, openItem, sort, onSortChange } =
-    props;
+  const { board, items, openItem, rowMenu, sort, onSortChange } = props;
   const columnOf = (columnId: string) =>
     board.columns.find(column => column.id === columnId);
   const sorted = sortItems(items, sort, board.columns);
@@ -75,7 +71,7 @@ function ItemsTable(props: {
             key={item.id}
             id={item.id}
             onContextMenu={(event: React.MouseEvent) =>
-              props.onItemContextMenu(item, event)
+              rowMenu.onContextMenu(item, event)
             }
           >
             <Cell>
@@ -96,17 +92,7 @@ function ItemsTable(props: {
               <RefDisplay refString={item.createdBy} />
             </Cell>
             <Cell>{formatDate(item.updatedAt)}</Cell>
-            <Cell>
-              <RowActionsMenu label={`Actions for ${item.title}`}>
-                <ItemMenu
-                  item={item}
-                  columns={board.columns}
-                  readonly={!canWrite || !!item.externalManager}
-                  actions={actions}
-                  assigneePool={props.assigneePool}
-                />
-              </RowActionsMenu>
-            </Cell>
+            <Cell>{rowMenu.rowActions(item)}</Cell>
           </Row>
         ))}
       </TableBody>
@@ -125,33 +111,30 @@ export function TableView(props: {
   const { board, items, canWrite, actions, groupBy, openItem } = props;
   const assigneePool = [...new Set(items.flatMap(item => item.assignees))];
   const [sort, setSort] = useState<ItemSortDescriptor | undefined>(undefined);
-  const contextMenu = useRowContextMenu<BoardItem>();
-  const onItemContextMenu = contextMenu.open;
-  const contextMenuElement = (
-    <ItemContextMenu
-      state={contextMenu.state}
-      onClose={contextMenu.close}
-      columns={board.columns}
-      readonly={!canWrite || !!contextMenu.state?.row.externalManager}
-      actions={actions}
-      assigneePool={assigneePool}
-    />
-  );
+  const rowMenu = useRowMenu<BoardItem>({
+    name: item => item.title,
+    children: item => (
+      <ItemMenu
+        item={item}
+        columns={board.columns}
+        readonly={!canWrite || !!item.externalManager}
+        actions={actions}
+        assigneePool={assigneePool}
+      />
+    ),
+  });
   if (groupBy === 'none') {
     return (
       <>
         <ItemsTable
           board={board}
           items={items}
-          canWrite={canWrite}
-          actions={actions}
-          assigneePool={assigneePool}
           openItem={openItem}
-          onItemContextMenu={onItemContextMenu}
+          rowMenu={rowMenu}
           sort={sort}
           onSortChange={setSort}
         />
-        {contextMenuElement}
+        {rowMenu.contextMenu}
       </>
     );
   }
@@ -165,17 +148,14 @@ export function TableView(props: {
           <ItemsTable
             board={board}
             items={group.items}
-            canWrite={canWrite}
-            actions={actions}
-            assigneePool={assigneePool}
             openItem={openItem}
-            onItemContextMenu={onItemContextMenu}
+            rowMenu={rowMenu}
             sort={sort}
             onSortChange={setSort}
           />
         </Fragment>
       ))}
-      {contextMenuElement}
+      {rowMenu.contextMenu}
     </>
   );
 }

@@ -13,7 +13,6 @@ import {
 } from '@internal/plugin-boards-common';
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '../queries';
-import { RowContextMenu, RowContextMenuState } from './RowMenu';
 
 /**
  * The item mutations the item menu needs. Kept separate from the board
@@ -153,44 +152,5 @@ export function ItemMenu(props: {
         </MenuItem>
       )}
     </Menu>
-  );
-}
-
-/** The item actions menu opened at the pointer on right-click. */
-export function ItemContextMenu(props: {
-  state: RowContextMenuState<BoardItem> | undefined;
-  onClose: () => void;
-  columns: BoardColumn[];
-  readonly: boolean;
-  actions: ItemActions;
-  assigneePool: string[];
-  extraItems?: ReactNode;
-}) {
-  const {
-    state,
-    onClose,
-    columns,
-    readonly,
-    actions,
-    assigneePool,
-    extraItems,
-  } = props;
-  return (
-    <RowContextMenu
-      state={state}
-      onClose={onClose}
-      label={item => `Context menu for ${item.title}`}
-    >
-      {item => (
-        <ItemMenu
-          item={item}
-          columns={columns}
-          readonly={readonly}
-          actions={actions}
-          assigneePool={assigneePool}
-          extraItems={extraItems}
-        />
-      )}
-    </RowContextMenu>
   );
 }
