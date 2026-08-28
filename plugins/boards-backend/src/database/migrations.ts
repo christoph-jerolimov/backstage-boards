@@ -353,6 +353,59 @@ const dropItemLabels: Migration = {
   },
 };
 
+const boardPriorities: Migration = {
+  name: '20260828_01_board_priorities',
+  async up(knex) {
+    await knex.schema.createTable('board_priorities', table => {
+      table.string('id').primary();
+      table
+        .string('board_id')
+        .notNullable()
+        .references('id')
+        .inTable('boards')
+        .onDelete('CASCADE');
+      table.string('name').notNullable();
+      table.string('color').nullable();
+      // 1-based contiguous order; 1 is the highest priority
+      table.integer('ord').notNullable();
+      table.index(['board_id']);
+    });
+    await knex.schema.alterTable('items', table => {
+      // no FK cascade: the service resolves reassign/drop before a
+      // priority definition is deleted
+      table.string('priority_id').nullable();
+    });
+  },
+  async down(knex) {
+    await knex.schema.alterTable('items', table => {
+      table.dropColumn('priority_id');
+    });
+    await knex.schema.dropTableIfExists('board_priorities');
+  },
+};
+
+const itemChecklists: Migration = {
+  name: '20260828_02_item_checklists',
+  async up(knex) {
+    await knex.schema.createTable('item_checklist_entries', table => {
+      table
+        .string('item_id')
+        .notNullable()
+        .references('id')
+        .inTable('items')
+        .onDelete('CASCADE');
+      // 0-based insertion order within the item's checklist
+      table.integer('position').notNullable();
+      table.string('text').notNullable();
+      table.boolean('checked').notNullable().defaultTo(false);
+      table.primary(['item_id', 'position']);
+    });
+  },
+  async down(knex) {
+    await knex.schema.dropTableIfExists('item_checklist_entries');
+  },
+};
+
 const migrations: Migration[] = [
   initial,
   itemDescriptions,
@@ -362,9 +415,11 @@ const migrations: Migration[] = [
   itemDueDates,
   boardEntities,
   dropItemLabels,
+  boardPriorities,
+  itemChecklists,
 ];
 
-class BoardsMigrationSource implements Knex.MigrationSource<Migration> {
+export class BoardsMigrationSource implements Knex.MigrationSource<Migration> {
   async getMigrations(): Promise<Migration[]> {
     return migrations;
   }

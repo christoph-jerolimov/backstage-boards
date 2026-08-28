@@ -10,6 +10,8 @@ import {
   testBoardsApi,
   testColumn,
   testItem,
+  testPriorities,
+  testPriority,
 } from './__testUtils__/testHelpers';
 
 const identityApi = {
@@ -73,6 +75,7 @@ function renderList(
     items?: unknown[];
     error?: Error;
     access?: BoardPermissionLevel;
+    priorities?: ReturnType<typeof testPriorities>;
     api?: Record<string, unknown>;
   } = {},
 ) {
@@ -88,6 +91,7 @@ function renderList(
     createdAt: '2026-08-01T10:00:00.000Z',
     updatedAt: '2026-08-01T10:00:00.000Z',
     columns: boardColumns,
+    priorities: over.priorities ?? [],
     access: over.access ?? 'write',
     favorite: false,
     watching: false,
@@ -151,6 +155,53 @@ describe('MyItemsList', () => {
     );
     expect(screen.getByText('docs, urgent')).toBeInTheDocument();
     expect(screen.getByText(/Sep 4/)).toBeInTheDocument();
+  });
+
+  it('shows the priority column only when an item has a priority', async () => {
+    renderList({
+      items: [
+        {
+          ...myItems[0],
+          item: testItem({
+            id: 'item-1',
+            title: 'Ship the docs',
+            columnId: 'column-1',
+            assignees: ['user:default/alice'],
+            priorityId: 'priority-1',
+          }),
+          priority: testPriority(),
+        },
+        myItems[1],
+      ],
+      priorities: testPriorities(),
+    });
+    await screen.findByText('Ship the docs');
+    expect(
+      screen.getAllByRole('columnheader').map(cell => cell.textContent),
+    ).toContain('Priority');
+    expect(screen.getByText('critical')).toBeInTheDocument();
+  });
+
+  it('has no priority column while no item has a priority', async () => {
+    renderList();
+    await screen.findByText('Ship the docs');
+    expect(
+      screen.getAllByRole('columnheader').map(cell => cell.textContent),
+    ).not.toContain('Priority');
+  });
+
+  it('offers the priorities of the item’s own board in the row menu', async () => {
+    const { boardsApi } = renderList({ priorities: testPriorities() });
+    await openRowMenu('Ship the docs');
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Priority' }));
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'critical' }),
+    );
+    await waitFor(() =>
+      expect(boardsApi.updateItem).toHaveBeenCalledWith('board-1', 'item-1', {
+        priorityId: 'priority-1',
+      }),
+    );
   });
 
   it('falls back to the listing status until the board resolves', async () => {

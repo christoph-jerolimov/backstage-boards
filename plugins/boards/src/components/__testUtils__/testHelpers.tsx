@@ -6,6 +6,7 @@ import {
   BoardColumn,
   BoardItem,
   BoardListEntry,
+  BoardPriority,
   BoardWithContext,
   MyBoardItem,
 } from '@internal/plugin-boards-common';
@@ -71,6 +72,7 @@ export function testItem(over: Partial<BoardItem> = {}): BoardItem {
     descriptionVersionCount: 0,
     assignees: [],
     tags: [],
+    checklist: [],
     ...over,
   };
 }
@@ -120,6 +122,7 @@ export function testBoard(
     createdAt: '2026-08-01T10:00:00.000Z',
     updatedAt: '2026-08-02T10:00:00.000Z',
     columns: [],
+    priorities: [],
     access: 'admin',
     favorite: false,
     watching: false,
@@ -137,6 +140,32 @@ export function testColumn(over: Partial<BoardColumn> = {}): BoardColumn {
   };
 }
 
+export function testPriority(over: Partial<BoardPriority> = {}): BoardPriority {
+  return {
+    id: 'priority-1',
+    boardId: 'board-1',
+    name: 'critical',
+    color: 'red',
+    order: 1,
+    ...over,
+  };
+}
+
+/** The four default priorities a new board starts with. */
+export function testPriorities(): BoardPriority[] {
+  return [
+    testPriority(),
+    testPriority({ id: 'priority-2', name: 'high', color: 'orange', order: 2 }),
+    testPriority({
+      id: 'priority-3',
+      name: 'medium',
+      color: undefined,
+      order: 3,
+    }),
+    testPriority({ id: 'priority-4', name: 'low', color: undefined, order: 4 }),
+  ];
+}
+
 /** Board actions where every handler is a jest mock. */
 export function testActions(): jest.Mocked<BoardActions> {
   return {
@@ -151,6 +180,7 @@ export function testActions(): jest.Mocked<BoardActions> {
     renameItem: jest.fn().mockResolvedValue(undefined),
     setItemDueDate: jest.fn().mockResolvedValue(undefined),
     setAssignees: jest.fn().mockResolvedValue(undefined),
+    setItemPriority: jest.fn().mockResolvedValue(undefined),
     deleteItem: jest.fn().mockResolvedValue(undefined),
   };
 }
@@ -181,6 +211,9 @@ export function testBoardsApi(
     addColumn: jest.fn(),
     updateColumn: jest.fn(),
     deleteColumn: jest.fn().mockResolvedValue(undefined),
+    addPriority: jest.fn(),
+    updatePriority: jest.fn(),
+    deletePriority: jest.fn().mockResolvedValue(undefined),
     listItems: jest.fn().mockResolvedValue([]),
     createItem: jest.fn(),
     updateItem: jest.fn(),

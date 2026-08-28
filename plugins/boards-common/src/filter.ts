@@ -6,19 +6,22 @@ import { BoardItem } from './types';
  * case-insensitive), carries ALL listed tags, and is assigned to at
  * least ONE of the listed assignees. Assignees are any-of because a
  * person is on a card or not — asking for the items two people hold
- * jointly is not the question the filter bar asks.
+ * jointly is not the question the filter bar asks. Priorities (by id)
+ * are any-of for the same reason: an item holds exactly one.
  */
 export interface ItemFilter {
   text?: string;
   tags?: string[];
   assignees?: string[];
+  priorities?: string[];
 }
 
 export function isEmptyFilter(filter: ItemFilter): boolean {
   return (
     !filter.text?.trim() &&
     !(filter.tags && filter.tags.length > 0) &&
-    !(filter.assignees && filter.assignees.length > 0)
+    !(filter.assignees && filter.assignees.length > 0) &&
+    !(filter.priorities && filter.priorities.length > 0)
   );
 }
 
@@ -44,6 +47,13 @@ export function itemMatchesFilter(
   if (
     assignees.length > 0 &&
     !assignees.some(assignee => item.assignees.includes(assignee))
+  ) {
+    return false;
+  }
+  const priorities = filter.priorities ?? [];
+  if (
+    priorities.length > 0 &&
+    !(item.priorityId && priorities.includes(item.priorityId))
   ) {
     return false;
   }

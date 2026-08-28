@@ -1,6 +1,7 @@
 import {
   BoardColumn,
   BoardItem,
+  BoardPriority,
   MyBoardItem,
   todayISO,
 } from '@internal/plugin-boards-common';
@@ -76,12 +77,14 @@ export function sortItems(
 export const UNASSIGNED = 'unassigned';
 export const NO_DUE_DATE = 'no-due-date';
 export const UNTAGGED = 'untagged';
+export const NO_PRIORITY = 'no-priority';
 
 /** How board/table items are grouped. */
 /** Every grouping the board and my-items views offer. */
 export const ALL_GROUP_BY_MODES = [
   'none',
   'assignee',
+  'priority',
   'dueDate',
   'tags',
 ] as const;
@@ -96,6 +99,7 @@ export interface ItemGroup {
 /** The group the items carrying none of the grouped values land in. */
 export const REST_KEY: Record<Exclude<GroupByMode, 'none'>, string> = {
   assignee: UNASSIGNED,
+  priority: NO_PRIORITY,
   dueDate: NO_DUE_DATE,
   tags: UNTAGGED,
 };
@@ -103,6 +107,7 @@ export const REST_KEY: Record<Exclude<GroupByMode, 'none'>, string> = {
 /** How that group reads, wherever a grouping is labelled. */
 export const REST_LABEL: Record<Exclude<GroupByMode, 'none'>, string> = {
   assignee: 'Unassigned',
+  priority: 'No priority',
   dueDate: 'No due date',
   tags: 'Untagged',
 };
@@ -112,6 +117,8 @@ function groupKeysOf(item: BoardItem, mode: GroupByMode): string[] {
   switch (mode) {
     case 'assignee':
       return item.assignees;
+    case 'priority':
+      return item.priorityId ? [item.priorityId] : [];
     case 'dueDate':
       return item.dueDate ? [item.dueDate] : [];
     default:
@@ -122,9 +129,15 @@ function groupKeysOf(item: BoardItem, mode: GroupByMode): string[] {
 /**
  * Groups items by the selected mode. Multi-valued modes (assignee,
  * tags) put an item into each of its groups; the "none of them" group
- * (unassigned / no due date / untagged) always comes last.
+ * (unassigned / no priority / no due date / untagged) always comes last.
+ * Priority groups are keyed by priority id and ordered by the board's
+ * priority order (1 first), which is why that mode needs `priorities`.
  */
-export function groupItems(items: BoardItem[], mode: GroupByMode): ItemGroup[] {
+export function groupItems(
+  items: BoardItem[],
+  mode: GroupByMode,
+  priorities: BoardPriority[] = [],
+): ItemGroup[] {
   if (mode === 'none') {
     return [{ key: 'all', items }];
   }
@@ -142,8 +155,14 @@ export function groupItems(items: BoardItem[], mode: GroupByMode): ItemGroup[] {
       groups.set(key, group);
     }
   }
+  const priorityOrder = new Map(priorities.map(p => [p.id, p.order]));
   const result = [...groups.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
+    .sort(([a], [b]) =>
+      mode === 'priority'
+        ? (priorityOrder.get(a) ?? Infinity) -
+          (priorityOrder.get(b) ?? Infinity)
+        : a.localeCompare(b),
+    )
     .map(([key, grouped]) => ({ key, items: grouped }));
   if (rest.length > 0) {
     result.push({ key: REST_KEY[mode], items: rest });

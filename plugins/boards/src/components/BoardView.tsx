@@ -19,6 +19,7 @@ import {
 import {
   BoardColumn,
   BoardItem,
+  BoardPriority,
   BoardWithContext,
   ALL_COLUMN_COLORS,
   ColumnColor,
@@ -34,8 +35,9 @@ import { ItemActions, ItemMenu } from './ItemMenu';
 import { RowMenuHandle, useRowMenu } from './RowMenu';
 import { InlineAddField, InlineEdit } from './common';
 import { AssigneeAvatars } from './AssigneeAvatars';
+import { ChecklistBadge } from './ChecklistEditor';
 import { DueDateBadge } from './DueDate';
-import { ColorDot, ColumnDot } from './StatusBadge';
+import { ColorDot, ColumnDot, PriorityChip } from './StatusBadge';
 
 const DRAG_TYPE = 'application/x-boards-item';
 
@@ -55,12 +57,13 @@ export interface BoardActions extends ItemActions {
 
 function ItemCard(props: {
   item: BoardItem;
+  priority?: BoardPriority;
   canWrite: boolean;
   actions: BoardActions;
   rowMenu: RowMenuHandle<BoardItem>;
   onDropBefore: (droppedItemId: string) => void;
 }) {
-  const { item, canWrite, actions, rowMenu } = props;
+  const { item, priority, canWrite, actions, rowMenu } = props;
   const readonly = !canWrite || !!item.externalManager;
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -145,7 +148,13 @@ function ItemCard(props: {
           Managed by {item.externalManager} (read-only)
         </Text>
       )}
+      {priority && (
+        <div style={{ marginTop: 4 }}>
+          <PriorityChip priority={priority} size="small" />
+        </div>
+      )}
       <DueDateBadge dueDate={item.dueDate} />
+      <ChecklistBadge checklist={item.checklist} />
       <AssigneeAvatars refs={item.assignees} />
       {item.tags.length > 0 && (
         <Text variant="body-x-small" color="secondary">
@@ -244,6 +253,7 @@ function ColumnLane(props: {
     <ItemCard
       key={`${item.id}`}
       item={item}
+      priority={board.priorities.find(p => p.id === item.priorityId)}
       canWrite={canWrite}
       actions={actions}
       rowMenu={props.rowMenu}
@@ -368,10 +378,17 @@ function ColumnLane(props: {
         )}
       </Flex>
       {groupBy !== 'none'
-        ? groupItems(sorted, groupBy).map(group => (
+        ? groupItems(sorted, groupBy, board.priorities).map(group => (
             <div key={group.key}>
               <Text variant="body-x-small" color="secondary">
-                <GroupLabel mode={groupBy} groupKey={group.key} />
+                <GroupLabel
+                  mode={groupBy}
+                  groupKey={group.key}
+                  priorities={board.priorities}
+                  count={
+                    groupBy === 'priority' ? group.items.length : undefined
+                  }
+                />
               </Text>
               <Flex direction="column" gap="2">
                 {group.items.map(renderCard)}
@@ -399,6 +416,7 @@ export function BoardView(props: {
       <ItemMenu
         item={item}
         columns={board.columns}
+        priorities={board.priorities}
         readonly={!canWrite || !!item.externalManager}
         actions={actions}
         assigneePool={pool}

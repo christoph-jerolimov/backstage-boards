@@ -192,6 +192,58 @@ describe('actions', () => {
     ).rejects.toThrow(/not found/);
   });
 
+  it('items carry priorities through add, update, and list', async () => {
+    const board = await registry.invoke<BoardOutput>(
+      'create-board',
+      { name: 'B' },
+      aliceCredentials,
+    );
+    const columns = await knex('board_columns').where('board_id', board.id);
+    const priorities = await knex('board_priorities')
+      .where('board_id', board.id)
+      .orderBy('ord');
+    const critical = priorities[0];
+    const high = priorities[1];
+    const added = await registry.invoke<IdOutput>(
+      'add-item',
+      {
+        boardId: board.id,
+        columnId: columns[0].id,
+        title: 'Urgent',
+        priorityId: critical.id,
+      },
+      aliceCredentials,
+    );
+    await registry.invoke(
+      'add-item',
+      { boardId: board.id, columnId: columns[0].id, title: 'Later' },
+      aliceCredentials,
+    );
+    const listed = await registry.invoke<{
+      items: Array<{ title: string; priorityId?: string }>;
+    }>(
+      'list-items',
+      { boardId: board.id, priorities: [critical.id] },
+      aliceCredentials,
+    );
+    expect(listed.items.map(entry => entry.title)).toEqual(['Urgent']);
+    expect(listed.items[0].priorityId).toBe(critical.id);
+    await registry.invoke(
+      'update-item',
+      { boardId: board.id, itemId: added.id, priorityId: high.id },
+      aliceCredentials,
+    );
+    const row = await knex('items').where('id', added.id).first();
+    expect(row?.priority_id).toBe(high.id);
+    await registry.invoke(
+      'update-item',
+      { boardId: board.id, itemId: added.id, priorityId: null },
+      aliceCredentials,
+    );
+    const clearedRow = await knex('items').where('id', added.id).first();
+    expect(clearedRow?.priority_id).toBeNull();
+  });
+
   it('registers the full action set', () => {
     expect([...registry.actions.keys()].sort()).toEqual(
       [

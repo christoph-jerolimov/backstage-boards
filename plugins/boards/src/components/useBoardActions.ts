@@ -100,6 +100,8 @@ export function useBoardActions(
         guarded(() => boardsApi.updateItem(boardId, itemId, { dueDate })),
       setAssignees: (itemId, assignees) =>
         guarded(() => boardsApi.updateItem(boardId, itemId, { assignees })),
+      setItemPriority: (itemId, priorityId) =>
+        guarded(() => boardsApi.updateItem(boardId, itemId, { priorityId })),
       deleteItem: itemId =>
         guarded(() => boardsApi.deleteItem(boardId, itemId)),
       openItem,

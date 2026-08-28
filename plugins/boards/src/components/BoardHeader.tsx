@@ -8,6 +8,7 @@ import {
   RiLockUnlockLine,
   RiSettings3Line,
   RiMore2Fill,
+  RiTableLine,
 } from '@remixicon/react';
 import {
   Alert,
@@ -116,6 +117,9 @@ export function BoardHeader(props: {
             options={[
               { value: 'none', label: 'Not grouped' },
               { value: 'assignee', label: 'By assignee' },
+              ...(board.priorities.length > 0
+                ? [{ value: 'priority', label: 'By priority' }]
+                : []),
               { value: 'dueDate', label: 'By due date' },
               { value: 'tags', label: 'By tags' },
             ]}
@@ -162,6 +166,20 @@ export function BoardHeader(props: {
                   onAction={() => onOpenDialog('archived')}
                 >
                   Archived items…
+                </MenuItem>
+              )}
+              <MenuItem
+                iconStart={<RiTableLine size={16} />}
+                onAction={() => onOpenDialog('assigneeMatrix')}
+              >
+                Assignee matrix…
+              </MenuItem>
+              {board.priorities.length > 0 && (
+                <MenuItem
+                  iconStart={<RiTableLine size={16} />}
+                  onAction={() => onOpenDialog('priorityMatrix')}
+                >
+                  Priority matrix…
                 </MenuItem>
               )}
               <MenuItem

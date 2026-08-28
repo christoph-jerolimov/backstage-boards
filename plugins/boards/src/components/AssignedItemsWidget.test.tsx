@@ -7,6 +7,7 @@ import {
   renderWithProviders,
   testBoardsApi,
   testMyItem,
+  testPriority,
 } from './__testUtils__/testHelpers';
 
 const mockNavigate = jest.fn();
@@ -88,6 +89,27 @@ describe('AssignedItemsContent', () => {
     expect(
       screen.getByRole('button', { name: 'Open board Support' }),
     ).toBeInTheDocument();
+  });
+
+  it('shows the priority of an item that has one', async () => {
+    renderWidget(
+      {},
+      {
+        items: [
+          testMyItem({
+            item: {
+              id: 'item-1',
+              title: 'Urgent task',
+              priorityId: 'priority-1',
+            },
+            priority: testPriority(),
+          }),
+          testMyItem({ item: { id: 'item-2', title: 'Plain task' } }),
+        ],
+      },
+    );
+    await screen.findByRole('button', { name: 'Open item Urgent task' });
+    expect(screen.getByText('critical')).toBeInTheDocument();
   });
 
   it('shows a loading state while the items are in flight', () => {

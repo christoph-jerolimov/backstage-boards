@@ -306,7 +306,11 @@ export function BoardListPage() {
           <MyItemsList />
         </TabPanel>
       </Tabs>
-      <Dialog isOpen={createOpen} onOpenChange={setCreateOpen}>
+      <Dialog
+        isOpen={createOpen}
+        onOpenChange={setCreateOpen}
+        style={{ width: '800px', maxWidth: '95%' }}
+      >
         <DialogHeader>Create board</DialogHeader>
         <DialogBody>
           <TextField

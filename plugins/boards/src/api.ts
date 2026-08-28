@@ -9,6 +9,7 @@ import {
   BoardItem,
   BoardPermissionEntry,
   BoardPermissionLevel,
+  BoardPriority,
   BoardUpdate,
   BoardWithContext,
   ColumnColor,
@@ -105,6 +106,21 @@ export interface BoardsApi {
     boardId: string,
     columnId: string,
     options?: { moveItemsTo?: string },
+  ): Promise<void>;
+
+  addPriority(
+    boardId: string,
+    options: { name: string; color?: ColumnColor },
+  ): Promise<BoardPriority>;
+  updatePriority(
+    boardId: string,
+    priorityId: string,
+    update: { name?: string; color?: ColumnColor | null; order?: number },
+  ): Promise<BoardPriority>;
+  deletePriority(
+    boardId: string,
+    priorityId: string,
+    options?: { reassignTo?: string; drop?: boolean },
   ): Promise<void>;
 
   listItems(boardId: string): Promise<BoardItem[]>;
@@ -387,6 +403,44 @@ export class BoardsClient implements BoardsApi {
     return this.requestVoid(
       'DELETE',
       `/boards/${boardId}/columns/${columnId}${query}`,
+    );
+  }
+
+  addPriority(
+    boardId: string,
+    options: { name: string; color?: ColumnColor },
+  ): Promise<BoardPriority> {
+    return this.request('POST', `/boards/${boardId}/priorities`, options);
+  }
+
+  updatePriority(
+    boardId: string,
+    priorityId: string,
+    update: { name?: string; color?: ColumnColor | null; order?: number },
+  ): Promise<BoardPriority> {
+    return this.request(
+      'PATCH',
+      `/boards/${boardId}/priorities/${priorityId}`,
+      update,
+    );
+  }
+
+  deletePriority(
+    boardId: string,
+    priorityId: string,
+    options?: { reassignTo?: string; drop?: boolean },
+  ): Promise<void> {
+    const params = new URLSearchParams();
+    if (options?.reassignTo) {
+      params.set('reassignTo', options.reassignTo);
+    }
+    if (options?.drop) {
+      params.set('drop', 'true');
+    }
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return this.requestVoid(
+      'DELETE',
+      `/boards/${boardId}/priorities/${priorityId}${query}`,
     );
   }
 

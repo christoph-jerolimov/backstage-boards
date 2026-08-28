@@ -9,6 +9,7 @@ import {
   testBoardsApi,
   testColumn,
   testItem,
+  testPriorities,
 } from './__testUtils__/testHelpers';
 
 const catalogApi = {
@@ -48,7 +49,11 @@ const timeline = [
 ];
 
 function renderDrawer(
-  over: { item?: ReturnType<typeof testItem>; canWrite?: boolean } = {},
+  over: {
+    item?: ReturnType<typeof testItem>;
+    canWrite?: boolean;
+    priorities?: ReturnType<typeof testPriorities>;
+  } = {},
 ) {
   const boardsApi = testBoardsApi({
     getTimeline: jest.fn().mockResolvedValue(timeline),
@@ -57,7 +62,7 @@ function renderDrawer(
   const onChanged = jest.fn().mockResolvedValue(undefined);
   renderWithProviders(
     <ItemDrawer
-      board={board}
+      board={{ ...board, priorities: over.priorities ?? [] }}
       item={over.item ?? testItem({ title: 'Ship the docs' })}
       canWrite={over.canWrite ?? true}
       tagSuggestions={['docs']}
@@ -122,6 +127,34 @@ describe('ItemDrawer', () => {
     });
   });
 
+  it('offers no priority field on a board without priorities', () => {
+    renderDrawer();
+    expect(
+      screen.queryByRole('button', { name: /Priority/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('sets the priority from the drawer', async () => {
+    const { boardsApi } = renderDrawer({ priorities: testPriorities() });
+    await userEvent.click(screen.getByRole('button', { name: /Priority/ }));
+    await userEvent.click(await screen.findByRole('option', { name: 'high' }));
+    expect(boardsApi.updateItem).toHaveBeenCalledWith('board-1', 'item-1', {
+      priorityId: 'priority-2',
+    });
+  });
+
+  it('clears the priority via the None option', async () => {
+    const { boardsApi } = renderDrawer({
+      item: testItem({ priorityId: 'priority-2' }),
+      priorities: testPriorities(),
+    });
+    await userEvent.click(screen.getByRole('button', { name: /Priority/ }));
+    await userEvent.click(await screen.findByRole('option', { name: 'None' }));
+    expect(boardsApi.updateItem).toHaveBeenCalledWith('board-1', 'item-1', {
+      priorityId: null,
+    });
+  });
+
   it('sets and clears the due date', async () => {
     const { boardsApi } = renderDrawer({
       item: testItem({ dueDate: '2026-09-04' }),
@@ -179,6 +212,48 @@ describe('ItemDrawer', () => {
     expect(boardsApi.updateItem).toHaveBeenCalledWith('board-1', 'item-1', {
       tags: ['frontend'],
     });
+  });
+
+  it('saves checklist changes', async () => {
+    const { boardsApi } = renderDrawer({
+      item: testItem({
+        checklist: [{ text: 'write docs', checked: false }],
+      }),
+    });
+    await userEvent.click(
+      screen.getByRole('checkbox', { name: /"write docs" as done/ }),
+    );
+    expect(boardsApi.updateItem).toHaveBeenCalledWith('board-1', 'item-1', {
+      checklist: [{ text: 'write docs', checked: true }],
+    });
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Add checklist entry' }),
+    );
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Add checklist entry' }),
+      'announce{Enter}',
+    );
+    expect(boardsApi.updateItem).toHaveBeenCalledWith('board-1', 'item-1', {
+      checklist: [
+        { text: 'write docs', checked: false },
+        { text: 'announce', checked: false },
+      ],
+    });
+  });
+
+  it('shows the checklist read-only on externally managed items', () => {
+    renderDrawer({
+      item: testItem({
+        externalManager: 'jira',
+        checklist: [{ text: 'write docs', checked: true }],
+      }),
+    });
+    expect(
+      screen.getByRole('checkbox', { name: /"write docs" as not done/ }),
+    ).toBeDisabled();
+    expect(
+      screen.queryByRole('button', { name: 'Add checklist entry' }),
+    ).not.toBeInTheDocument();
   });
 
   it('deletes the item and closes', async () => {

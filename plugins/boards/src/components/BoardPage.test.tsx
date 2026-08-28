@@ -10,6 +10,7 @@ import {
   testBoardsApi,
   testColumn,
   testItem,
+  testPriorities,
 } from './__testUtils__/testHelpers';
 
 const identityApi = {
@@ -37,6 +38,7 @@ const board = {
     testColumn({ id: 'column-1', title: 'Todo' }),
     testColumn({ id: 'column-2', title: 'Done', position: 2000 }),
   ],
+  priorities: [],
 };
 
 const items = [
@@ -390,6 +392,7 @@ describe('BoardPage actions menu', () => {
     ).toEqual([
       'Recent changes…',
       'Archived items…',
+      'Assignee matrix…',
       'Duplicate board…',
       'Board settings…',
       'Share…',
@@ -402,7 +405,56 @@ describe('BoardPage actions menu', () => {
     await openBoardMenu();
     expect(
       screen.getAllByRole('menuitem').map(entry => entry.textContent),
-    ).toEqual(['Recent changes…', 'Archived items…', 'Duplicate board…']);
+    ).toEqual([
+      'Recent changes…',
+      'Archived items…',
+      'Assignee matrix…',
+      'Duplicate board…',
+    ]);
+  });
+
+  it('offers the priority matrix only on boards with priorities', async () => {
+    renderBoard({ board: { priorities: testPriorities() } });
+    await openBoardMenu();
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: 'Priority matrix…' }),
+    );
+    expect(
+      await screen.findByRole('table', { name: 'Priority matrix' }),
+    ).toBeInTheDocument();
+  });
+
+  it('counts only the filtered items in the assignee matrix', async () => {
+    renderBoard({ items: assignedItems, catalogApi: assigneeCatalogApi() });
+    // Bob's item is the only one tagged "docs"
+    await userEvent.click(await screen.findByRole('button', { name: 'Tags' }));
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'docs' }),
+    );
+    await openBoardMenu();
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: 'Assignee matrix…' }),
+    );
+    const table = await screen.findByRole('table', { name: 'Assignee matrix' });
+    expect(
+      within(table)
+        .getAllByRole('rowheader')
+        .map(header => header.textContent),
+    ).toEqual(['Bob Builder', 'Sum']);
+    // Todo, Done, Sum — only the filtered item is counted
+    expect(
+      within(within(table).getAllByRole('row')[2])
+        .getAllByRole('cell')
+        .map(cell => cell.textContent),
+    ).toEqual(['1', '0', '1']);
+  });
+
+  it('offers no priority matrix entry without priorities', async () => {
+    renderBoard();
+    await openBoardMenu();
+    expect(
+      screen.queryByRole('menuitem', { name: 'Priority matrix…' }),
+    ).not.toBeInTheDocument();
   });
 
   it('opens the recent changes dialog', async () => {

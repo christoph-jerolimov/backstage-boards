@@ -315,6 +315,47 @@ describe('BoardsClient column endpoints', () => {
       'http://backstage/api/boards/boards/board-1/columns/column-1?moveItemsTo=column%202',
     );
   });
+
+  it('adds, updates and deletes priorities', async () => {
+    const { client, calls } = setup(() => ({
+      json: async () => ({ id: 'priority-1' }),
+    }));
+    await client.addPriority('board-1', { name: 'blocker', color: 'purple' });
+    expect(calls[0].url).toBe(
+      'http://backstage/api/boards/boards/board-1/priorities',
+    );
+    expect(calls[0].init.method).toBe('POST');
+    expect(bodyOf(calls[0].init)).toEqual({ name: 'blocker', color: 'purple' });
+    await client.updatePriority('board-1', 'priority-1', {
+      name: 'Blocker',
+      color: null,
+      order: 1,
+    });
+    expect(calls[1].url).toBe(
+      'http://backstage/api/boards/boards/board-1/priorities/priority-1',
+    );
+    expect(calls[1].init.method).toBe('PATCH');
+    expect(bodyOf(calls[1].init)).toEqual({
+      name: 'Blocker',
+      color: null,
+      order: 1,
+    });
+    await client.deletePriority('board-1', 'priority-1');
+    expect(calls[2].url).toBe(
+      'http://backstage/api/boards/boards/board-1/priorities/priority-1',
+    );
+    expect(calls[2].init.method).toBe('DELETE');
+    await client.deletePriority('board-1', 'priority-1', {
+      reassignTo: 'priority-2',
+    });
+    expect(calls[3].url).toBe(
+      'http://backstage/api/boards/boards/board-1/priorities/priority-1?reassignTo=priority-2',
+    );
+    await client.deletePriority('board-1', 'priority-1', { drop: true });
+    expect(calls[4].url).toBe(
+      'http://backstage/api/boards/boards/board-1/priorities/priority-1?drop=true',
+    );
+  });
 });
 
 describe('BoardsClient item endpoints', () => {

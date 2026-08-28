@@ -9,6 +9,7 @@ import {
   testBoard,
   testColumn,
   testItem,
+  testPriorities,
 } from './__testUtils__/testHelpers';
 
 const identityApi = {
@@ -28,6 +29,7 @@ const board = testBoard({
     testColumn({ id: 'column-1', title: 'Todo' }),
     testColumn({ id: 'column-2', title: 'Done', position: 2000 }),
   ],
+  priorities: testPriorities(),
 });
 
 const items = [
@@ -103,6 +105,31 @@ describe('TableView', () => {
     expect(screen.getByText('docs')).toBeInTheDocument();
     expect(screen.getByText('Importer')).toBeInTheDocument();
     expect(screen.getByText('Done')).toBeInTheDocument();
+  });
+
+  it('adds the priority column only when a listed item has one', () => {
+    renderTable({
+      items: [
+        testItem({
+          id: 'item-1',
+          title: 'Urgent',
+          columnId: 'column-1',
+          priorityId: 'priority-1',
+        }),
+        testItem({ id: 'item-2', title: 'Plain', columnId: 'column-1' }),
+      ],
+    });
+    expect(
+      screen.getAllByRole('columnheader').map(cell => cell.textContent),
+    ).toContain('Priority');
+    expect(screen.getByText('critical')).toBeInTheDocument();
+  });
+
+  it('has no priority column while no item has a priority', () => {
+    renderTable();
+    expect(
+      screen.getAllByRole('columnheader').map(cell => cell.textContent),
+    ).not.toContain('Priority');
   });
 
   it('marks externally managed items in the title', () => {

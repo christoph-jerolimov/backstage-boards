@@ -975,6 +975,328 @@ describe('BoardsService', () => {
     });
   });
 
+  describe('priorities', () => {
+    it('seeds new boards with the default priorities', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      expect(board.priorities.map(p => [p.name, p.color, p.order])).toEqual([
+        ['critical', 'red', 1],
+        ['high', 'orange', 2],
+        ['medium', undefined, 3],
+        ['low', undefined, 4],
+      ]);
+    });
+
+    it('appends new priorities with the next order number', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const added = await service.addPriority(alice, board.id, {
+        name: 'blocker',
+      });
+      expect(added.order).toBe(5);
+      expect(added.color).toBeUndefined();
+      const fresh = await service.getBoard(alice, board.id);
+      expect(fresh.priorities).toHaveLength(5);
+    });
+
+    it('caps a board at ten priorities', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      for (let index = 5; index <= 10; index += 1) {
+        await service.addPriority(alice, board.id, { name: `p${index}` });
+      }
+      await expect(
+        service.addPriority(alice, board.id, { name: 'eleventh' }),
+      ).rejects.toThrow(/at most 10 priorities/);
+    });
+
+    it('validates names and colors', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      await expect(
+        service.addPriority(alice, board.id, { name: '   ' }),
+      ).rejects.toThrow(/must not be empty/);
+      await expect(
+        service.addPriority(alice, board.id, { name: 'x', color: 'pink' }),
+      ).rejects.toThrow(/Invalid priority color/);
+    });
+
+    it('renames and recolors without touching items', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const high = board.priorities[1];
+      const item = await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Item',
+        priorityId: high.id,
+      });
+      const updated = await service.updatePriority(alice, board.id, high.id, {
+        name: 'important',
+        color: 'purple',
+      });
+      expect(updated.name).toBe('important');
+      expect(updated.color).toBe('purple');
+      expect(updated.order).toBe(2);
+      const fetched = await service.getItem(alice, board.id, item.id);
+      expect(fetched.priorityId).toBe(high.id);
+    });
+
+    it('rearranging renumbers contiguously', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const low = board.priorities[3];
+      const moved = await service.updatePriority(alice, board.id, low.id, {
+        order: 1,
+      });
+      expect(moved.order).toBe(1);
+      const fresh = await service.getBoard(alice, board.id);
+      expect(fresh.priorities.map(p => [p.name, p.order])).toEqual([
+        ['low', 1],
+        ['critical', 2],
+        ['high', 3],
+        ['medium', 4],
+      ]);
+      await expect(
+        service.updatePriority(alice, board.id, low.id, { order: 0 }),
+      ).rejects.toThrow(/Invalid priority order/);
+      await expect(
+        service.updatePriority(alice, board.id, low.id, { order: 5 }),
+      ).rejects.toThrow(/Invalid priority order/);
+    });
+
+    it('deletes an unused priority and renumbers the rest', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const high = board.priorities[1];
+      await service.deletePriority(alice, board.id, high.id);
+      const fresh = await service.getBoard(alice, board.id);
+      expect(fresh.priorities.map(p => [p.name, p.order])).toEqual([
+        ['critical', 1],
+        ['medium', 2],
+        ['low', 3],
+      ]);
+    });
+
+    it('requires a choice when deleting a used priority', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const high = board.priorities[1];
+      await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Item',
+        priorityId: high.id,
+      });
+      await expect(
+        service.deletePriority(alice, board.id, high.id),
+      ).rejects.toThrow(/still used by items/);
+    });
+
+    it('reassigns items when deleting with a target', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const [, high, medium] = board.priorities;
+      const item = await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Item',
+        priorityId: high.id,
+      });
+      const archived = await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Archived',
+        priorityId: high.id,
+      });
+      await service.deleteItem(alice, board.id, archived.id);
+      await service.deletePriority(alice, board.id, high.id, {
+        reassignTo: medium.id,
+      });
+      const fetched = await service.getItem(alice, board.id, item.id);
+      expect(fetched.priorityId).toBe(medium.id);
+      const archivedRow = await knex('items').where('id', archived.id).first();
+      expect(archivedRow?.priority_id).toBe(medium.id);
+    });
+
+    it('drops the priority from items on request', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const low = board.priorities[3];
+      const item = await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Item',
+        priorityId: low.id,
+      });
+      await service.deletePriority(alice, board.id, low.id, { drop: true });
+      const fetched = await service.getItem(alice, board.id, item.id);
+      expect(fetched.priorityId).toBeUndefined();
+    });
+
+    it('rejects reassigning to the deleted or a foreign priority', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const other = await service.createBoard(alice, { name: 'Other' });
+      const high = board.priorities[1];
+      await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Item',
+        priorityId: high.id,
+      });
+      await expect(
+        service.deletePriority(alice, board.id, high.id, {
+          reassignTo: high.id,
+        }),
+      ).rejects.toThrow(/must differ/);
+      await expect(
+        service.deletePriority(alice, board.id, high.id, {
+          reassignTo: other.priorities[0].id,
+        }),
+      ).rejects.toThrow(/not found/);
+    });
+
+    it('requires admin access to manage priorities', async () => {
+      const board = await service.createBoard(alice, {
+        name: 'B',
+        visibility: 'logged-in-write',
+      });
+      const high = board.priorities[1];
+      await expect(
+        service.addPriority(bob, board.id, { name: 'X' }),
+      ).rejects.toThrow(/requires 'admin'/);
+      await expect(
+        service.updatePriority(bob, board.id, high.id, { name: 'X' }),
+      ).rejects.toThrow(/requires 'admin'/);
+      await expect(
+        service.deletePriority(bob, board.id, high.id),
+      ).rejects.toThrow(/requires 'admin'/);
+    });
+
+    it('sets, changes and clears an item priority with named history', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const [critical, high] = board.priorities;
+      const item = await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Item',
+      });
+      const set = await service.updateItem(alice, board.id, item.id, {
+        priorityId: critical.id,
+      });
+      expect(set.priorityId).toBe(critical.id);
+      await service.updateItem(alice, board.id, item.id, {
+        priorityId: high.id,
+      });
+      const cleared = await service.updateItem(alice, board.id, item.id, {
+        priorityId: null,
+      });
+      expect(cleared.priorityId).toBeUndefined();
+      const timeline = await service.getTimeline(alice, board.id, item.id);
+      const priorityChanges = timeline.flatMap(entry =>
+        entry.kind === 'change' && entry.change.field === 'priority'
+          ? [entry.change]
+          : [],
+      );
+      expect(
+        priorityChanges.map(change => [change.oldValue, change.newValue]),
+      ).toEqual([
+        [undefined, 'critical'],
+        ['critical', 'high'],
+        ['high', undefined],
+      ]);
+    });
+
+    it('rejects priorities of another board on items', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const other = await service.createBoard(alice, { name: 'Other' });
+      const item = await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Item',
+      });
+      await expect(
+        service.updateItem(alice, board.id, item.id, {
+          priorityId: other.priorities[0].id,
+        }),
+      ).rejects.toThrow(/does not belong to this board/);
+      await expect(
+        service.createItem(alice, board.id, {
+          columnId: board.columns[0].id,
+          title: 'New',
+          priorityId: other.priorities[0].id,
+        }),
+      ).rejects.toThrow(/does not belong to this board/);
+    });
+
+    it('filters items by priority, any-of', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const [critical, high, medium] = board.priorities;
+      const columnId = board.columns[0].id;
+      const one = await service.createItem(alice, board.id, {
+        columnId,
+        title: 'One',
+        priorityId: critical.id,
+      });
+      const two = await service.createItem(alice, board.id, {
+        columnId,
+        title: 'Two',
+        priorityId: high.id,
+      });
+      await service.createItem(alice, board.id, {
+        columnId,
+        title: 'Three',
+        priorityId: medium.id,
+      });
+      await service.createItem(alice, board.id, { columnId, title: 'Four' });
+      const filtered = await service.listItems(alice, board.id, {
+        priorities: [critical.id, high.id],
+      });
+      expect(filtered.map(entry => entry.id).sort()).toEqual(
+        [one.id, two.id].sort(),
+      );
+    });
+
+    it('resolves the priority on my-items entries', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const critical = board.priorities[0];
+      await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Mine',
+        assignees: ['user:default/alice'],
+        priorityId: critical.id,
+      });
+      await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Unprioritized',
+        assignees: ['user:default/alice'],
+      });
+      const mine = await service.listMyItems(alice);
+      const withPriority = mine.find(entry => entry.item.title === 'Mine');
+      expect(withPriority?.priority?.name).toBe('critical');
+      expect(withPriority?.priority?.color).toBe('red');
+      expect(withPriority?.priority?.order).toBe(1);
+      const without = mine.find(entry => entry.item.title === 'Unprioritized');
+      expect(without?.priority).toBeUndefined();
+    });
+
+    it('copies priorities and item assignments on duplication', async () => {
+      const board = await service.createBoard(alice, { name: 'Source' });
+      const high = board.priorities[1];
+      await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Item',
+        priorityId: high.id,
+      });
+      const copy = await service.duplicateBoard(alice, board.id, {
+        copyColumns: true,
+        copyItems: true,
+        copyPermissions: false,
+      });
+      expect(copy.priorities.map(p => [p.name, p.color, p.order])).toEqual(
+        board.priorities.map(p => [p.name, p.color, p.order]),
+      );
+      const [copied] = await service.listItems(alice, copy.id);
+      const copiedHigh = copy.priorities[1];
+      expect(copied.priorityId).toBe(copiedHigh.id);
+      expect(copiedHigh.id).not.toBe(high.id);
+    });
+
+    it('a duplicated board without priorities stays without them', async () => {
+      const board = await service.createBoard(alice, { name: 'Source' });
+      for (const priority of board.priorities) {
+        await service.deletePriority(alice, board.id, priority.id);
+      }
+      const copy = await service.duplicateBoard(alice, board.id, {
+        copyColumns: true,
+        copyPermissions: false,
+      });
+      expect(copy.priorities).toEqual([]);
+    });
+  });
+
   describe('items', () => {
     it('creates items with audit fields and associations', async () => {
       const board = await service.createBoard(alice, { name: 'B' });
@@ -1610,6 +1932,147 @@ describe('BoardsService', () => {
       await expect(
         service.updateItem(alice, board.id, item.id, { description: 'x' }),
       ).rejects.toThrow(/read-only/);
+    });
+  });
+
+  describe('item checklists', () => {
+    it('round-trips entries with order and done states', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const item = await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Release',
+        checklist: [
+          { text: 'write docs', checked: false },
+          { text: 'update tests', checked: true },
+        ],
+      });
+      expect(item.checklist).toEqual([
+        { text: 'write docs', checked: false },
+        { text: 'update tests', checked: true },
+      ]);
+
+      const updated = await service.updateItem(alice, board.id, item.id, {
+        checklist: [
+          { text: 'update tests', checked: true },
+          { text: '  announce  ', checked: false },
+        ],
+      });
+      expect(updated.checklist).toEqual([
+        { text: 'update tests', checked: true },
+        { text: 'announce', checked: false },
+      ]);
+
+      const cleared = await service.updateItem(alice, board.id, item.id, {
+        checklist: [],
+      });
+      expect(cleared.checklist).toEqual([]);
+    });
+
+    it('defaults to an empty checklist', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const item = await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Plain',
+      });
+      expect(item.checklist).toEqual([]);
+    });
+
+    it('rejects empty entry labels and leaves the item unchanged', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const item = await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Release',
+        checklist: [{ text: 'write docs', checked: false }],
+      });
+      await expect(
+        service.updateItem(alice, board.id, item.id, {
+          checklist: [{ text: '   ', checked: false }],
+        }),
+      ).rejects.toThrow(/must not be empty/);
+      const unchanged = await service.getItem(alice, board.id, item.id);
+      expect(unchanged.checklist).toEqual([
+        { text: 'write docs', checked: false },
+      ]);
+      await expect(
+        service.createItem(alice, board.id, {
+          columnId: board.columns[0].id,
+          title: 'Bad',
+          checklist: [{ text: '', checked: false }],
+        }),
+      ).rejects.toThrow(/must not be empty/);
+    });
+
+    it('records checklist changes in the history', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const item = await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Release',
+        checklist: [{ text: 'write docs', checked: false }],
+      });
+      await service.updateItem(alice, board.id, item.id, {
+        checklist: [{ text: 'write docs', checked: true }],
+      });
+      // an unchanged checklist records nothing
+      await service.updateItem(alice, board.id, item.id, {
+        checklist: [{ text: 'write docs', checked: true }],
+      });
+      const timeline = await service.getTimeline(alice, board.id, item.id);
+      const checklistChanges = timeline.filter(
+        entry => entry.kind === 'change' && entry.change.field === 'checklist',
+      );
+      expect(checklistChanges).toHaveLength(1);
+      expect((checklistChanges[0] as any).change.actorRef).toBe(
+        'user:default/alice',
+      );
+    });
+
+    it('rejects checklist changes from read-only users and on external items', async () => {
+      const board = await service.createBoard(alice, {
+        name: 'B',
+        visibility: 'logged-in-read',
+      });
+      const item = await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Release',
+      });
+      await expect(
+        service.updateItem(bob, board.id, item.id, {
+          checklist: [{ text: 'sneaky', checked: false }],
+        }),
+      ).rejects.toThrow();
+      const external = await service.createItem(syncService, board.id, {
+        columnId: board.columns[0].id,
+        title: 'PR #1',
+        externalManager: 'github',
+      });
+      await expect(
+        service.updateItem(alice, board.id, external.id, {
+          checklist: [{ text: 'sneaky', checked: false }],
+        }),
+      ).rejects.toThrow(/read-only/);
+    });
+
+    it('copies checklists on board duplication', async () => {
+      const board = await service.createBoard(alice, { name: 'Source' });
+      await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Release',
+        checklist: [
+          { text: 'write docs', checked: true },
+          { text: 'update tests', checked: false },
+        ],
+      });
+      const copy = await service.duplicateBoard(alice, board.id, {
+        copyColumns: true,
+        copyItems: true,
+        copyPermissions: false,
+      });
+      const items = await service.listItems(alice, copy.id);
+      expect(items).toHaveLength(1);
+      expect(items[0].checklist).toEqual([
+        { text: 'write docs', checked: true },
+        { text: 'update tests', checked: false },
+      ]);
     });
   });
 

@@ -225,6 +225,10 @@ export function registerActions(options: ActionsOptions): void {
           boardId: z.string(),
           text: z.string().optional(),
           tags: z.array(z.string()).optional(),
+          priorities: z
+            .array(z.string())
+            .optional()
+            .describe('Priority ids; items matching any of them are returned'),
         }),
       output: z =>
         z.object({
@@ -235,6 +239,7 @@ export function registerActions(options: ActionsOptions): void {
               columnId: z.string(),
               tags: z.array(z.string()),
               assignees: z.array(z.string()),
+              priorityId: z.string().optional(),
             }),
           ),
         }),
@@ -243,7 +248,7 @@ export function registerActions(options: ActionsOptions): void {
       const items = await service.listItems(
         await toPrincipal(credentials),
         input.boardId,
-        { text: input.text, tags: input.tags },
+        { text: input.text, tags: input.tags, priorities: input.priorities },
       );
       return {
         output: {
@@ -253,6 +258,7 @@ export function registerActions(options: ActionsOptions): void {
             columnId: item.columnId,
             tags: item.tags,
             assignees: item.assignees,
+            priorityId: item.priorityId,
           })),
         },
       };
@@ -273,6 +279,10 @@ export function registerActions(options: ActionsOptions): void {
           creatorRef: z.string().optional(),
           assignees: z.array(z.string()).optional(),
           tags: z.array(z.string()).optional(),
+          priorityId: z
+            .string()
+            .optional()
+            .describe("Id of one of the board's priorities"),
           externalManager: z
             .string()
             .optional()
@@ -292,6 +302,7 @@ export function registerActions(options: ActionsOptions): void {
           creatorRef: input.creatorRef,
           assignees: input.assignees,
           tags: input.tags,
+          priorityId: input.priorityId,
           externalManager: input.externalManager,
         },
       );
@@ -303,7 +314,7 @@ export function registerActions(options: ActionsOptions): void {
     name: 'update-item',
     title: 'Update Board Item',
     description:
-      "Updates an item's title, description, creator, assignees, or due date.",
+      "Updates an item's title, description, creator, assignees, due date, or priority.",
     schema: {
       input: z =>
         z.object({
@@ -321,6 +332,13 @@ export function registerActions(options: ActionsOptions): void {
             .nullable()
             .optional()
             .describe('Due date as YYYY-MM-DD, or null to clear it'),
+          priorityId: z
+            .string()
+            .nullable()
+            .optional()
+            .describe(
+              "Id of one of the board's priorities, or null to clear it",
+            ),
         }),
       output: z => z.object({ id: z.string() }),
     },
@@ -335,6 +353,7 @@ export function registerActions(options: ActionsOptions): void {
           creatorRef: input.creatorRef,
           assignees: input.assignees,
           dueDate: input.dueDate,
+          priorityId: input.priorityId,
         },
       );
       return { output: { id: item.id } };

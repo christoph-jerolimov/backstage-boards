@@ -11,8 +11,10 @@ import {
   Board,
   BoardChangeEntry,
   BoardColumn,
+  BoardPriority,
   COLUMN_COLORS,
   ColumnColor,
+  MAX_PRIORITIES,
   BoardItem,
   BoardFilterOptions,
   BoardListEntry,
@@ -26,6 +28,7 @@ import {
   BoardWithContext,
   ChangeRecord,
   ChangeType,
+  ChecklistEntry,
   CommentVersion,
   ItemComment,
   ItemFilter,
@@ -52,6 +55,7 @@ import {
   ColumnRow,
   ItemRow,
   PermissionRow,
+  PriorityRow,
 } from '../database/tables';
 import {
   BoardsPrincipal,
@@ -61,6 +65,28 @@ import {
 } from './access';
 
 const DEFAULT_COLUMNS = ['To do', 'In progress', 'Done'];
+
+/** Trims entry labels, rejecting empty ones; keeps the given order. */
+function normalizeChecklist(entries: ChecklistEntry[]): ChecklistEntry[] {
+  if (!Array.isArray(entries)) {
+    throw new InputError('checklist must be an array of entries');
+  }
+  return entries.map(entry => {
+    const text = typeof entry?.text === 'string' ? entry.text.trim() : '';
+    if (!text) {
+      throw new InputError('Checklist entries must not be empty');
+    }
+    return { text, checked: !!entry.checked };
+  });
+}
+
+/** Priorities every new board starts with, in order (1 = highest). */
+const DEFAULT_PRIORITIES: Array<{ name: string; color: ColumnColor | null }> = [
+  { name: 'critical', color: 'red' },
+  { name: 'high', color: 'orange' },
+  { name: 'medium', color: null },
+  { name: 'low', color: null },
+];
 
 /** One row of the grouped item count per board column. */
 type ColumnItemCount = { column_id: string; total: string | number };
@@ -125,6 +151,24 @@ function parseColumnColor(color: string): ColumnColor {
     throw new InputError(`Invalid column color '${color}'`);
   }
   return color;
+}
+
+/** Priorities share the columns' fixed palette. */
+function parsePriorityColor(color: string): ColumnColor {
+  if (!isColumnColor(color)) {
+    throw new InputError(`Invalid priority color '${color}'`);
+  }
+  return color;
+}
+
+function toPriority(row: PriorityRow): BoardPriority {
+  return {
+    id: row.id,
+    boardId: row.board_id,
+    name: row.name,
+    color: row.color ?? undefined,
+    order: row.ord,
+  };
 }
 
 function toPermission(row: PermissionRow): BoardPermissionEntry {
@@ -330,6 +374,12 @@ export class BoardsService {
     options: {
       name: string;
       columns?: string[];
+      /**
+       * Priority definitions in order; undefined seeds the defaults, an
+       * empty list creates a board without priorities (used when
+       * duplicating a source board that has none).
+       */
+      priorities?: Array<{ name: string; color?: ColumnColor }>;
       entityRefs?: string[];
       visibility?: BoardVisibility;
       /** Additional admin grants, mainly for service callers. */
@@ -355,6 +405,17 @@ export class BoardsService {
       options.columns && options.columns.length > 0
         ? options.columns
         : DEFAULT_COLUMNS;
+    const priorities =
+      options.priorities ??
+      DEFAULT_PRIORITIES.map(entry => ({
+        name: entry.name,
+        color: entry.color ?? undefined,
+      }));
+    if (priorities.length > MAX_PRIORITIES) {
+      throw new InputError(
+        `A board can define at most ${MAX_PRIORITIES} priorities`,
+      );
+    }
 
     await this.knex.transaction(async trx => {
       await trx('boards').insert({
@@ -379,6 +440,17 @@ export class BoardsService {
           color: null,
         })),
       );
+      if (priorities.length > 0) {
+        await trx('board_priorities').insert(
+          priorities.map((entry, index) => ({
+            id: uuid(),
+            board_id: boardId,
+            name: entry.name,
+            color: entry.color ?? null,
+            ord: index + 1,
+          })),
+        );
+      }
       const adminRefs = new Set<string>(options.admins ?? []);
       if (principal.type === 'user') {
         adminRefs.add(principal.userRef);
@@ -419,6 +491,9 @@ export class BoardsService {
     const columns = await this.knex('board_columns')
       .where('board_id', boardId)
       .orderBy('position');
+    const priorities = await this.knex('board_priorities')
+      .where('board_id', boardId)
+      .orderBy('ord');
     const userRef = principal.type === 'user' ? principal.userRef : undefined;
     const favorite = userRef
       ? !!(await this.knex('favorites')
@@ -439,6 +514,7 @@ export class BoardsService {
     return {
       ...toBoard(board, entityRefs),
       columns: columns.map(toColumn),
+      priorities: priorities.map(toPriority),
       access: level,
       favorite,
       watching,
@@ -903,10 +979,19 @@ export class BoardsService {
     const sourceColumns = await this.knex('board_columns')
       .where('board_id', boardId)
       .orderBy('position');
+    const sourcePriorities = await this.priorityRows(boardId);
     const created = await this.createBoard(principal, {
       name: options.name?.trim() || `${board.name} (copy)`,
       columns: options.copyColumns
         ? sourceColumns.map(column => column.title)
+        : undefined,
+      // priorities travel with the columns: an empty source list stays
+      // empty rather than falling back to the defaults
+      priorities: options.copyColumns
+        ? sourcePriorities.map(priority => ({
+            name: priority.name,
+            color: priority.color ?? undefined,
+          }))
         : undefined,
       entityRefs: options.copyEntities
         ? (await this.entityRefsByBoard([boardId])).get(boardId)
@@ -933,6 +1018,8 @@ export class BoardsService {
           created.id,
           sourceColumns,
           newColumns,
+          sourcePriorities,
+          await this.priorityRows(created.id),
         );
       }
     }
@@ -971,6 +1058,8 @@ export class BoardsService {
     targetBoardId: string,
     sourceColumns: ColumnRow[],
     targetColumns: ColumnRow[],
+    sourcePriorities: PriorityRow[] = [],
+    targetPriorities: PriorityRow[] = [],
   ): Promise<void> {
     const actor = actorRef(principal);
     const timestamp = now();
@@ -978,15 +1067,23 @@ export class BoardsService {
       .where('board_id', sourceBoardId)
       .whereNull('archived_at');
     const itemIds = items.map(item => item.id);
-    const [assignees, tags] = await Promise.all([
+    const [assignees, tags, checklistEntries] = await Promise.all([
       this.knex('item_assignees').whereIn('item_id', itemIds),
       this.knex('item_tags').whereIn('item_id', itemIds),
+      this.knex('item_checklist_entries').whereIn('item_id', itemIds),
     ]);
     const columnIdMap = new Map<string, string>();
     sourceColumns.forEach((column, index) => {
       const target = targetColumns[index];
       if (target) {
         columnIdMap.set(column.id, target.id);
+      }
+    });
+    const priorityIdMap = new Map<string, string>();
+    sourcePriorities.forEach((priority, index) => {
+      const target = targetPriorities[index];
+      if (target) {
+        priorityIdMap.set(priority.id, target.id);
       }
     });
     await this.knex.transaction(async trx => {
@@ -1012,6 +1109,9 @@ export class BoardsService {
           archived_at: null,
           archived_by: null,
           due_date: item.due_date,
+          priority_id: item.priority_id
+            ? priorityIdMap.get(item.priority_id) ?? null
+            : null,
         });
         const links = <TRow extends { item_id: string }>(rows: TRow[]) =>
           rows
@@ -1024,6 +1124,10 @@ export class BoardsService {
         const newTags = links(tags);
         if (newTags.length > 0) {
           await trx('item_tags').insert(newTags);
+        }
+        const newChecklistEntries = links(checklistEntries);
+        if (newChecklistEntries.length > 0) {
+          await trx('item_checklist_entries').insert(newChecklistEntries);
         }
         await this.recordChange(trx, {
           itemId: newId,
@@ -1252,6 +1356,170 @@ export class BoardsService {
     await this.emitBoardSignal(boardId);
   }
 
+  // ------------------------------------------------------------ priorities
+
+  private async priorityRows(
+    boardId: string,
+    trx?: Knex.Transaction,
+  ): Promise<PriorityRow[]> {
+    return (trx ?? this.knex)('board_priorities')
+      .where('board_id', boardId)
+      .orderBy('ord');
+  }
+
+  /** Rewrites `ord` to 1..n following the given row order. */
+  private async renumberPriorities(
+    trx: Knex.Transaction,
+    rows: PriorityRow[],
+  ): Promise<void> {
+    for (const [index, row] of rows.entries()) {
+      if (row.ord !== index + 1) {
+        await trx('board_priorities')
+          .where('id', row.id)
+          .update({ ord: index + 1 });
+      }
+    }
+  }
+
+  async addPriority(
+    principal: BoardsPrincipal,
+    boardId: string,
+    options: { name: string; color?: string },
+  ): Promise<BoardPriority> {
+    await this.requireBoard(principal, boardId, 'admin');
+    const name = options.name?.trim();
+    if (!name) {
+      throw new InputError('Priority name must not be empty');
+    }
+    const color = options.color ? parsePriorityColor(options.color) : null;
+    const existing = await this.priorityRows(boardId);
+    if (existing.length >= MAX_PRIORITIES) {
+      throw new InputError(
+        `A board can define at most ${MAX_PRIORITIES} priorities`,
+      );
+    }
+    const row: PriorityRow = {
+      id: uuid(),
+      board_id: boardId,
+      name,
+      color,
+      ord: existing.length + 1,
+    };
+    await this.knex('board_priorities').insert(row);
+    await this.emitBoardSignal(boardId);
+    return toPriority(row);
+  }
+
+  async updatePriority(
+    principal: BoardsPrincipal,
+    boardId: string,
+    priorityId: string,
+    update: { name?: string; color?: string | null; order?: number },
+  ): Promise<BoardPriority> {
+    await this.requireBoard(principal, boardId, 'admin');
+    const rows = await this.priorityRows(boardId);
+    const row = rows.find(entry => entry.id === priorityId);
+    if (!row) {
+      throw new NotFoundError(`Priority ${priorityId} not found`);
+    }
+    const patch: Partial<PriorityRow> = {};
+    if (update.name !== undefined) {
+      const name = update.name.trim();
+      if (!name) {
+        throw new InputError('Priority name must not be empty');
+      }
+      patch.name = name;
+    }
+    if (update.color !== undefined) {
+      patch.color = update.color ? parsePriorityColor(update.color) : null;
+    }
+    let reordered = rows;
+    if (update.order !== undefined) {
+      if (
+        !Number.isInteger(update.order) ||
+        update.order < 1 ||
+        update.order > rows.length
+      ) {
+        throw new InputError(
+          `Invalid priority order '${update.order}', expected 1..${rows.length}`,
+        );
+      }
+      reordered = rows.filter(entry => entry.id !== priorityId);
+      reordered.splice(update.order - 1, 0, row);
+    }
+    await this.knex.transaction(async trx => {
+      if (Object.keys(patch).length > 0) {
+        await trx('board_priorities').where('id', priorityId).update(patch);
+      }
+      await this.renumberPriorities(trx, reordered);
+    });
+    await this.emitBoardSignal(boardId);
+    const updated = (await this.priorityRows(boardId)).find(
+      entry => entry.id === priorityId,
+    );
+    return toPriority(updated ?? { ...row, ...patch });
+  }
+
+  /**
+   * Deletes a priority definition. When items — archived ones included —
+   * still use it, the caller must choose: reassign them to another of the
+   * board's priorities or drop the priority from them.
+   */
+  async deletePriority(
+    principal: BoardsPrincipal,
+    boardId: string,
+    priorityId: string,
+    options?: { reassignTo?: string; drop?: boolean },
+  ): Promise<void> {
+    await this.requireBoard(principal, boardId, 'admin');
+    const rows = await this.priorityRows(boardId);
+    const row = rows.find(entry => entry.id === priorityId);
+    if (!row) {
+      throw new NotFoundError(`Priority ${priorityId} not found`);
+    }
+    const itemCount = Number(
+      (
+        await this.knex('items')
+          .where('priority_id', priorityId)
+          .count({ count: '*' })
+          .first()
+      )?.count ?? 0,
+    );
+    let reassignTo: string | null = null;
+    if (itemCount > 0) {
+      if (options?.reassignTo) {
+        if (options.reassignTo === priorityId) {
+          throw new InputError(
+            'Target priority must differ from the deleted one',
+          );
+        }
+        if (!rows.some(entry => entry.id === options.reassignTo)) {
+          throw new NotFoundError(
+            `Target priority ${options.reassignTo} not found`,
+          );
+        }
+        reassignTo = options.reassignTo;
+      } else if (!options?.drop) {
+        throw new ConflictError(
+          'Priority is still used by items; choose to reassign or drop it',
+        );
+      }
+    }
+    await this.knex.transaction(async trx => {
+      if (itemCount > 0) {
+        await trx('items')
+          .where('priority_id', priorityId)
+          .update({ priority_id: reassignTo });
+      }
+      await trx('board_priorities').where('id', priorityId).delete();
+      await this.renumberPriorities(
+        trx,
+        rows.filter(entry => entry.id !== priorityId),
+      );
+    });
+    await this.emitBoardSignal(boardId);
+  }
+
   // ----------------------------------------------------------------- items
 
   private async hydrateItems(
@@ -1268,6 +1536,10 @@ export class BoardsService {
     const tags = await this.knex('item_tags')
       .whereIn('item_id', ids)
       .select('item_id', 'tag');
+    const checklistEntries = await this.knex('item_checklist_entries')
+      .whereIn('item_id', ids)
+      .orderBy('position')
+      .select('item_id', 'position', 'text', 'checked');
     const watches = userRef
       ? await this.knex('watches')
           .where({ user_ref: userRef, target_type: 'item' })
@@ -1302,10 +1574,14 @@ export class BoardsService {
       archivedAt: row.archived_at ?? undefined,
       archivedBy: row.archived_by ?? undefined,
       dueDate: row.due_date ?? undefined,
+      priorityId: row.priority_id ?? undefined,
       assignees: assignees
         .filter(a => a.item_id === row.id)
         .map(a => a.assignee_ref),
       tags: tags.filter(t => t.item_id === row.id).map(t => t.tag),
+      checklist: checklistEntries
+        .filter(entry => entry.item_id === row.id)
+        .map(entry => ({ text: entry.text, checked: !!entry.checked })),
       watching: watchedIds.has(row.id),
     }));
   }
@@ -1350,6 +1626,10 @@ export class BoardsService {
           .whereRaw('item_assignees.item_id = items.id')
           .whereIn('item_assignees.assignee_ref', assignees),
       );
+    }
+    const priorities = filter?.priorities ?? [];
+    if (priorities.length > 0) {
+      query.whereIn('items.priority_id', priorities);
     }
     const rows = await query;
     return this.hydrateItems(
@@ -1396,6 +1676,16 @@ export class BoardsService {
       ...new Set(visible.map(row => row.column_id)),
     ]);
     const columnTitles = new Map(columns.map(col => [col.id, col.title]));
+    const priorityIds = [
+      ...new Set(visible.flatMap(row => row.priority_id ?? [])),
+    ];
+    const priorityRows =
+      priorityIds.length > 0
+        ? await this.knex('board_priorities').whereIn('id', priorityIds)
+        : [];
+    const prioritiesById = new Map(
+      priorityRows.map(row => [row.id, toPriority(row)]),
+    );
     const items = await this.hydrateItems(visible, principal.userRef);
     const itemsById = new Map(items.map(item => [item.id, item]));
     return visible
@@ -1411,6 +1701,9 @@ export class BoardsService {
             boardId: board.id,
             boardName: board.name,
             columnTitle: columnTitles.get(row.column_id) ?? '',
+            priority: row.priority_id
+              ? prioritiesById.get(row.priority_id)
+              : undefined,
           },
         ];
       })
@@ -1475,6 +1768,13 @@ export class BoardsService {
       ...(item.creatorRef ? [item.creatorRef] : []),
       ...(item.assignees ?? []),
     ]);
+    if (item.priorityId) {
+      await this.requirePriority(boardId, item.priorityId);
+    }
+    const checklist =
+      item.checklist !== undefined
+        ? normalizeChecklist(item.checklist)
+        : undefined;
 
     let position = item.position;
     if (position === undefined) {
@@ -1501,8 +1801,9 @@ export class BoardsService {
         updated_at: timestamp,
         creator_ref: item.creatorRef ?? null,
         external_manager: item.externalManager ?? null,
+        priority_id: item.priorityId ?? null,
       });
-      await this.writeAssociations(trx, itemId, item);
+      await this.writeAssociations(trx, itemId, { ...item, checklist });
       await this.recordChange(trx, {
         itemId,
         boardId,
@@ -1527,7 +1828,11 @@ export class BoardsService {
   private async writeAssociations(
     trx: Knex.Transaction,
     itemId: string,
-    item: { assignees?: string[]; tags?: string[] },
+    item: {
+      assignees?: string[];
+      tags?: string[];
+      checklist?: ChecklistEntry[];
+    },
   ): Promise<void> {
     if (item.assignees !== undefined) {
       await trx('item_assignees').where('item_id', itemId).delete();
@@ -1549,6 +1854,35 @@ export class BoardsService {
         );
       }
     }
+    if (item.checklist !== undefined) {
+      await trx('item_checklist_entries').where('item_id', itemId).delete();
+      if (item.checklist.length > 0) {
+        await trx('item_checklist_entries').insert(
+          item.checklist.map((entry, position) => ({
+            item_id: itemId,
+            position,
+            text: entry.text,
+            checked: entry.checked,
+          })),
+        );
+      }
+    }
+  }
+
+  /** Loads a priority and asserts it belongs to the given board. */
+  private async requirePriority(
+    boardId: string,
+    priorityId: string,
+  ): Promise<PriorityRow> {
+    const row = await this.knex('board_priorities')
+      .where({ id: priorityId, board_id: boardId })
+      .first();
+    if (!row) {
+      throw new InputError(
+        `Priority ${priorityId} does not belong to this board`,
+      );
+    }
+    return row;
   }
 
   private async requireMutableItem(
@@ -1660,6 +1994,40 @@ export class BoardsService {
         });
       }
     }
+    let checklist: ChecklistEntry[] | undefined;
+    if (update.checklist !== undefined) {
+      const next = normalizeChecklist(update.checklist);
+      if (JSON.stringify(next) !== JSON.stringify(before.checklist)) {
+        checklist = next;
+        changes.push({
+          field: 'checklist',
+          oldValue: before.checklist,
+          newValue: next,
+        });
+      }
+    }
+    if (update.priorityId !== undefined) {
+      const next = update.priorityId;
+      if ((next ?? null) !== row.priority_id) {
+        // recorded by name: ids go stale once a definition is deleted
+        const nextName = next
+          ? (await this.requirePriority(boardId, next)).name
+          : undefined;
+        const prevName = row.priority_id
+          ? (
+              await this.knex('board_priorities')
+                .where('id', row.priority_id)
+                .first()
+            )?.name
+          : undefined;
+        patch.priority_id = next ?? null;
+        changes.push({
+          field: 'priority',
+          oldValue: prevName,
+          newValue: nextName,
+        });
+      }
+    }
 
     if (changes.length > 0) {
       await this.knex.transaction(async trx => {
@@ -1673,7 +2041,7 @@ export class BoardsService {
             edited_at: timestamp,
           });
         }
-        await this.writeAssociations(trx, itemId, update);
+        await this.writeAssociations(trx, itemId, { ...update, checklist });
         for (const change of changes) {
           await this.recordChange(trx, {
             itemId,
