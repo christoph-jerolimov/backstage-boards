@@ -3,20 +3,33 @@ import {
   BackstageCredentials,
   UserInfoService,
 } from '@backstage/backend-plugin-api';
-import { ActionsRegistryService } from '@backstage/backend-plugin-api/alpha';
+import { ActionsRegistryActionOptions } from '@backstage/backend-plugin-api/alpha';
+import { AnyZodObject } from 'zod/v3';
 import { BoardsService } from './service/BoardsService';
 import { BoardsPrincipal } from './service/access';
 
+/**
+ * The registry surface these actions use: none of them declares secrets, so
+ * the secrets type parameter is left at its default. Spelling the shape out
+ * rather than taking `ActionsRegistryService` whole lets a test double stand
+ * in without losing the schema types; the real service still satisfies it.
+ */
+export type BoardsActionsRegistry = {
+  register<TInput extends AnyZodObject, TOutput extends AnyZodObject>(
+    options: ActionsRegistryActionOptions<TInput, TOutput>,
+  ): void;
+};
+
 export interface ActionsOptions {
-  actionsRegistry: ActionsRegistryService;
+  actionsRegistry: BoardsActionsRegistry;
   service: BoardsService;
-  auth: AuthService;
-  userInfo: UserInfoService;
+  auth: Pick<AuthService, 'isPrincipal'>;
+  userInfo: Pick<UserInfoService, 'getUserInfo'>;
 }
 
 export async function credentialsToPrincipal(
   credentials: BackstageCredentials,
-  options: { auth: AuthService; userInfo: UserInfoService },
+  options: Pick<ActionsOptions, 'auth' | 'userInfo'>,
 ): Promise<BoardsPrincipal> {
   if (options.auth.isPrincipal(credentials, 'user')) {
     const info = await options.userInfo.getUserInfo(credentials);

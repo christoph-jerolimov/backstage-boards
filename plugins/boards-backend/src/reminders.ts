@@ -200,8 +200,9 @@ function describe(entries: MyBoardItem[], withBoard: boolean): string {
 export interface ReminderRunOptions {
   reminder: ReminderConfig;
   service: BoardsService;
-  catalog: CatalogService;
-  auth: AuthService;
+  /** Only the entity lookup is used; naming it keeps stubs honest. */
+  catalog: Pick<CatalogService, 'getEntities'>;
+  auth: Pick<AuthService, 'getOwnServiceCredentials'>;
   notifications: NotificationService;
   logger: LoggerService;
   /** Base path for links in notifications; defaults to `/boards`. */

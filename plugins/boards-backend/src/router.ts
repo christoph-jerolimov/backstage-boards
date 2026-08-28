@@ -1,6 +1,6 @@
 import {
   AuthService,
-  HttpAuthService,
+  BackstageCredentials,
   LoggerService,
   UserInfoService,
 } from '@backstage/backend-plugin-api';
@@ -15,21 +15,30 @@ function isString(value: unknown): value is string {
   return typeof value === 'string';
 }
 
+/**
+ * The credential lookup the router needs, spelled out concretely: the
+ * `HttpAuthService` method is generic in its allowed principal types and no
+ * stand-in can produce that return type, while every real implementation
+ * satisfies this narrower shape.
+ */
+export type RouterHttpAuth = {
+  credentials(
+    req: Request,
+    options: { allow: Array<'user' | 'service' | 'none'> },
+  ): Promise<BackstageCredentials>;
+};
+
 export interface RouterOptions {
   service: BoardsService;
-  httpAuth: HttpAuthService;
-  auth: AuthService;
-  userInfo: UserInfoService;
+  httpAuth: RouterHttpAuth;
+  auth: Pick<AuthService, 'isPrincipal'>;
+  userInfo: Pick<UserInfoService, 'getUserInfo'>;
   logger: LoggerService;
 }
 
 export async function resolvePrincipal(
   req: Request,
-  options: {
-    httpAuth: HttpAuthService;
-    auth: AuthService;
-    userInfo: UserInfoService;
-  },
+  options: Pick<RouterOptions, 'httpAuth' | 'auth' | 'userInfo'>,
 ): Promise<BoardsPrincipal> {
   const credentials = await options.httpAuth.credentials(req, {
     allow: ['user', 'service', 'none'],

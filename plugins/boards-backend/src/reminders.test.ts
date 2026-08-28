@@ -1,17 +1,21 @@
-import { AuthService } from '@backstage/backend-plugin-api';
 import { Entity } from '@backstage/catalog-model';
 import { ConfigReader } from '@backstage/config';
-import { CatalogService } from '@backstage/plugin-catalog-node';
-import { NotificationService } from '@backstage/plugin-notifications-node';
 import { Knex } from 'knex';
 import {
   entityField,
   readRemindersConfig,
   runReminder,
   ReminderConfig,
+  ReminderRunOptions,
 } from './reminders';
 import { BoardsService } from './service/BoardsService';
-import { alice, bob, createTestService, testLogger } from './service/testUtils';
+import {
+  alice,
+  bob,
+  createTestService,
+  testLogger,
+  TestService,
+} from './service/testUtils';
 
 function userEntity(
   name: string,
@@ -31,17 +35,15 @@ function userEntity(
   };
 }
 
-function stubCatalog(users: Entity[]): CatalogService {
-  return {
-    getEntities: jest.fn().mockResolvedValue({ items: users }),
-  } as unknown as CatalogService;
+function stubCatalog(users: Entity[]): ReminderRunOptions['catalog'] {
+  return { getEntities: jest.fn().mockResolvedValue({ items: users }) };
 }
 
-const auth = {
+const auth: ReminderRunOptions['auth'] = {
   getOwnServiceCredentials: jest
     .fn()
     .mockResolvedValue({ principal: { type: 'service' } }),
-} as unknown as AuthService;
+};
 
 function reminder(overrides: Partial<ReminderConfig>): ReminderConfig {
   return {
@@ -156,7 +158,7 @@ describe('entityField', () => {
 describe('runReminder', () => {
   let knex: Knex;
   let service: BoardsService;
-  let notifications: { send: jest.Mock };
+  let notifications: TestService['notifications'];
 
   beforeEach(async () => {
     ({ knex, service, notifications } = await createTestService());
@@ -213,7 +215,7 @@ describe('runReminder', () => {
       service,
       catalog,
       auth,
-      notifications: notifications as unknown as NotificationService,
+      notifications,
       logger: testLogger,
     });
 
@@ -242,7 +244,7 @@ describe('runReminder', () => {
       service,
       catalog,
       auth,
-      notifications: notifications as unknown as NotificationService,
+      notifications,
       logger: testLogger,
     });
 
@@ -272,7 +274,7 @@ describe('runReminder', () => {
       service,
       catalog,
       auth,
-      notifications: notifications as unknown as NotificationService,
+      notifications,
       logger: testLogger,
     });
 

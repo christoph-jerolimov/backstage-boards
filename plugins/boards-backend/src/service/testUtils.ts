@@ -1,19 +1,21 @@
 import { LoggerService } from '@backstage/backend-plugin-api';
-import { NotificationService } from '@backstage/plugin-notifications-node';
+import {
+  NotificationSendOptions,
+  NotificationService,
+} from '@backstage/plugin-notifications-node';
+import { SignalsService } from '@backstage/plugin-signals-node';
 import knexFactory, { Knex } from 'knex';
 import { applyDatabaseMigrations } from '../database/migrations';
 import { BoardsPrincipal } from './access';
-import { BoardsService } from './BoardsService';
+import { BoardsService, BoardsServiceOptions } from './BoardsService';
 
-export const testLogger = {
+export const testLogger: LoggerService = {
   info: () => {},
   warn: () => {},
   error: () => {},
   debug: () => {},
-  child: function child() {
-    return this;
-  },
-} as unknown as LoggerService;
+  child: () => testLogger,
+};
 
 export const alice: BoardsPrincipal = {
   type: 'user',
@@ -40,6 +42,9 @@ export const syncService: BoardsPrincipal = {
 
 export const anonymous: BoardsPrincipal = { type: 'anonymous' };
 
+/** The bit of a better-sqlite3 connection the pool hook reaches for. */
+type SqliteConnection = { pragma(source: string): unknown };
+
 export async function createTestKnex(): Promise<Knex> {
   const knex = knexFactory({
     client: 'better-sqlite3',
@@ -49,8 +54,8 @@ export async function createTestKnex(): Promise<Knex> {
       min: 1,
       max: 1,
       afterCreate: (
-        conn: any,
-        done: (err: Error | null, conn: any) => void,
+        conn: SqliteConnection,
+        done: (err: Error | null, conn: SqliteConnection) => void,
       ) => {
         conn.pragma('foreign_keys = ON');
         done(null, conn);
@@ -61,22 +66,53 @@ export async function createTestKnex(): Promise<Knex> {
   return knex;
 }
 
-export async function createTestService(): Promise<{
+/**
+ * The entities a notification was addressed to. Recipients are a union, so
+ * a broadcast — which the boards service never sends — fails the test here
+ * rather than at an assertion further down.
+ */
+export function recipientRefs(options: NotificationSendOptions): string[] {
+  if (options.recipients.type !== 'entity') {
+    throw new Error('Expected a notification addressed to entities');
+  }
+  const { entityRef } = options.recipients;
+  return Array.isArray(entityRef) ? entityRef : [entityRef];
+}
+
+/** The notification and signal services, mocked so tests can assert on them. */
+export interface TestNotifications extends NotificationService {
+  send: jest.MockedFunction<NotificationService['send']>;
+}
+
+export interface TestSignals extends SignalsService {
+  publish: jest.MockedFunction<SignalsService['publish']>;
+}
+
+/** A service wired to an in-memory database, with its collaborators mocked. */
+export interface TestService {
   knex: Knex;
   service: BoardsService;
-  notifications: { send: jest.Mock };
-  signals: { publish: jest.Mock };
-  onEntityRefsChanged: jest.Mock;
-}> {
+  notifications: TestNotifications;
+  signals: TestSignals;
+  onEntityRefsChanged: jest.MockedFunction<
+    NonNullable<BoardsServiceOptions['onEntityRefsChanged']>
+  >;
+}
+
+export async function createTestService(): Promise<TestService> {
   const knex = await createTestKnex();
-  const notifications = { send: jest.fn().mockResolvedValue(undefined) };
-  const signals = { publish: jest.fn().mockResolvedValue(undefined) };
+  const notifications: TestNotifications = {
+    send: jest.fn().mockResolvedValue(undefined),
+  };
+  const signals: TestSignals = {
+    publish: jest.fn().mockResolvedValue(undefined),
+  };
   const onEntityRefsChanged = jest.fn();
   const service = new BoardsService({
     knex,
     logger: testLogger,
-    notifications: notifications as unknown as NotificationService,
-    signals: signals as any,
+    notifications,
+    signals,
     onEntityRefsChanged,
   });
   return { knex, service, notifications, signals, onEntityRefsChanged };
