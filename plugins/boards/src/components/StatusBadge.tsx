@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import {
   BoardColumn,
   COLUMN_COLORS,
@@ -43,26 +44,51 @@ export function ColumnDot(props: { column?: BoardColumn; size?: number }) {
   return <ColorDot color={props.column?.color} size={props.size} />;
 }
 
-/** Status badge (dot + column title) used in the table and item drawer. */
-export function StatusBadge(props: { column?: BoardColumn }) {
-  const { column } = props;
-  const hex = columnColorHex(column);
+/** The sizes the status chip comes in. */
+type StatusChipSize = 'small' | 'medium';
+
+const CHIP_SIZES = {
+  small: { gap: 4, padding: '1px 6px', fontSize: '0.75em', dot: 6 },
+  medium: { gap: 6, padding: '2px 8px', fontSize: '0.85em', dot: 8 },
+} as const;
+
+/**
+ * A pill naming a status: a dot in the column's color, a background and
+ * border tinted to match, and whatever the caller labels it with — the
+ * column title on a board, the title and a count on the home page card.
+ */
+export function StatusChip(props: {
+  color?: ColumnColor;
+  size?: StatusChipSize;
+  children: ReactNode;
+}) {
+  const size = CHIP_SIZES[props.size ?? 'medium'];
+  const hex = colorHex(props.color);
   return (
     <span
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        gap: 6,
-        padding: '2px 8px',
+        gap: size.gap,
+        padding: size.padding,
         borderRadius: 10,
         background: `${hex}22`,
         border: `1px solid ${hex}55`,
-        fontSize: '0.85em',
+        fontSize: size.fontSize,
         whiteSpace: 'nowrap',
       }}
     >
-      <ColumnDot column={column} size={8} />
-      {column?.title ?? '?'}
+      <ColorDot color={props.color} size={size.dot} />
+      {props.children}
     </span>
+  );
+}
+
+/** Status badge (dot + column title) used in the table and item drawer. */
+export function StatusBadge(props: { column?: BoardColumn }) {
+  return (
+    <StatusChip color={props.column?.color}>
+      {props.column?.title ?? '?'}
+    </StatusChip>
   );
 }
