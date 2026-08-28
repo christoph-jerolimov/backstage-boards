@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApi } from '@backstage/frontend-plugin-api';
 import { useQueryClient } from '@tanstack/react-query';
 import { boardsApiRef } from '../api';
 import { invalidateBoard, useMoveItem, useRenameItem } from '../queries';
 import type { BoardActions } from './BoardView';
+import { useAsyncAction } from './useAsyncAction';
 
 /** The item shown in the drawer is kept in the `item` search param. */
 export function useOpenItemParam() {
@@ -45,7 +46,7 @@ export function useBoardActions(
 ): BoardActionsHandle {
   const boardsApi = useApi(boardsApiRef);
   const queryClient = useQueryClient();
-  const [error, setError] = useState<string | undefined>();
+  const { error, run, setError } = useAsyncAction();
 
   const refreshAll = async () => {
     setError(undefined);
@@ -53,13 +54,13 @@ export function useBoardActions(
   };
 
   const guarded = async (action: () => Promise<unknown>) => {
-    try {
+    const failure = await run(async () => {
       await action();
       await refreshAll();
-    } catch (err) {
-      // refresh directly: refreshAll() would clear the error again
+    });
+    if (failure) {
+      // resync directly: refreshAll() would clear the error again
       await invalidateBoard(queryClient, boardId);
-      setError((err as Error).message);
     }
   };
 

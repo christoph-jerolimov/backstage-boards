@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useApi } from '@backstage/frontend-plugin-api';
 import {
   Button,
@@ -13,6 +12,7 @@ import { EntityRefLink } from '@backstage/plugin-catalog-react';
 import { BoardWithContext } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
 import { EntityPicker } from './EntityPicker';
+import { useAsyncAction } from './useAsyncAction';
 
 /**
  * Board settings: manage the list of catalog entities the board
@@ -26,17 +26,13 @@ export function BoardSettingsDialog(props: {
 }) {
   const { board, isOpen, onOpenChange, onChanged } = props;
   const boardsApi = useApi(boardsApiRef);
-  const [error, setError] = useState<string | undefined>();
+  const { error, run } = useAsyncAction();
 
-  const save = async (entityRefs: string[]) => {
-    setError(undefined);
-    try {
+  const save = (entityRefs: string[]) =>
+    run(async () => {
       await boardsApi.updateBoard(board.id, { entityRefs });
       await onChanged();
-    } catch (err) {
-      setError((err as Error).message);
-    }
-  };
+    });
 
   return (
     <Dialog isOpen={isOpen} onOpenChange={onOpenChange}>
