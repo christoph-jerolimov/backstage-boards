@@ -1,12 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   BreadcrumbEntry,
   useApi,
   useRouteRef,
 } from '@backstage/frontend-plugin-api';
-import { useSignal } from '@backstage/plugin-signals-react';
 import {
   Badge,
   Button,
@@ -30,8 +29,9 @@ import { boardsApiRef } from '../api';
 import {
   invalidateBoard,
   invalidateMyItems,
-  queryKeys,
   useBoardQuery,
+  useBoardsSignal,
+  useMyItemsQuery,
 } from '../queries';
 import { rootRouteRef } from '../routes';
 import { DueDateBadge } from './DueDate';
@@ -191,27 +191,13 @@ function BoardGroupTable(props: {
 
 /** The current user's items grouped by board; reused by the Boards tab. */
 export function MyItemsList() {
-  const boardsApi = useApi(boardsApiRef);
   const rootLink = useRouteRef(rootRouteRef);
   const basePath = rootLink?.() ?? '/boards';
   const [actionError, setActionError] = useState<string | undefined>();
 
-  const {
-    data: entries,
-    isLoading,
-    error,
-    refetch,
-  } = useQuery({
-    queryKey: queryKeys.myItems,
-    queryFn: () => boardsApi.listMyItems(),
-  });
+  const { data: entries, isLoading, error, refetch } = useMyItemsQuery();
 
-  const { lastSignal } = useSignal('boards');
-  useEffect(() => {
-    if (lastSignal) {
-      refetch();
-    }
-  }, [lastSignal, refetch]);
+  useBoardsSignal(refetch);
 
   const groups = useMemo(() => groupByBoard(entries ?? []), [entries]);
 

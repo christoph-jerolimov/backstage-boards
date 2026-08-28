@@ -1,11 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { BreadcrumbEntry, useRouteRef } from '@backstage/frontend-plugin-api';
-import { useSignal } from '@backstage/plugin-signals-react';
 import { Flex, Text } from '@backstage/ui';
 import { levelIncludes } from '@internal/plugin-boards-common';
 import { rootRouteRef } from '../routes';
-import { invalidateBoard, useBoardQuery, useItemsQuery } from '../queries';
+import {
+  invalidateBoard,
+  useBoardQuery,
+  useBoardsSignal,
+  useItemsQuery,
+} from '../queries';
 import { useQueryClient } from '@tanstack/react-query';
 import { BoardView } from './BoardView';
 import { TableView } from './TableView';
@@ -53,13 +57,7 @@ export function BoardPageContent(props: {
   );
   const filter = useItemFilter(items ?? []);
 
-  const { lastSignal } = useSignal<{ boardId: string }>('boards');
-  useEffect(() => {
-    if (lastSignal?.boardId === boardId) {
-      invalidateBoard(queryClient, boardId);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lastSignal]);
+  useBoardsSignal(() => invalidateBoard(queryClient, boardId), { boardId });
 
   if (boardLoading) {
     return <Text style={{ padding: 16 }}>Loading board…</Text>;

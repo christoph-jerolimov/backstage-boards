@@ -1,11 +1,9 @@
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { useApi, useRouteRef } from '@backstage/frontend-plugin-api';
-import { useSignal } from '@backstage/plugin-signals-react';
+import { useRouteRef } from '@backstage/frontend-plugin-api';
 import { Badge, Button, Flex, Text } from '@backstage/ui';
 import { MyBoardItem } from '@internal/plugin-boards-common';
-import { boardsApiRef } from '../api';
+import { useBoardsSignal, useMyItemsQuery } from '../queries';
 import { rootRouteRef } from '../routes';
 import { ErrorText } from './common';
 import { DueDateBadge, formatDueDate } from './DueDate';
@@ -103,28 +101,13 @@ function ItemRow(props: {
  */
 export function AssignedItemsContent(props: AssignedItemsContentProps) {
   const { scope = 'all', groupBy = 'board' } = props;
-  const boardsApi = useApi(boardsApiRef);
   const navigate = useNavigate();
   const rootLink = useRouteRef(rootRouteRef);
   const basePath = rootLink?.() ?? '/boards';
 
-  const {
-    data: entries,
-    isLoading,
-    error,
-    refetch,
-  } = useQuery({
-    // the same key the My items page uses, so both share one cache entry
-    queryKey: ['boards', 'my-items'],
-    queryFn: () => boardsApi.listMyItems(),
-  });
+  const { data: entries, isLoading, error, refetch } = useMyItemsQuery();
 
-  const { lastSignal } = useSignal('boards');
-  useEffect(() => {
-    if (lastSignal) {
-      refetch();
-    }
-  }, [lastSignal, refetch]);
+  useBoardsSignal(refetch);
 
   const groups = useMemo(() => {
     const all = entries ?? [];

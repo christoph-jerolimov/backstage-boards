@@ -4,7 +4,9 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { useApi } from '@backstage/frontend-plugin-api';
+import { useSignal } from '@backstage/plugin-signals-react';
 import { BoardItem } from '@internal/plugin-boards-common';
 import { boardsApiRef } from './api';
 
@@ -73,6 +75,38 @@ export function useBoardListQuery(options: {
         withCounts: options.withCounts,
       }),
   });
+}
+
+/** The current user's items across every board they can read. */
+export function useMyItemsQuery() {
+  const boardsApi = useApi(boardsApiRef);
+  return useQuery({
+    queryKey: queryKeys.myItems,
+    queryFn: () => boardsApi.listMyItems(),
+  });
+}
+
+/**
+ * Reacts to the backend's board change signals. With a `boardId`, only
+ * that board's signals are answered.
+ */
+export function useBoardsSignal(
+  onSignal: () => void,
+  options?: { boardId?: string },
+): void {
+  const { lastSignal } = useSignal<{ boardId?: string }>('boards');
+  const onlyBoardId = options?.boardId;
+  useEffect(() => {
+    if (!lastSignal) {
+      return;
+    }
+    if (onlyBoardId && lastSignal.boardId !== onlyBoardId) {
+      return;
+    }
+    onSignal();
+    // the callback is rebuilt every render; the signal is what matters
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastSignal, onlyBoardId]);
 }
 
 export function useBoardsByEntityQuery(entityRef: string) {

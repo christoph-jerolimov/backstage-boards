@@ -1,14 +1,12 @@
-import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useRouteRef } from '@backstage/frontend-plugin-api';
-import { useSignal } from '@backstage/plugin-signals-react';
 import { Button, Flex, Text } from '@backstage/ui';
 import {
   BoardListEntry,
   BoardStatusCount,
   COLUMN_COLORS,
 } from '@internal/plugin-boards-common';
-import { useBoardListQuery } from '../queries';
+import { useBoardListQuery, useBoardsSignal } from '../queries';
 import { rootRouteRef } from '../routes';
 import { ErrorText } from './common';
 
@@ -109,12 +107,7 @@ export function BoardsContent(props: BoardsContentProps) {
     withCounts: showCounts,
   });
 
-  const { lastSignal } = useSignal('boards');
-  useEffect(() => {
-    if (lastSignal) {
-      refetch();
-    }
-  }, [lastSignal, refetch]);
+  useBoardsSignal(refetch);
 
   if (isLoading) {
     return <Text>Loading boards…</Text>;
