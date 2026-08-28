@@ -12,100 +12,23 @@ import {
 import {
   BoardItem,
   BoardWithContext,
-  ItemComment,
-  TimelineEntry,
+  ItemUpdate,
 } from '@internal/plugin-boards-common';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { boardsApiRef } from '../api';
 import { queryKeys } from '../queries';
 import { WatchButton } from './WatchButton';
-import { DueDateBadge } from './DueDate';
 import { EditableMarkdown } from './EditableMarkdown';
-import { PrincipalPicker } from './PrincipalPicker';
-import { TagsEditor } from './TagsEditor';
 import {
-  changeSummary,
-  formatDate,
-  InlineEdit,
-  RefChips,
-  RefDisplay,
-} from './common';
+  AssigneesField,
+  DrawerField,
+  DueDateField,
+  ItemMetadata,
+} from './ItemDrawerFields';
+import { Timeline } from './ItemTimeline';
+import { TagsEditor } from './TagsEditor';
+import { InlineEdit } from './common';
 import { StatusBadge } from './StatusBadge';
-
-function CommentBlock(props: {
-  boardId: string;
-  itemId: string;
-  comment: ItemComment;
-  canWrite: boolean;
-  onChanged: () => Promise<void>;
-}) {
-  const { boardId, itemId, comment, canWrite, onChanged } = props;
-  const boardsApi = useApi(boardsApiRef);
-
-  return (
-    <div
-      style={{
-        border: '1px solid var(--bui-border-1)',
-        borderRadius: 8,
-        padding: 8,
-      }}
-    >
-      <Text variant="body-small">
-        <RefDisplay refString={comment.authorRef} /> commented{' '}
-        {formatDate(comment.createdAt)}
-        {comment.versionCount > 1 ? ' (edited)' : ''}
-      </Text>
-      <EditableMarkdown
-        text={comment.text}
-        canEdit={canWrite}
-        versionCount={comment.versionCount}
-        editAriaLabel="Edit comment"
-        loadVersions={() =>
-          boardsApi.listCommentVersions(boardId, itemId, comment.id)
-        }
-        versionsKey={queryKeys.commentVersions(boardId, itemId, comment.id)}
-        onSave={async text => {
-          await boardsApi.updateComment(boardId, itemId, comment.id, text);
-          await onChanged();
-        }}
-      />
-    </div>
-  );
-}
-
-function Timeline(props: {
-  boardId: string;
-  itemId: string;
-  entries: TimelineEntry[];
-  canWrite: boolean;
-  onChanged: () => Promise<void>;
-}) {
-  return (
-    <Flex direction="column" gap="2">
-      {props.entries.map((entry, index) => {
-        if (entry.kind === 'comment') {
-          return (
-            <CommentBlock
-              key={`comment-${entry.comment.id}`}
-              boardId={props.boardId}
-              itemId={props.itemId}
-              comment={entry.comment}
-              canWrite={props.canWrite}
-              onChanged={props.onChanged}
-            />
-          );
-        }
-        const { change } = entry;
-        return (
-          <Text key={`change-${index}`} variant="body-small" color="secondary">
-            <RefDisplay refString={change.actorRef} /> {changeSummary(change)} ·{' '}
-            {formatDate(change.at)}
-          </Text>
-        );
-      })}
-    </Flex>
-  );
-}
 
 export function ItemDrawer(props: {
   board: BoardWithContext;
@@ -131,6 +54,12 @@ export function ItemDrawer(props: {
   const changed = async () => {
     await onChanged();
     await queryClient.invalidateQueries({ queryKey: timelineKey });
+  };
+
+  /** Saves one or more item fields and refreshes what the drawer shows. */
+  const patchItem = async (update: ItemUpdate) => {
+    await boardsApi.updateItem(board.id, item.id, update);
+    await changed();
   };
 
   useEffect(() => {
@@ -191,10 +120,7 @@ export function ItemDrawer(props: {
               value={item.title}
               canEdit={!readonly}
               ariaLabel="item title"
-              onCommit={async title => {
-                await boardsApi.updateItem(board.id, item.id, { title });
-                await changed();
-              }}
+              onCommit={title => patchItem({ title })}
               display={
                 <Text variant="title-small" as="h2">
                   {item.title}
@@ -265,105 +191,19 @@ export function ItemDrawer(props: {
             }}
           />
 
-          <div>
-            <Text variant="body-small" color="secondary">
-              Due date
-            </Text>
-            <Flex align="center" gap="2">
-              {item.dueDate ? (
-                <DueDateBadge dueDate={item.dueDate} />
-              ) : (
-                <Text variant="body-small" color="secondary">
-                  No due date
-                </Text>
-              )}
-              {!readonly && (
-                <input
-                  type="date"
-                  aria-label="Due date"
-                  value={item.dueDate ?? ''}
-                  onChange={async event => {
-                    const value = event.target.value;
-                    await boardsApi.updateItem(board.id, item.id, {
-                      dueDate: value === '' ? null : value,
-                    });
-                    await changed();
-                  }}
-                  style={{
-                    background: 'var(--bui-bg-neutral-1)',
-                    color: 'inherit',
-                    border: '1px solid var(--bui-border-1)',
-                    borderRadius: 4,
-                    padding: '4px 8px',
-                    font: 'inherit',
-                  }}
-                />
-              )}
-              {!readonly && item.dueDate && (
-                <Button
-                  variant="tertiary"
-                  size="small"
-                  onPress={async () => {
-                    await boardsApi.updateItem(board.id, item.id, {
-                      dueDate: null,
-                    });
-                    await changed();
-                  }}
-                >
-                  Clear
-                </Button>
-              )}
-            </Flex>
-          </div>
+          <DueDateField
+            dueDate={item.dueDate}
+            readonly={readonly}
+            onChange={dueDate => patchItem({ dueDate })}
+          />
 
-          <div>
-            <Text variant="body-small" color="secondary">
-              Assignees
-            </Text>
-            <Flex direction="column" gap="2">
-              {item.assignees.length > 0 ? (
-                <RefChips
-                  refs={item.assignees}
-                  withAvatars
-                  onRemove={
-                    readonly
-                      ? undefined
-                      : async assignee => {
-                          await boardsApi.updateItem(board.id, item.id, {
-                            assignees: item.assignees.filter(
-                              ref => ref !== assignee,
-                            ),
-                          });
-                          await changed();
-                        }
-                  }
-                />
-              ) : (
-                <Text variant="body-small" color="secondary">
-                  Unassigned
-                </Text>
-              )}
-              {!readonly && (
-                <PrincipalPicker
-                  ariaLabel="Add assignee"
-                  placeholder="Add assignee…"
-                  allowText
-                  exclude={item.assignees}
-                  onSelect={async ref => {
-                    await boardsApi.updateItem(board.id, item.id, {
-                      assignees: [...item.assignees, ref],
-                    });
-                    await changed();
-                  }}
-                />
-              )}
-            </Flex>
-          </div>
+          <AssigneesField
+            assignees={item.assignees}
+            readonly={readonly}
+            onChange={assignees => patchItem({ assignees })}
+          />
 
-          <div>
-            <Text variant="body-small" color="secondary">
-              Description
-            </Text>
+          <DrawerField label="Description">
             <EditableMarkdown
               text={item.description ?? ''}
               canEdit={!readonly}
@@ -375,45 +215,20 @@ export function ItemDrawer(props: {
                 boardsApi.listDescriptionVersions(board.id, item.id)
               }
               versionsKey={queryKeys.descriptionVersions(board.id, item.id)}
-              onSave={async text => {
-                await boardsApi.updateItem(board.id, item.id, {
-                  description: text,
-                });
-                await changed();
-              }}
+              onSave={description => patchItem({ description })}
             />
-          </div>
+          </DrawerField>
 
-          <div>
-            <Text variant="body-small" color="secondary">
-              Tags
-            </Text>
+          <DrawerField label="Tags">
             <TagsEditor
               tags={item.tags}
               canEdit={!readonly}
               suggestions={props.tagSuggestions ?? []}
-              onChange={async tags => {
-                await boardsApi.updateItem(board.id, item.id, { tags });
-                await changed();
-              }}
+              onChange={tags => patchItem({ tags })}
             />
-          </div>
+          </DrawerField>
 
-          <Flex direction="column" gap="1">
-            <Text variant="body-x-small" color="secondary">
-              Created by <RefDisplay refString={item.createdBy} /> at{' '}
-              {formatDate(item.createdAt)}
-            </Text>
-            {item.creatorRef && (
-              <Text variant="body-x-small" color="secondary">
-                Creator: <RefDisplay refString={item.creatorRef} />
-              </Text>
-            )}
-            <Text variant="body-x-small" color="secondary">
-              Updated by <RefDisplay refString={item.updatedBy} /> at{' '}
-              {formatDate(item.updatedAt)}
-            </Text>
-          </Flex>
+          <ItemMetadata item={item} />
 
           <Text variant="body-medium" weight="bold" as="h3">
             Activity
