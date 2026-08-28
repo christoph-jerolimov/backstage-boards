@@ -57,6 +57,25 @@ export interface ItemGroup {
   items: BoardItem[];
 }
 
+/** The group the items carrying none of the grouped values land in. */
+const REST_KEY: Record<Exclude<GroupByMode, 'none'>, string> = {
+  assignee: UNASSIGNED,
+  dueDate: NO_DUE_DATE,
+  tags: UNTAGGED,
+};
+
+/** The values an item is grouped under; empty puts it in the rest group. */
+function groupKeysOf(item: BoardItem, mode: GroupByMode): string[] {
+  switch (mode) {
+    case 'assignee':
+      return item.assignees;
+    case 'dueDate':
+      return item.dueDate ? [item.dueDate] : [];
+    default:
+      return item.tags;
+  }
+}
+
 /**
  * Groups items by the selected mode. Multi-valued modes (assignee,
  * tags) put an item into each of its groups; the "none of them" group
@@ -66,18 +85,10 @@ export function groupItems(items: BoardItem[], mode: GroupByMode): ItemGroup[] {
   if (mode === 'none') {
     return [{ key: 'all', items }];
   }
-  if (mode === 'assignee') {
-    return groupByAssignee(items);
-  }
   const groups = new Map<string, BoardItem[]>();
   const rest: BoardItem[] = [];
   for (const item of items) {
-    let keys: string[];
-    if (mode === 'dueDate') {
-      keys = item.dueDate ? [item.dueDate] : [];
-    } else {
-      keys = item.tags;
-    }
+    const keys = groupKeysOf(item, mode);
     if (keys.length === 0) {
       rest.push(item);
       continue;
@@ -92,10 +103,7 @@ export function groupItems(items: BoardItem[], mode: GroupByMode): ItemGroup[] {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([key, grouped]) => ({ key, items: grouped }));
   if (rest.length > 0) {
-    result.push({
-      key: mode === 'dueDate' ? NO_DUE_DATE : UNTAGGED,
-      items: rest,
-    });
+    result.push({ key: REST_KEY[mode], items: rest });
   }
   return result;
 }
@@ -106,29 +114,16 @@ export function groupItems(items: BoardItem[], mode: GroupByMode): ItemGroup[] {
  * {@link UNASSIGNED} group. Group order: assignees alphabetically, then
  * the unassigned group.
  */
-export function groupByAssignee(
-  items: BoardItem[],
-): Array<{ key: string; items: BoardItem[] }> {
-  const groups = new Map<string, BoardItem[]>();
-  const unassigned: BoardItem[] = [];
-  for (const item of items) {
-    if (item.assignees.length === 0) {
-      unassigned.push(item);
-      continue;
-    }
-    for (const assignee of item.assignees) {
-      const group = groups.get(assignee) ?? [];
-      group.push(item);
-      groups.set(assignee, group);
-    }
-  }
-  const result = [...groups.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, grouped]) => ({ key, items: grouped }));
-  if (unassigned.length > 0) {
-    result.push({ key: UNASSIGNED, items: unassigned });
-  }
-  return result;
+export function groupByAssignee(items: BoardItem[]): ItemGroup[] {
+  return groupItems(items, 'assignee');
+}
+
+/**
+ * The distinct assignees across a set of items — the pool the item
+ * menu offers as quick-assign shortcuts.
+ */
+export function assigneePool(items: Array<{ assignees: string[] }>): string[] {
+  return [...new Set(items.flatMap(item => item.assignees))];
 }
 
 /** Midpoint position for inserting before the item at `index`. */

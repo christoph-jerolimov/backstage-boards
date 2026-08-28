@@ -16,6 +16,22 @@ export function textRefDisplay(ref: string): string | undefined {
 }
 
 /**
+ * A short display name for a ref: the text of a `text:` ref, otherwise
+ * the entity's own name — never the whole `kind:namespace/name` triple.
+ */
+export function refDisplayName(ref: string): string {
+  const text = textRefDisplay(ref);
+  if (text !== undefined) {
+    return text;
+  }
+  try {
+    return parseEntityRef(ref).name;
+  } catch {
+    return ref;
+  }
+}
+
+/**
  * Validates a creator/assignee reference: either a `text:` ref with
  * non-empty content, or a syntactically valid catalog entity ref.
  */

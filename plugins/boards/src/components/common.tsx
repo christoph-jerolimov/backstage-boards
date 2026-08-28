@@ -284,6 +284,40 @@ export function InlineEdit(props: {
   );
 }
 
+/**
+ * A text field revealed in place of an "add" button: Enter submits,
+ * Escape cancels, and losing focus commits what is there.
+ */
+export function InlineAddField(props: {
+  ariaLabel: string;
+  placeholder: string;
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+  onBlur: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <TextField
+      aria-label={props.ariaLabel}
+      value={props.value}
+      onChange={props.onChange}
+      placeholder={props.placeholder}
+      // eslint-disable-next-line jsx-a11y/no-autofocus -- focus moves into a field the user just revealed
+      autoFocus
+      onBlur={props.onBlur}
+      onKeyDown={event => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          props.onSubmit();
+        } else if (event.key === 'Escape') {
+          props.onCancel();
+        }
+      }}
+    />
+  );
+}
+
 /** Human wording for a change record, shared by timeline and change feed. */
 export function changeSummary(change: {
   type: string;

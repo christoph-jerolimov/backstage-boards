@@ -1,10 +1,9 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useRouteRef } from '@backstage/frontend-plugin-api';
 import { Badge, Button, Flex, Text } from '@backstage/ui';
 import { MyBoardItem } from '@internal/plugin-boards-common';
 import { useBoardsSignal, useMyItemsQuery } from '../queries';
-import { rootRouteRef } from '../routes';
+import { useBoardsBasePath } from '../routes';
 import { AsyncList, ErrorText } from './common';
 import { DueDateBadge, formatDueDate } from './DueDate';
 import {
@@ -102,8 +101,7 @@ function ItemRow(props: {
 export function AssignedItemsContent(props: AssignedItemsContentProps) {
   const { scope = 'all', groupBy = 'board' } = props;
   const navigate = useNavigate();
-  const rootLink = useRouteRef(rootRouteRef);
-  const basePath = rootLink?.() ?? '/boards';
+  const basePath = useBoardsBasePath();
 
   const { data: entries, isLoading, error, refetch } = useMyItemsQuery();
 

@@ -15,7 +15,6 @@ import {
   Select,
   SubmenuTrigger,
   Text,
-  TextField,
 } from '@backstage/ui';
 import {
   BoardColumn,
@@ -24,11 +23,16 @@ import {
   COLUMN_COLORS,
   ColumnColor,
 } from '@internal/plugin-boards-common';
-import { GroupByMode, groupItems, positionBefore } from './grouping';
+import {
+  assigneePool,
+  GroupByMode,
+  groupItems,
+  positionBefore,
+} from './grouping';
 import { GroupLabel } from './GroupLabel';
 import { ItemActions, ItemMenu } from './ItemMenu';
 import { RowMenuHandle, useRowMenu } from './RowMenu';
-import { InlineEdit } from './common';
+import { InlineAddField, InlineEdit } from './common';
 import { AssigneeAvatars } from './AssigneeAvatars';
 import { DueDateBadge } from './DueDate';
 import { ColumnDot } from './StatusBadge';
@@ -184,22 +188,16 @@ function AddItemRow(props: { columnId: string; actions: BoardActions }) {
   };
   return (
     <div ref={fieldRef}>
-      <TextField
-        aria-label="New item title"
+      <InlineAddField
+        ariaLabel="New item title"
+        placeholder="Item title"
         value={title}
         onChange={setTitle}
-        placeholder="Item title"
-        // eslint-disable-next-line jsx-a11y/no-autofocus -- focus moves into a field the user just revealed
-        autoFocus
+        onSubmit={() => commit({ addAnother: true })}
         onBlur={() => commit()}
-        onKeyDown={event => {
-          if (event.key === 'Enter') {
-            event.preventDefault();
-            commit({ addAnother: true });
-          } else if (event.key === 'Escape') {
-            setAdding(false);
-            setTitle('');
-          }
+        onCancel={() => {
+          setAdding(false);
+          setTitle('');
         }}
       />
     </div>
@@ -400,7 +398,7 @@ export function BoardView(props: {
   groupBy: GroupByMode;
 }) {
   const { board, items, canWrite, actions, groupBy } = props;
-  const assigneePool = [...new Set(items.flatMap(item => item.assignees))];
+  const pool = assigneePool(items);
   const rowMenu = useRowMenu<BoardItem>({
     name: item => item.title,
     children: item => (
@@ -409,7 +407,7 @@ export function BoardView(props: {
         columns={board.columns}
         readonly={!canWrite || !!item.externalManager}
         actions={actions}
-        assigneePool={assigneePool}
+        assigneePool={pool}
       />
     ),
   });
@@ -445,22 +443,14 @@ export function BoardView(props: {
 
   const titleField = (
     <div style={{ minWidth: 200 }}>
-      <TextField
-        aria-label="New column title"
+      <InlineAddField
+        ariaLabel="New column title"
+        placeholder="Column title"
         value={columnTitle}
         onChange={setColumnTitle}
-        placeholder="Column title"
-        // eslint-disable-next-line jsx-a11y/no-autofocus -- focus moves into a field the user just revealed
-        autoFocus
+        onSubmit={commitColumn}
         onBlur={commitColumn}
-        onKeyDown={event => {
-          if (event.key === 'Enter') {
-            event.preventDefault();
-            commitColumn();
-          } else if (event.key === 'Escape') {
-            cancelColumn();
-          }
-        }}
+        onCancel={cancelColumn}
       />
     </div>
   );

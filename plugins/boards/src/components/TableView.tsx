@@ -10,6 +10,7 @@ import {
 } from '@backstage/ui';
 import { BoardItem, BoardWithContext } from '@internal/plugin-boards-common';
 import {
+  assigneePool,
   GroupByMode,
   groupItems,
   ItemSortDescriptor,
@@ -109,7 +110,7 @@ export function TableView(props: {
   openItem: (itemId: string) => void;
 }) {
   const { board, items, canWrite, actions, groupBy, openItem } = props;
-  const assigneePool = [...new Set(items.flatMap(item => item.assignees))];
+  const pool = assigneePool(items);
   const [sort, setSort] = useState<ItemSortDescriptor | undefined>(undefined);
   const rowMenu = useRowMenu<BoardItem>({
     name: item => item.title,
@@ -119,7 +120,7 @@ export function TableView(props: {
         columns={board.columns}
         readonly={!canWrite || !!item.externalManager}
         actions={actions}
-        assigneePool={assigneePool}
+        assigneePool={pool}
       />
     ),
   });

@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { BreadcrumbEntry, useRouteRef } from '@backstage/frontend-plugin-api';
+import { BreadcrumbEntry } from '@backstage/frontend-plugin-api';
 import { Flex, Text } from '@backstage/ui';
 import { levelIncludes } from '@internal/plugin-boards-common';
-import { rootRouteRef } from '../routes';
+import { useBoardsBasePath } from '../routes';
 import {
   invalidateBoard,
   useBoardQuery,
@@ -37,7 +37,7 @@ export function BoardPageContent(props: {
 }) {
   const { boardId, embedded } = props;
   const navigate = useNavigate();
-  const rootLink = useRouteRef(rootRouteRef);
+  const basePath = useBoardsBasePath();
   const queryClient = useQueryClient();
   const [view, setView] = useState<BoardViewMode>('board');
   const [groupBy, setGroupBy] = useState<GroupByMode>('none');
@@ -75,7 +75,6 @@ export function BoardPageContent(props: {
   const canWrite = levelIncludes(board.access, 'write') && !archived;
   const isAdmin = levelIncludes(board.access, 'admin') && !archived;
   const openDrawerItem = (items ?? []).find(item => item.id === openItemId);
-  const basePath = rootLink?.() ?? '/boards';
 
   const content = (
     <Flex direction="column" gap="3" style={{ padding: 16 }}>
