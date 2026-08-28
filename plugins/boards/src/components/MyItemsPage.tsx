@@ -37,7 +37,7 @@ import { rootRouteRef } from '../routes';
 import { DueDateBadge } from './DueDate';
 import { ItemActions, ItemContextMenu, ItemMenu } from './ItemMenu';
 import { RowActionsMenu, useRowContextMenu } from './RowMenu';
-import { ErrorText } from './common';
+import { AsyncList, ErrorText } from './common';
 import { StatusBadge } from './StatusBadge';
 import { useAsyncAction } from './useAsyncAction';
 
@@ -203,24 +203,32 @@ export function MyItemsList() {
 
   return (
     <Flex direction="column" gap="4">
-      {error && (
-        <ErrorText>
-          My items could not be loaded: {(error as Error).message}
-        </ErrorText>
-      )}
       {actionError && <ErrorText>{actionError}</ErrorText>}
-      {isLoading && <Text>Loading your items…</Text>}
-      {!isLoading && !error && groups.length === 0 && (
-        <Text color="secondary">Nothing is assigned to you on any board.</Text>
-      )}
-      {groups.map(group => (
-        <BoardGroupTable
-          key={group.boardId}
-          group={group}
-          basePath={basePath}
-          onError={setActionError}
-        />
-      ))}
+      <AsyncList
+        isLoading={isLoading}
+        error={error}
+        items={groups}
+        loading={<Text>Loading your items…</Text>}
+        renderError={message => (
+          <ErrorText>My items could not be loaded: {message}</ErrorText>
+        )}
+        empty={
+          <Text color="secondary">
+            Nothing is assigned to you on any board.
+          </Text>
+        }
+      >
+        {boards =>
+          boards.map(group => (
+            <BoardGroupTable
+              key={group.boardId}
+              group={group}
+              basePath={basePath}
+              onError={setActionError}
+            />
+          ))
+        }
+      </AsyncList>
     </Flex>
   );
 }
