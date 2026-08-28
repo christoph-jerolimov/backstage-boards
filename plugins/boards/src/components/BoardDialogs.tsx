@@ -100,11 +100,7 @@ export function BoardDialogs(props: {
         onOpenChange={openChange}
       />
 
-      <Dialog
-        isOpen={open === 'delete'}
-        onOpenChange={openChange}
-        style={{ width: '800px', maxWidth: '95%' }}
-      >
+      <Dialog isOpen={open === 'delete'} onOpenChange={openChange}>
         <DialogHeader>
           {archived
             ? `Permanently delete “${board.name}”`

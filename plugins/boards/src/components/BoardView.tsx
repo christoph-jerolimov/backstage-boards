@@ -507,7 +507,6 @@ export function BoardView(props: {
         onOpenChange={open => {
           if (!open) setDeleteTarget(undefined);
         }}
-        style={{ width: '800px', maxWidth: '95%' }}
       >
         <DialogHeader>Delete column “{deleteTarget?.title}”</DialogHeader>
         <DialogBody>
