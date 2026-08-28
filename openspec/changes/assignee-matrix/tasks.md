@@ -70,7 +70,7 @@
 
 - [x] 5.1 Run `yarn workspace @internal/plugin-boards test`,
       `yarn prettier:check` and `yarn lint:all`; verify all pass
-- [ ] 5.2 Start the app (`yarn start`), open a board with several
+- [x] 5.2 Start the app (`yarn start`), open a board with several
       statuses, multi-assignee items and unassigned items, open the
       assignee matrix and verify the counts against the board, then
       unselect a status and an assignee and verify the sums match what
