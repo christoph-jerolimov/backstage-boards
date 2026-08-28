@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApi } from '@backstage/frontend-plugin-api';
 import {
@@ -24,19 +24,32 @@ import {
   TextField,
 } from '@backstage/ui';
 import { RiArrowRightLine } from '@remixicon/react';
-import { BoardListEntry, errorMessage } from '@internal/plugin-boards-common';
+import {
+  BoardListEntry,
+  BoardListFilter,
+  errorMessage,
+} from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
 import {
   boardsQueryClient,
   queryKeys,
-  useBoardsQuery,
+  useBoardsPageQuery,
   useBoardsSignal,
 } from '../queries';
+import { BoardsFilterBar, useBoardFilter } from './BoardsFilterBar';
 import { MyItemsList } from './MyItemsPage';
 import { useRowMenu } from './RowMenu';
-import { EntityRefList, ErrorText } from './common';
+import { AsyncList, EntityRefList, ErrorText } from './common';
+import {
+  DEFAULT_PAGE_SIZE,
+  PageSize,
+  TablePagination,
+} from './TablePagination';
 import { FavoriteButton, FavoriteStar } from './FavoriteButton';
 import { useAsyncAction } from './useAsyncAction';
+
+/** Stable so the favorites tab's paging effect does not reset every render. */
+const FAVORITES_FILTER: BoardListFilter = { favoritesOnly: true };
 
 /** The shared board actions menu: row button and right-click alike. */
 function BoardMenu(props: {
@@ -67,9 +80,8 @@ function BoardsTable(props: {
   label: string;
   boards: BoardListEntry[];
   onToggleFavorite: (board: BoardListEntry) => void;
-  emptyText: string;
 }) {
-  const { label, boards, onToggleFavorite, emptyText } = props;
+  const { label, boards, onToggleFavorite } = props;
   const navigate = useNavigate();
   const openBoard = (board: BoardListEntry) => navigate(board.id);
   const rowMenu = useRowMenu<BoardListEntry>({
@@ -82,9 +94,6 @@ function BoardsTable(props: {
       />
     ),
   });
-  if (boards.length === 0) {
-    return <Text>{emptyText}</Text>;
-  }
   return (
     <>
       <TableRoot aria-label={label} onRowAction={key => navigate(String(key))}>
@@ -126,6 +135,78 @@ function BoardsTable(props: {
   );
 }
 
+/** One tab's page of boards: the listing query plus its paging state. */
+function useBoardsPage(filter: BoardListFilter) {
+  const [pageSize, setPageSize] = useState<PageSize>(DEFAULT_PAGE_SIZE);
+  const [offset, setOffset] = useState(0);
+  const query = useBoardsPageQuery({
+    ...filter,
+    limit: Number(pageSize),
+    offset,
+  });
+  // a narrowing filter can otherwise leave the user on a page that no
+  // longer exists; the filter itself is a fresh object every render, so
+  // the effect keys on its content
+  const filterKey = JSON.stringify(filter);
+  useEffect(() => setOffset(0), [filterKey]);
+  return {
+    ...query,
+    offset,
+    setOffset,
+    pageSize,
+    changePageSize: (size: PageSize) => {
+      setPageSize(size);
+      setOffset(0);
+    },
+  };
+}
+
+/** A tab's table with its pagination footer, or why it is empty. */
+function BoardsPanel(props: {
+  label: string;
+  page: ReturnType<typeof useBoardsPage>;
+  empty: React.ReactNode;
+  onToggleFavorite: (board: BoardListEntry) => void;
+  /** The filter bar, on the tab that has one. */
+  children?: React.ReactNode;
+}) {
+  const { label, page, empty, onToggleFavorite, children } = props;
+  return (
+    <Flex direction="column" gap="4">
+      {children}
+      <AsyncList
+        isLoading={page.isLoading}
+        error={page.error}
+        items={page.data?.boards}
+        loading={<Text>Loading boards…</Text>}
+        renderError={message => (
+          <ErrorText>Boards could not be loaded: {message}</ErrorText>
+        )}
+        empty={empty}
+      >
+        {boards => (
+          <>
+            <BoardsTable
+              label={label}
+              boards={boards}
+              onToggleFavorite={onToggleFavorite}
+            />
+            <TablePagination
+              noun="boards"
+              total={page.data?.total ?? boards.length}
+              offset={page.offset}
+              count={boards.length}
+              pageSize={page.pageSize}
+              onOffsetChange={page.setOffset}
+              onPageSizeChange={page.changePageSize}
+            />
+          </>
+        )}
+      </AsyncList>
+    </Flex>
+  );
+}
+
 export function BoardListPage() {
   const boardsApi = useApi(boardsApiRef);
   const navigate = useNavigate();
@@ -140,27 +221,20 @@ export function BoardListPage() {
     formatError: err => `Could not create board: ${errorMessage(err)}`,
   });
 
-  const {
-    data: boards,
-    isLoading: loading,
-    refetch: refresh,
-  } = useBoardsQuery();
+  const filter = useBoardFilter();
+  const favorites = useBoardsPage(FAVORITES_FILTER);
+  const all = useBoardsPage(filter.filter);
 
-  useBoardsSignal(() =>
-    boardsQueryClient.invalidateQueries({
-      queryKey: queryKeys.boards,
-      exact: true,
-    }),
-  );
-
-  const favorites = useMemo(
-    () => (boards ?? []).filter(board => board.favorite),
-    [boards],
-  );
+  useBoardsSignal(() => {
+    boardsQueryClient.invalidateQueries({ queryKey: queryKeys.boardsPage });
+    // a board created or archived elsewhere changes what the dropdowns offer
+    boardsQueryClient.invalidateQueries({ queryKey: queryKeys.filterOptions });
+  });
 
   const toggleFavorite = async (board: BoardListEntry) => {
     await boardsApi.setFavorite(board.id, !board.favorite);
-    await refresh();
+    // the star moves a board between the two tabs, so both are stale
+    await Promise.all([favorites.refetch(), all.refetch()]);
   };
 
   const createBoard = async () => {
@@ -186,36 +260,52 @@ export function BoardListPage() {
         </Button>
       </Flex>
       {error && <ErrorText>{error}</ErrorText>}
-      {loading ? (
-        <Text>Loading boards…</Text>
-      ) : (
-        <Tabs selectedKey={tab} onSelectionChange={key => setTab(String(key))}>
-          <TabList>
-            <Tab id="favorites">Favorites ({favorites.length})</Tab>
-            <Tab id="all">All ({(boards ?? []).length})</Tab>
-            <Tab id="my-items">My items</Tab>
-          </TabList>
-          <TabPanel id="favorites">
-            <BoardsTable
-              label="Favorite boards"
-              boards={favorites}
-              onToggleFavorite={toggleFavorite}
-              emptyText="No favorite boards yet — star a board in the All tab."
+      <Tabs selectedKey={tab} onSelectionChange={key => setTab(String(key))}>
+        <TabList>
+          <Tab id="favorites">Favorites ({favorites.data?.total ?? 0})</Tab>
+          {/* the caller's whole readable set, so filtering never moves it */}
+          <Tab id="all">All ({filter.options?.total ?? 0})</Tab>
+          <Tab id="my-items">My items</Tab>
+        </TabList>
+        <TabPanel id="favorites">
+          <BoardsPanel
+            label="Favorite boards"
+            page={favorites}
+            onToggleFavorite={toggleFavorite}
+            empty={
+              <Text color="secondary">
+                No favorite boards yet — star a board in the All tab.
+              </Text>
+            }
+          />
+        </TabPanel>
+        <TabPanel id="all">
+          <BoardsPanel
+            label="All boards"
+            page={all}
+            onToggleFavorite={toggleFavorite}
+            empty={
+              filter.active ? (
+                // the bar right above holds the clear action; a second
+                // one here would be two controls doing one thing
+                <Text color="secondary">No boards match your filters.</Text>
+              ) : (
+                <Text color="secondary">
+                  No boards are accessible to you yet. Create one!
+                </Text>
+              )
+            }
+          >
+            <BoardsFilterBar
+              filter={filter}
+              matchCount={all.data?.total ?? 0}
             />
-          </TabPanel>
-          <TabPanel id="all">
-            <BoardsTable
-              label="All boards"
-              boards={boards ?? []}
-              onToggleFavorite={toggleFavorite}
-              emptyText="No boards are accessible to you yet. Create one!"
-            />
-          </TabPanel>
-          <TabPanel id="my-items">
-            <MyItemsList />
-          </TabPanel>
-        </Tabs>
-      )}
+          </BoardsPanel>
+        </TabPanel>
+        <TabPanel id="my-items">
+          <MyItemsList />
+        </TabPanel>
+      </Tabs>
       <Dialog isOpen={createOpen} onOpenChange={setCreateOpen}>
         <DialogHeader>Create board</DialogHeader>
         <DialogBody>

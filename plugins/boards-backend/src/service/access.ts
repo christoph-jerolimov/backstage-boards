@@ -1,4 +1,5 @@
 import {
+  ALL_VISIBILITIES,
   BoardPermissionLevel,
   BoardVisibility,
   maxLevel,
@@ -49,6 +50,20 @@ export function visibilityLevel(
     default:
       return undefined;
   }
+}
+
+/**
+ * The visibilities that grant a principal access on their own, without
+ * any permission entry. Derived from {@link visibilityLevel} rather than
+ * listed again, so a query filtering on it cannot disagree with the level
+ * computation about which boards are visible to whom.
+ */
+export function visibleVisibilities(
+  principal: BoardsPrincipal,
+): BoardVisibility[] {
+  return ALL_VISIBILITIES.filter(
+    visibility => visibilityLevel(visibility, principal) !== undefined,
+  );
 }
 
 /**

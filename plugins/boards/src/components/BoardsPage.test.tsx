@@ -12,7 +12,7 @@ describe('BoardsPage', () => {
   it('routes the index path to the board list', async () => {
     boardsQueryClient.clear();
     const boardsApi = testBoardsApi({
-      listBoards: jest.fn().mockResolvedValue([]),
+      listBoards: jest.fn().mockResolvedValue({ boards: [], total: 0 }),
     });
     renderWithProviders(<BoardsPage />, {
       apis: [[boardsApiRef, boardsApi]],

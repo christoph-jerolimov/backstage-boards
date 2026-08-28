@@ -52,7 +52,9 @@ function renderTab(assigned: ReturnType<typeof board>[]) {
   // the component brings its own module-level query client
   boardsQueryClient.clear();
   const boardsApi = testBoardsApi({
-    listBoards: jest.fn().mockResolvedValue(assigned),
+    listBoards: jest
+      .fn()
+      .mockResolvedValue({ boards: assigned, total: assigned.length }),
     getBoard: jest
       .fn()
       .mockImplementation(async (id: string) =>

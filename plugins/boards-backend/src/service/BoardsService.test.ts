@@ -1,5 +1,10 @@
 import { Knex } from 'knex';
+import {
+  ALL_VISIBILITIES,
+  BoardVisibility,
+} from '@internal/plugin-boards-common';
 import { BoardsService } from './BoardsService';
+import { computeEffectiveLevel } from './access';
 import {
   alice,
   anonymous,
@@ -54,7 +59,7 @@ describe('BoardsService', () => {
       await expect(service.getBoard(bob, board.id)).rejects.toThrow(
         /not found/,
       );
-      const list = await service.listBoards(bob);
+      const { boards: list } = await service.listBoards(bob);
       expect(list).toHaveLength(0);
     });
 
@@ -71,7 +76,7 @@ describe('BoardsService', () => {
       });
       await service.createBoard(bob, { name: 'Hidden' });
 
-      const list = await service.listBoards(alice);
+      const { boards: list } = await service.listBoards(alice);
       expect(list.map(b => b.id).sort()).toEqual(
         [own.id, viaGroup.id, publicBoard.id].sort(),
       );
@@ -88,7 +93,7 @@ describe('BoardsService', () => {
         name: 'Inaccessible',
         entityRefs: ['system:default/payments'],
       });
-      const filtered = await service.listBoards(alice, {
+      const { boards: filtered } = await service.listBoards(alice, {
         entityRef: 'system:default/payments',
       });
       expect(filtered.map(board => board.id)).toEqual([mine.id]);
@@ -101,7 +106,7 @@ describe('BoardsService', () => {
         title: 'One',
       });
 
-      const [plain] = await service.listBoards(alice);
+      const [plain] = (await service.listBoards(alice)).boards;
       expect(plain.statusCounts).toBeUndefined();
       expect(Object.keys(plain)).not.toContain('statusCounts');
     });
@@ -122,7 +127,8 @@ describe('BoardsService', () => {
         title: 'Three',
       });
 
-      const [entry] = await service.listBoards(alice, { withCounts: true });
+      const [entry] = (await service.listBoards(alice, { withCounts: true }))
+        .boards;
       expect(entry.statusCounts).toEqual(
         board.columns.map(column => ({
           columnId: column.id,
@@ -146,7 +152,8 @@ describe('BoardsService', () => {
       });
       await service.deleteItem(alice, board.id, gone.id);
 
-      const [entry] = await service.listBoards(alice, { withCounts: true });
+      const [entry] = (await service.listBoards(alice, { withCounts: true }))
+        .boards;
       expect(entry.statusCounts?.[0]).toMatchObject({
         columnId: column.id,
         count: 1,
@@ -161,14 +168,17 @@ describe('BoardsService', () => {
       });
       const mine = await service.createBoard(alice, { name: 'Mine' });
 
-      const list = await service.listBoards(alice, { withCounts: true });
+      const { boards: list } = await service.listBoards(alice, {
+        withCounts: true,
+      });
       expect(list.map(board => board.id)).toEqual([mine.id]);
       expect(JSON.stringify(list)).not.toContain(secret.columns[0].id);
     });
 
     it('reports a board with no items as all-zero counts', async () => {
       const board = await service.createBoard(alice, { name: 'Empty' });
-      const [entry] = await service.listBoards(alice, { withCounts: true });
+      const [entry] = (await service.listBoards(alice, { withCounts: true }))
+        .boards;
       expect(entry.statusCounts).toHaveLength(board.columns.length);
       expect(entry.statusCounts?.every(count => count.count === 0)).toBe(true);
     });
@@ -218,7 +228,7 @@ describe('BoardsService', () => {
       await service.deleteBoard(alice, board.id);
 
       // hidden from every listing, but the admin can still open it read-only
-      expect(await service.listBoards(alice)).toHaveLength(0);
+      expect((await service.listBoards(alice)).boards).toHaveLength(0);
       const archived = await service.getBoard(alice, board.id);
       expect(archived.archivedAt).toBeDefined();
       expect(archived.archivedBy).toBe('user:default/alice');
@@ -269,7 +279,7 @@ describe('BoardsService', () => {
       await service.unarchiveBoard(alice, board.id);
       const restored = await service.getBoard(alice, board.id);
       expect(restored.archivedAt).toBeUndefined();
-      expect(await service.listBoards(alice)).toHaveLength(1);
+      expect((await service.listBoards(alice)).boards).toHaveLength(1);
       // writable again
       await service.createItem(alice, board.id, {
         columnId: board.columns[0].id,
@@ -351,17 +361,301 @@ describe('BoardsService', () => {
       });
       await service.setFavorite(alice, board.id, true);
       expect(
-        (await service.listBoards(alice, { favoritesOnly: true })).map(
+        (await service.listBoards(alice, { favoritesOnly: true })).boards.map(
           b => b.id,
         ),
       ).toEqual([board.id]);
       expect(
-        await service.listBoards(bob, { favoritesOnly: true }),
+        (await service.listBoards(bob, { favoritesOnly: true })).boards,
       ).toHaveLength(0);
       await service.setFavorite(alice, board.id, false);
       expect(
-        await service.listBoards(alice, { favoritesOnly: true }),
+        (await service.listBoards(alice, { favoritesOnly: true })).boards,
       ).toHaveLength(0);
+    });
+  });
+
+  describe('visibility parity', () => {
+    // The listing decides what a caller may see in SQL, while every
+    // single-board path decides it with computeEffectiveLevel. Two
+    // implementations of one rule drift silently, so this pins them to
+    // each other over the whole matrix of visibilities and grants.
+    const GRANTS = {
+      none: undefined,
+      direct: { principalRef: 'user:default/carol', level: 'read' as const },
+      group: { principalRef: 'group:default/team-a', level: 'write' as const },
+    };
+
+    it('lists exactly the boards the effective level computation grants', async () => {
+      const boards: Array<{ id: string; visibility: BoardVisibility }> = [];
+      for (const visibility of ALL_VISIBILITIES) {
+        for (const grant of Object.values(GRANTS)) {
+          // bob owns every board, so alice and carol only ever reach one
+          // through its visibility or through the grant under test
+          const board = await service.createBoard(bob, {
+            name: `${visibility}-${grant?.principalRef ?? 'none'}`,
+            visibility,
+          });
+          if (grant) {
+            await service.addPermission(bob, board.id, grant);
+          }
+          boards.push({ id: board.id, visibility });
+        }
+      }
+
+      const entriesByBoard = new Map(
+        await Promise.all(
+          boards.map(
+            async board =>
+              [
+                board.id,
+                (
+                  await service.listPermissions(bob, board.id)
+                ).map(entry => ({
+                  principalRef: entry.principalRef,
+                  level: entry.level,
+                })),
+              ] as const,
+          ),
+        ),
+      );
+
+      for (const [name, principal] of Object.entries({
+        alice,
+        carol,
+        syncService,
+        anonymous,
+      })) {
+        const expected = boards
+          .filter(
+            board =>
+              computeEffectiveLevel({
+                principal,
+                visibility: board.visibility,
+                entries: entriesByBoard.get(board.id) ?? [],
+              }) !== undefined,
+          )
+          .map(board => board.id)
+          .sort();
+        const listed = (await service.listBoards(principal)).boards
+          .map(board => board.id)
+          .sort();
+        // the principal's name rides along so a failure says who
+        expect({ principal: name, listed }).toEqual({
+          principal: name,
+          listed: expected,
+        });
+      }
+    });
+
+    it('reports the level the effective level computation computes', async () => {
+      const board = await service.createBoard(bob, {
+        name: 'Public and granted',
+        visibility: 'public-read',
+      });
+      await service.addPermission(bob, board.id, {
+        principalRef: 'group:default/team-a',
+        level: 'write',
+      });
+      const [entry] = (await service.listBoards(alice)).boards;
+      expect(entry.access).toBe('write');
+    });
+  });
+
+  describe('board listing filters and paging', () => {
+    /** Boards alice can read, named as the tests refer to them. */
+    async function seed(names: string[]) {
+      const created = [];
+      for (const name of names) {
+        created.push(await service.createBoard(alice, { name }));
+      }
+      return created;
+    }
+
+    it('matches the search term against the name, case-insensitively', async () => {
+      await seed(['Payments', 'payment reconciliation', 'Shipping']);
+      const { boards, total } = await service.listBoards(alice, {
+        search: 'PAY',
+      });
+      expect(boards.map(board => board.name)).toEqual([
+        'Payments',
+        'payment reconciliation',
+      ]);
+      expect(total).toBe(2);
+    });
+
+    it('treats a whitespace-only search as no search at all', async () => {
+      await seed(['One', 'Two']);
+      const { boards } = await service.listBoards(alice, { search: '   ' });
+      expect(boards).toHaveLength(2);
+    });
+
+    it('matches LIKE wildcards literally', async () => {
+      await seed(['100% done', 'Nothing like it']);
+      const { boards } = await service.listBoards(alice, { search: '100%' });
+      expect(boards.map(board => board.name)).toEqual(['100% done']);
+
+      // an unescaped _ would match any single character
+      const underscore = await service.listBoards(alice, { search: 'n_thing' });
+      expect(underscore.boards).toHaveLength(0);
+    });
+
+    it('filters by creator', async () => {
+      const mine = await service.createBoard(alice, { name: 'Mine' });
+      const theirs = await service.createBoard(bob, {
+        name: 'Theirs',
+        visibility: 'logged-in-read',
+      });
+      const { boards } = await service.listBoards(alice, {
+        createdBy: 'user:default/alice',
+      });
+      expect(boards.map(board => board.id)).toEqual([mine.id]);
+      expect(
+        (await service.listBoards(alice, { createdBy: 'user:default/bob' }))
+          .boards,
+      ).toHaveLength(1);
+      expect(theirs.createdBy).toBe('user:default/bob');
+    });
+
+    it('combines filters with AND', async () => {
+      const wanted = await service.createBoard(alice, {
+        name: 'Payments board',
+        entityRefs: ['system:default/payments'],
+      });
+      await service.createBoard(alice, { name: 'Payments without entity' });
+      await service.createBoard(alice, {
+        name: 'Other',
+        entityRefs: ['system:default/payments'],
+      });
+      const { boards } = await service.listBoards(alice, {
+        search: 'payments',
+        entityRef: 'system:default/payments',
+      });
+      expect(boards.map(board => board.id)).toEqual([wanted.id]);
+    });
+
+    it('pages through the listing, reporting the total of matches', async () => {
+      const created = await seed(['A', 'B', 'C', 'D', 'E']);
+      const page = await service.listBoards(alice, { limit: 2, offset: 2 });
+      expect(page.boards.map(board => board.name)).toEqual(['C', 'D']);
+      expect(page).toMatchObject({ total: 5, limit: 2, offset: 2 });
+      expect(created).toHaveLength(5);
+    });
+
+    it('applies access before cutting the page', async () => {
+      // bob's private boards are interleaved by name with alice's
+      for (const name of ['A', 'C', 'E']) {
+        await service.createBoard(bob, { name });
+      }
+      for (const name of ['B', 'D', 'F']) {
+        await service.createBoard(alice, { name });
+      }
+      const page = await service.listBoards(alice, { limit: 2 });
+      expect(page.boards.map(board => board.name)).toEqual(['B', 'D']);
+      expect(page.total).toBe(3);
+    });
+
+    it('pages boards of equal name without repeating or skipping one', async () => {
+      await seed(['Same', 'Same', 'Same', 'Same']);
+      const first = await service.listBoards(alice, { limit: 2, offset: 0 });
+      const second = await service.listBoards(alice, { limit: 2, offset: 2 });
+      const ids = [...first.boards, ...second.boards].map(board => board.id);
+      expect(new Set(ids).size).toBe(4);
+    });
+
+    it('returns every match and no paging fields without a limit', async () => {
+      await seed(['A', 'B', 'C']);
+      const result = await service.listBoards(alice);
+      expect(result.boards).toHaveLength(3);
+      expect(result).toEqual({ boards: result.boards, total: 3 });
+    });
+
+    it('counts only the returned page when counts are requested', async () => {
+      const boards = await seed(['A', 'B']);
+      await service.createItem(alice, boards[0].id, {
+        columnId: (await service.getBoard(alice, boards[0].id)).columns[0].id,
+        title: 'One',
+      });
+      const page = await service.listBoards(alice, {
+        limit: 1,
+        withCounts: true,
+      });
+      expect(page.boards).toHaveLength(1);
+      expect(page.boards[0].statusCounts?.[0].count).toBe(1);
+    });
+
+    it('keeps favorites a filter of its own', async () => {
+      const [kept, other] = await seed(['Kept', 'Other']);
+      await service.setFavorite(alice, kept.id, true);
+      const { boards, total } = await service.listBoards(alice, {
+        favoritesOnly: true,
+      });
+      expect(boards.map(board => board.id)).toEqual([kept.id]);
+      expect(total).toBe(1);
+      expect(other.id).not.toBe(kept.id);
+    });
+  });
+
+  describe('board filter options', () => {
+    it('offers the entities and creators of the boards the caller can read', async () => {
+      await service.createBoard(alice, {
+        name: 'Mine',
+        entityRefs: ['system:default/payments'],
+      });
+      const shared = await service.createBoard(bob, {
+        name: 'Shared',
+        entityRefs: ['component:default/service-a'],
+        visibility: 'logged-in-read',
+      });
+
+      const options = await service.listFilterOptions(alice);
+      expect(options).toEqual({
+        total: 2,
+        entityRefs: ['component:default/service-a', 'system:default/payments'],
+        creators: ['user:default/alice', 'user:default/bob'],
+      });
+      expect(shared.createdBy).toBe('user:default/bob');
+    });
+
+    it('never discloses an inaccessible board, its entities, or its creator', async () => {
+      await service.createBoard(bob, {
+        name: 'Secret',
+        entityRefs: ['component:default/secret'],
+      });
+      await service.createBoard(alice, { name: 'Mine' });
+
+      const options = await service.listFilterOptions(alice);
+      expect(options.total).toBe(1);
+      expect(options.entityRefs).toEqual([]);
+      expect(options.creators).toEqual(['user:default/alice']);
+    });
+
+    it('drops an archived board from the options', async () => {
+      const gone = await service.createBoard(alice, {
+        name: 'Gone',
+        entityRefs: ['component:default/old'],
+      });
+      await service.createBoard(alice, {
+        name: 'Kept',
+        entityRefs: ['component:default/new'],
+      });
+      await service.deleteBoard(alice, gone.id);
+
+      const options = await service.listFilterOptions(alice);
+      expect(options).toEqual({
+        total: 1,
+        entityRefs: ['component:default/new'],
+        creators: ['user:default/alice'],
+      });
+    });
+
+    it('offers nothing to a caller with no readable boards', async () => {
+      await service.createBoard(bob, { name: 'Theirs' });
+      expect(await service.listFilterOptions(carol)).toEqual({
+        total: 0,
+        entityRefs: [],
+        creators: [],
+      });
     });
   });
 

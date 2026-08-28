@@ -101,11 +101,22 @@ describe('BoardsClient request handling', () => {
 });
 
 describe('BoardsClient board endpoints', () => {
-  it('unwraps and filters the board list', async () => {
-    const { client, calls } = setup(() => ({
-      json: async () => ({ boards: [{ id: 'board-1' }] }),
+  it('returns the board list page as it arrives', async () => {
+    const { client } = setup(() => ({
+      json: async () => ({ boards: [{ id: 'board-1' }], total: 3 }),
     }));
-    await expect(client.listBoards()).resolves.toEqual([{ id: 'board-1' }]);
+    await expect(client.listBoards()).resolves.toEqual({
+      boards: [{ id: 'board-1' }],
+      total: 3,
+    });
+  });
+
+  it('builds the board list query from its filters and paging', async () => {
+    const { client, calls } = setup(() => ({
+      json: async () => ({ boards: [], total: 0 }),
+    }));
+    await client.listBoards();
+    expect(calls[0].url).toBe('http://backstage/api/boards/boards');
 
     await client.listBoards({ favoritesOnly: true });
     expect(calls[1].url).toBe(
@@ -130,6 +141,37 @@ describe('BoardsClient board endpoints', () => {
 
     await client.listBoards({ withCounts: false });
     expect(calls[6].url).toBe('http://backstage/api/boards/boards');
+
+    await client.listBoards({ search: '  pay  ', createdBy: 'user:default/a' });
+    expect(calls[7].url).toBe(
+      'http://backstage/api/boards/boards?search=pay&createdBy=user%3Adefault%2Fa',
+    );
+
+    // a search of only whitespace is not a filter
+    await client.listBoards({ search: '   ' });
+    expect(calls[8].url).toBe('http://backstage/api/boards/boards');
+
+    // offset rides along with the limit, defaulting to the first page
+    await client.listBoards({ limit: 25 });
+    expect(calls[9].url).toBe(
+      'http://backstage/api/boards/boards?limit=25&offset=0',
+    );
+
+    await client.listBoards({ limit: 25, offset: 50 });
+    expect(calls[10].url).toBe(
+      'http://backstage/api/boards/boards?limit=25&offset=50',
+    );
+  });
+
+  it('reads the filter options off the facets endpoint', async () => {
+    const options = {
+      total: 2,
+      entityRefs: ['component:default/www'],
+      creators: ['user:default/alice'],
+    };
+    const { client, calls } = setup(() => ({ json: async () => options }));
+    await expect(client.listFilterOptions()).resolves.toEqual(options);
+    expect(calls[0].url).toBe('http://backstage/api/boards/boards/facets');
   });
 
   it('unwraps my items', async () => {

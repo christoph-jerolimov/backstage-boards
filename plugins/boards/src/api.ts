@@ -2,9 +2,11 @@ import { createApiRef, DiscoveryApi } from '@backstage/frontend-plugin-api';
 import {
   Board,
   BoardChangeEntry,
+  BoardFilterOptions,
+  BoardListFilter,
+  BoardListResult,
   BoardColumn,
   BoardItem,
-  BoardListEntry,
   BoardPermissionEntry,
   BoardPermissionLevel,
   BoardUpdate,
@@ -34,13 +36,22 @@ function errorPayloadMessage(payload: unknown): string | undefined {
   return typeof error.message === 'string' ? error.message : undefined;
 }
 
+/** The filters and paging one board listing request carries. */
+export interface BoardListQuery extends BoardListFilter {
+  /** Also return each board's per-column item counts. */
+  withCounts?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
 export interface BoardsApi {
-  listBoards(options?: {
-    favoritesOnly?: boolean;
-    entityRef?: string;
-    /** Also return each board's per-column item counts. */
-    withCounts?: boolean;
-  }): Promise<BoardListEntry[]>;
+  /**
+   * One page of the boards the user can read. Without a `limit` the
+   * whole listing comes back in one response.
+   */
+  listBoards(options?: BoardListQuery): Promise<BoardListResult>;
+  /** The options the board list's filter dropdowns offer. */
+  listFilterOptions(): Promise<BoardFilterOptions>;
   createBoard(options: {
     name: string;
     columns?: string[];
@@ -230,11 +241,7 @@ export class BoardsClient implements BoardsApi {
     return this.requestVoid(on ? 'PUT' : 'DELETE', path);
   }
 
-  async listBoards(options?: {
-    favoritesOnly?: boolean;
-    entityRef?: string;
-    withCounts?: boolean;
-  }): Promise<BoardListEntry[]> {
+  listBoards(options?: BoardListQuery): Promise<BoardListResult> {
     const params = new URLSearchParams();
     if (options?.favoritesOnly) {
       params.set('favorites', 'true');
@@ -245,8 +252,23 @@ export class BoardsClient implements BoardsApi {
     if (options?.withCounts) {
       params.set('counts', 'true');
     }
+    if (options?.search?.trim()) {
+      params.set('search', options.search.trim());
+    }
+    if (options?.createdBy) {
+      params.set('createdBy', options.createdBy);
+    }
+    if (options?.limit !== undefined) {
+      // offset only means anything alongside a limit
+      params.set('limit', String(options.limit));
+      params.set('offset', String(options.offset ?? 0));
+    }
     const query = params.toString() ? `?${params.toString()}` : '';
-    return this.requestList<BoardListEntry>(`/boards${query}`, 'boards');
+    return this.request('GET', `/boards${query}`);
+  }
+
+  listFilterOptions(): Promise<BoardFilterOptions> {
+    return this.request('GET', '/boards/facets');
   }
 
   listMyItems(): Promise<MyBoardItem[]> {

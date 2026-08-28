@@ -10,8 +10,8 @@ import {
   useBoardListQuery,
   useBoardQuery,
   useBoardsByEntityQuery,
+  useBoardsPageQuery,
   useBoardsQueries,
-  useBoardsQuery,
   useItemsQuery,
   useMoveItem,
   useRenameItem,
@@ -51,20 +51,57 @@ const items: BoardItem[] = [
 ];
 
 describe('query hooks', () => {
-  it('loads the board list', async () => {
-    const { boardsApi, wrapper } = setup({
-      listBoards: jest.fn().mockResolvedValue([{ id: 'board-1' }]),
+  it('loads one page of the board list, keyed by the whole request', async () => {
+    const { boardsApi, client, wrapper } = setup({
+      listBoards: jest
+        .fn()
+        .mockResolvedValue({ boards: [{ id: 'board-1' }], total: 3 }),
     });
-    const { result } = renderHook(() => useBoardsQuery(), { wrapper });
+    const query = { search: 'pay', limit: 25, offset: 0 };
+    const { result } = renderHook(() => useBoardsPageQuery(query), {
+      wrapper,
+    });
     await waitFor(() =>
-      expect(result.current.data).toEqual([{ id: 'board-1' }]),
+      expect(result.current.data).toEqual({
+        boards: [{ id: 'board-1' }],
+        total: 3,
+      }),
     );
-    expect(boardsApi.listBoards).toHaveBeenCalledWith();
+    expect(boardsApi.listBoards).toHaveBeenCalledWith(query);
+    expect(
+      client.getQueryData([...queryKeys.boardsPage, query] as const),
+    ).toBeDefined();
+
+    // a different page is a different cache entry, not a refetch of this one
+    const next = { ...query, offset: 25 };
+    renderHook(() => useBoardsPageQuery(next), { wrapper });
+    await waitFor(() =>
+      expect(boardsApi.listBoards).toHaveBeenCalledWith(next),
+    );
+    expect(client.getQueryCache().getAll()).toHaveLength(2);
+  });
+
+  it('invalidates the paged listing but not my items when a board changes', async () => {
+    const { client } = setup();
+    const query = { limit: 25, offset: 0 };
+    client.setQueryData([...queryKeys.boardsPage, query] as const, {
+      boards: [],
+      total: 0,
+    });
+    client.setQueryData(queryKeys.myItems, []);
+    await invalidateBoard(client, 'board-1');
+    expect(
+      client.getQueryState([...queryKeys.boardsPage, query] as const)
+        ?.isInvalidated,
+    ).toBe(true);
+    expect(client.getQueryState(queryKeys.myItems)?.isInvalidated).toBe(false);
   });
 
   it('caches each widget setting combination separately', async () => {
     const { boardsApi, client, wrapper } = setup({
-      listBoards: jest.fn().mockResolvedValue([{ id: 'board-1' }]),
+      listBoards: jest
+        .fn()
+        .mockResolvedValue({ boards: [{ id: 'board-1' }], total: 1 }),
     });
     const combinations = [
       { favoritesOnly: false, withCounts: false },
@@ -83,8 +120,9 @@ describe('query hooks', () => {
     expect(boardsApi.listBoards).toHaveBeenCalledTimes(combinations.length);
     for (const options of combinations) {
       expect(boardsApi.listBoards).toHaveBeenCalledWith(options);
+      // the cache holds the page; the hook unwraps it for the widget
       expect(client.getQueryData(['boards', 'list', options] as const)).toEqual(
-        [{ id: 'board-1' }],
+        { boards: [{ id: 'board-1' }], total: 1 },
       );
     }
   });
@@ -138,6 +176,7 @@ describe('invalidateBoard', () => {
       { queryKey: queryKeys.board('board-1') },
       { queryKey: queryKeys.items('board-1') },
       { queryKey: queryKeys.boards, exact: true },
+      { queryKey: queryKeys.boardsPage },
     ]);
   });
 });

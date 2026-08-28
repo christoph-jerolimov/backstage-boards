@@ -163,7 +163,7 @@ state updates immediately, so only the query key lags.
 **Pagination is a footer component shared by both tabs.**
 `TablePagination` renders "x–y of N boards", previous/next buttons
 disabled at the bounds, and a page-size `Select` (10 / 25 / 50, default
-25) in the 160px fixed-width wrapper the my-items group-by select uses.
+25) in a fixed-width wrapper, as the my-items group-by select sits in.
 It is built from BUI `Button`/`Text`/`Select`; if `@backstage/ui` turns
 out to export a pagination primitive, that is used instead — the
 component is the seam either way.

@@ -90,6 +90,50 @@ export interface BoardListEntry extends Board {
   statusCounts?: BoardStatusCount[];
 }
 
+/**
+ * The filters a board listing can be narrowed by. They combine with AND:
+ * a board is listed only if it satisfies every field that is set.
+ *
+ * `search` matches the board name case-insensitively; `entityRef` matches
+ * boards referencing that catalog entity; `createdBy` matches the board's
+ * creator ref exactly.
+ */
+export interface BoardListFilter {
+  search?: string;
+  entityRef?: string;
+  createdBy?: string;
+  favoritesOnly?: boolean;
+}
+
+/** The largest page a board listing will return. */
+export const MAX_BOARD_PAGE_SIZE = 100;
+
+/**
+ * One page of a board listing. `total` counts every board matching the
+ * request, not the page — so it is what a pagination control counts
+ * against. A listing requested without a `limit` returns every match and
+ * carries no `limit`/`offset`.
+ */
+export interface BoardListResult {
+  boards: BoardListEntry[];
+  total: number;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * The options offered by the board list's filter dropdowns, derived from
+ * the boards the caller can read and from nothing else: `entityRefs` are
+ * the entities those boards reference and `creators` the users who
+ * created them. `total` is how many boards the caller can read at all,
+ * independent of any filter they currently have applied.
+ */
+export interface BoardFilterOptions {
+  total: number;
+  entityRefs: string[];
+  creators: string[];
+}
+
 export interface BoardPermissionEntry {
   id: string;
   boardId: string;

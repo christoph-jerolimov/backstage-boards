@@ -14,7 +14,10 @@ import {
   COLUMN_COLORS,
   ColumnColor,
   BoardItem,
+  BoardFilterOptions,
   BoardListEntry,
+  BoardListFilter,
+  BoardListResult,
   BoardStatusCount,
   BoardPermissionEntry,
   BoardPermissionLevel,
@@ -50,12 +53,19 @@ import {
   ItemRow,
   PermissionRow,
 } from '../database/tables';
-import { BoardsPrincipal, actorRef, computeEffectiveLevel } from './access';
+import {
+  BoardsPrincipal,
+  actorRef,
+  computeEffectiveLevel,
+  visibleVisibilities,
+} from './access';
 
 const DEFAULT_COLUMNS = ['To do', 'In progress', 'Done'];
 
 /** One row of the grouped item count per board column. */
 type ColumnItemCount = { column_id: string; total: string | number };
+/** The single row a `count(*)` yields. */
+type TotalCount = { total: string | number };
 const POSITION_STEP = 1000;
 
 function now(): string {
@@ -71,6 +81,14 @@ function normalizeEntityRefs(refs: string[]): string[] {
     }
   }
   return result;
+}
+
+/**
+ * Escapes the LIKE wildcards in a search term, so a board named "100%"
+ * is found by searching for "100%" rather than by everything.
+ */
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, character => `\\${character}`);
 }
 
 function toBoard(row: BoardRow, entityRefs: string[]): Board {
@@ -224,6 +242,40 @@ export class BoardsService {
       principal,
       visibility: board.visibility,
       entries,
+    });
+  }
+
+  /**
+   * Every non-archived board the principal may see, as a query to build
+   * on. The listing's filtering, ordering, paging, counting and filter
+   * options all start from this one builder, so they cannot disagree
+   * about which boards are the caller's.
+   *
+   * The visibility half of the predicate comes from
+   * {@link visibleVisibilities}, which is derived from the same
+   * `visibilityLevel` the effective level uses; the grant half mirrors
+   * `computeEffectiveLevel` and is pinned to it by a test. Service
+   * principals see everything, as they do there.
+   */
+  private visibleBoards(principal: BoardsPrincipal) {
+    const query = this.knex('boards').whereNull('archived_at');
+    if (principal.type === 'service') {
+      return query;
+    }
+    const refs =
+      principal.type === 'user'
+        ? [principal.userRef, ...principal.ownershipRefs]
+        : [];
+    return query.where(builder => {
+      builder.whereIn('visibility', visibleVisibilities(principal));
+      if (refs.length > 0) {
+        builder.orWhereExists(function grantMatch() {
+          this.select('*')
+            .from('board_permissions')
+            .whereRaw('board_permissions.board_id = boards.id')
+            .whereIn('board_permissions.principal_ref', refs);
+        });
+      }
     });
   }
 
@@ -429,17 +481,21 @@ export class BoardsService {
     return !!row;
   }
 
-  async listBoards(
-    principal: BoardsPrincipal,
-    options?: {
-      favoritesOnly?: boolean;
-      entityRef?: string;
-      withCounts?: boolean;
-    },
-  ): Promise<BoardListEntry[]> {
-    const query = this.knex('boards').whereNull('archived_at').orderBy('name');
-    if (options?.entityRef) {
-      const entityRef = options.entityRef;
+  /**
+   * The caller's boards narrowed by a filter. Every filter is a SQL
+   * predicate rather than a pass over loaded rows, so the page, the
+   * total and the filter options are all computed over the same set.
+   */
+  private filteredBoards(principal: BoardsPrincipal, filter?: BoardListFilter) {
+    const query = this.visibleBoards(principal);
+    const search = filter?.search?.trim();
+    if (search) {
+      query.whereRaw(`lower(name) like ? escape '\\'`, [
+        `%${escapeLike(search.toLocaleLowerCase('en-US'))}%`,
+      ]);
+    }
+    if (filter?.entityRef) {
+      const entityRef = filter.entityRef;
       query.whereExists(function entityMatch() {
         this.select('*')
           .from('board_entities')
@@ -447,45 +503,173 @@ export class BoardsService {
           .where('board_entities.entity_ref', entityRef);
       });
     }
-    const rows = await query;
-    const refsByBoard = await this.entityRefsByBoard(rows.map(row => row.id));
-    const userRef = principal.type === 'user' ? principal.userRef : undefined;
-    const favoriteIds = new Set<string>(
-      userRef
-        ? (
-            await this.knex('favorites')
-              .where('user_ref', userRef)
-              .select('board_id')
-          ).map(row => row.board_id)
-        : [],
-    );
+    if (filter?.createdBy) {
+      query.where('created_by', filter.createdBy);
+    }
+    if (filter?.favoritesOnly) {
+      // favorites are per-user; nobody else has any
+      const userRef = principal.type === 'user' ? principal.userRef : undefined;
+      if (userRef) {
+        query.whereExists(function favoriteMatch() {
+          this.select('*')
+            .from('favorites')
+            .whereRaw('favorites.board_id = boards.id')
+            .where('favorites.user_ref', userRef);
+        });
+      } else {
+        query.whereRaw('1 = 0');
+      }
+    }
+    return query;
+  }
 
-    const result: BoardListEntry[] = [];
+  async listBoards(
+    principal: BoardsPrincipal,
+    options?: BoardListFilter & {
+      withCounts?: boolean;
+      limit?: number;
+      offset?: number;
+    },
+  ): Promise<BoardListResult> {
+    // a second builder rather than a clone: both start from the same
+    // private predicate, so they cannot describe different sets
+    const countRows = (await this.filteredBoards(principal, options).count({
+      total: '*',
+    })) as unknown as TotalCount[];
+    const total = Number(countRows[0]?.total ?? 0);
+
+    // id breaks the tie so two boards of the same name cannot swap
+    // places between two page requests
+    const query = this.filteredBoards(principal, options).orderBy([
+      { column: 'name' },
+      { column: 'id' },
+    ]);
+    if (options?.limit !== undefined) {
+      query.limit(options.limit).offset(options.offset ?? 0);
+    }
+    const rows = await query;
+    const ids = rows.map(row => row.id);
+
+    // three independent lookups over the same page of ids
+    const [refsByBoard, entriesByBoard, favoriteIds] = await Promise.all([
+      this.entityRefsByBoard(ids),
+      this.permissionEntriesByBoard(ids),
+      this.favoriteIds(principal, ids),
+    ]);
+
+    const boards: BoardListEntry[] = [];
     for (const row of rows) {
-      const level = await this.effectiveLevel(principal, row);
+      const level = computeEffectiveLevel({
+        principal,
+        visibility: row.visibility,
+        entries: entriesByBoard.get(row.id) ?? [],
+      });
       if (!level) {
+        // the query applied the same rule, so this is unreachable unless
+        // the two have drifted apart — which a test asserts they have not
         continue;
       }
-      if (options?.favoritesOnly && !favoriteIds.has(row.id)) {
-        continue;
-      }
-      result.push({
+      boards.push({
         ...toBoard(row, refsByBoard.get(row.id) ?? []),
         access: level,
         favorite: favoriteIds.has(row.id),
       });
     }
+
     if (options?.withCounts) {
-      // Counted only over the boards that survived the access filter
-      // above, so a board the caller cannot read contributes nothing.
+      // counted over the returned page alone: a board the caller cannot
+      // read, or one on another page, contributes nothing
       const countsByBoard = await this.statusCountsByBoard(
-        result.map(entry => entry.id),
+        boards.map(entry => entry.id),
       );
-      for (const entry of result) {
+      for (const entry of boards) {
         entry.statusCounts = countsByBoard.get(entry.id) ?? [];
       }
     }
-    return result;
+
+    return {
+      boards,
+      total,
+      ...(options?.limit === undefined
+        ? {}
+        : { limit: options.limit, offset: options.offset ?? 0 }),
+    };
+  }
+
+  /**
+   * The options the board list's filter dropdowns offer: the entities
+   * referenced by the caller's boards and the users who created them,
+   * and nothing else. Derived from the caller's whole readable set
+   * rather than from a filtered one, so a selection can always be
+   * widened again.
+   */
+  async listFilterOptions(
+    principal: BoardsPrincipal,
+  ): Promise<BoardFilterOptions> {
+    const ids = (await this.visibleBoards(principal).select('id')).map(
+      row => row.id,
+    );
+    if (ids.length === 0) {
+      return { total: 0, entityRefs: [], creators: [] };
+    }
+    const entityRows = await this.knex('board_entities')
+      .whereIn('board_id', ids)
+      .distinct('entity_ref')
+      .orderBy('entity_ref');
+    const creatorRows = await this.knex('boards')
+      .whereIn('id', ids)
+      .distinct('created_by')
+      .orderBy('created_by');
+    return {
+      total: ids.length,
+      entityRefs: entityRows.map(row => row.entity_ref),
+      creators: creatorRows.map(row => row.created_by),
+    };
+  }
+
+  /**
+   * Batch-loads the permission entries of a set of boards, in the shape
+   * {@link computeEffectiveLevel} takes. One query for a whole page,
+   * where the single-board paths load one board's rows at a time.
+   */
+  private async permissionEntriesByBoard(
+    boardIds: string[],
+  ): Promise<
+    Map<string, Array<{ principalRef: string; level: BoardPermissionLevel }>>
+  > {
+    const map = new Map<
+      string,
+      Array<{ principalRef: string; level: BoardPermissionLevel }>
+    >();
+    if (boardIds.length === 0) {
+      return map;
+    }
+    const rows = await this.knex('board_permissions').whereIn(
+      'board_id',
+      boardIds,
+    );
+    for (const row of rows) {
+      map.set(row.board_id, [
+        ...(map.get(row.board_id) ?? []),
+        { principalRef: row.principal_ref, level: row.level },
+      ]);
+    }
+    return map;
+  }
+
+  /** Which of the given boards the principal has favorited. */
+  private async favoriteIds(
+    principal: BoardsPrincipal,
+    boardIds: string[],
+  ): Promise<Set<string>> {
+    if (principal.type !== 'user' || boardIds.length === 0) {
+      return new Set();
+    }
+    const rows = await this.knex('favorites')
+      .where('user_ref', principal.userRef)
+      .whereIn('board_id', boardIds)
+      .select('board_id');
+    return new Set(rows.map(row => row.board_id));
   }
 
   /**
