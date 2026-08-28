@@ -297,6 +297,51 @@ export async function createRouter(
     res.status(204).end();
   });
 
+  // ---- priorities
+
+  router.post('/boards/:boardId/priorities', async (req, res) => {
+    const principal = await principalOf(req);
+    res.status(201).json(
+      await service.addPriority(principal, req.params.boardId, {
+        name: req.body.name,
+        color: req.body.color,
+      }),
+    );
+  });
+
+  router.patch('/boards/:boardId/priorities/:priorityId', async (req, res) => {
+    const principal = await principalOf(req);
+    res.json(
+      await service.updatePriority(
+        principal,
+        req.params.boardId,
+        req.params.priorityId,
+        {
+          name: req.body.name,
+          color: req.body.color,
+          order: req.body.order,
+        },
+      ),
+    );
+  });
+
+  router.delete('/boards/:boardId/priorities/:priorityId', async (req, res) => {
+    const principal = await principalOf(req);
+    await service.deletePriority(
+      principal,
+      req.params.boardId,
+      req.params.priorityId,
+      {
+        reassignTo:
+          typeof req.query.reassignTo === 'string'
+            ? req.query.reassignTo
+            : undefined,
+        drop: req.query.drop === 'true',
+      },
+    );
+    res.status(204).end();
+  });
+
   // ---- items
 
   router.get('/boards/:boardId/items', async (req, res) => {
@@ -314,6 +359,7 @@ export async function createRouter(
         text: typeof req.query.text === 'string' ? req.query.text : undefined,
         tags: asArray(req.query.tag),
         assignees: asArray(req.query.assignee),
+        priorities: asArray(req.query.priority),
       }),
     });
   });
@@ -349,6 +395,7 @@ export async function createRouter(
         creatorRef: req.body.creatorRef,
         assignees: req.body.assignees,
         tags: req.body.tags,
+        priorityId: req.body.priorityId,
         externalManager: req.body.externalManager,
       }),
     );
@@ -375,6 +422,7 @@ export async function createRouter(
           assignees: req.body.assignees,
           tags: req.body.tags,
           dueDate: req.body.dueDate,
+          priorityId: req.body.priorityId,
         },
       ),
     );

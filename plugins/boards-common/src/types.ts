@@ -49,6 +49,23 @@ export const COLUMN_COLORS: Record<ColumnColor, string> = {
   teal: '#14b8a6',
 };
 
+/**
+ * One of a board's priority definitions. Items reference a priority by
+ * id, so renaming or recoloring never touches items.
+ */
+export interface BoardPriority {
+  id: string;
+  boardId: string;
+  name: string;
+  /** Named palette color (see COLUMN_COLORS); undefined = neutral. */
+  color?: ColumnColor;
+  /** 1-based order; 1 is the highest priority. Always contiguous. */
+  order: number;
+}
+
+/** A board can define at most this many priorities. */
+export const MAX_PRIORITIES = 10;
+
 export interface Board {
   id: string;
   name: string;
@@ -66,6 +83,8 @@ export interface Board {
 /** A board as returned to a specific user, with per-user context. */
 export interface BoardWithContext extends Board {
   columns: BoardColumn[];
+  /** Priority definitions ordered by `order`; empty = feature unused. */
+  priorities: BoardPriority[];
   access: BoardPermissionLevel;
   favorite: boolean;
   watching: boolean;
@@ -122,6 +141,8 @@ export interface BoardItem {
   tags: string[];
   /** Optional due date as a plain `YYYY-MM-DD` calendar date. */
   dueDate?: string;
+  /** Id of one of the board's priorities, when set. */
+  priorityId?: string;
   watching?: boolean;
 }
 
@@ -180,6 +201,8 @@ export interface MyBoardItem {
   boardId: string;
   boardName: string;
   columnTitle: string;
+  /** The item's priority resolved against its board, when set. */
+  priority?: BoardPriority;
 }
 
 export interface NewItem {
@@ -189,6 +212,7 @@ export interface NewItem {
   creatorRef?: string;
   assignees?: string[];
   tags?: string[];
+  priorityId?: string;
   externalManager?: string;
 }
 
@@ -201,6 +225,8 @@ export interface ItemUpdate {
   tags?: string[];
   /** New due date as `YYYY-MM-DD`, or null to clear it. */
   dueDate?: string | null;
+  /** Id of one of the board's priorities, or null to clear it. */
+  priorityId?: string | null;
 }
 
 export interface BoardUpdate {

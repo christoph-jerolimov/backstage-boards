@@ -9,6 +9,7 @@ import {
   testBoardsApi,
   testColumn,
   testItem,
+  testPriorities,
 } from './__testUtils__/testHelpers';
 
 const catalogApi = {
@@ -48,7 +49,11 @@ const timeline = [
 ];
 
 function renderDrawer(
-  over: { item?: ReturnType<typeof testItem>; canWrite?: boolean } = {},
+  over: {
+    item?: ReturnType<typeof testItem>;
+    canWrite?: boolean;
+    priorities?: ReturnType<typeof testPriorities>;
+  } = {},
 ) {
   const boardsApi = testBoardsApi({
     getTimeline: jest.fn().mockResolvedValue(timeline),
@@ -57,7 +62,7 @@ function renderDrawer(
   const onChanged = jest.fn().mockResolvedValue(undefined);
   renderWithProviders(
     <ItemDrawer
-      board={board}
+      board={{ ...board, priorities: over.priorities ?? [] }}
       item={over.item ?? testItem({ title: 'Ship the docs' })}
       canWrite={over.canWrite ?? true}
       tagSuggestions={['docs']}
@@ -119,6 +124,34 @@ describe('ItemDrawer', () => {
     await userEvent.click(await screen.findByRole('option', { name: 'Done' }));
     expect(boardsApi.moveItem).toHaveBeenCalledWith('board-1', 'item-1', {
       columnId: 'column-2',
+    });
+  });
+
+  it('offers no priority field on a board without priorities', () => {
+    renderDrawer();
+    expect(
+      screen.queryByRole('button', { name: /Priority/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('sets the priority from the drawer', async () => {
+    const { boardsApi } = renderDrawer({ priorities: testPriorities() });
+    await userEvent.click(screen.getByRole('button', { name: /Priority/ }));
+    await userEvent.click(await screen.findByRole('option', { name: 'high' }));
+    expect(boardsApi.updateItem).toHaveBeenCalledWith('board-1', 'item-1', {
+      priorityId: 'priority-2',
+    });
+  });
+
+  it('clears the priority via the None option', async () => {
+    const { boardsApi } = renderDrawer({
+      item: testItem({ priorityId: 'priority-2' }),
+      priorities: testPriorities(),
+    });
+    await userEvent.click(screen.getByRole('button', { name: /Priority/ }));
+    await userEvent.click(await screen.findByRole('option', { name: 'None' }));
+    expect(boardsApi.updateItem).toHaveBeenCalledWith('board-1', 'item-1', {
+      priorityId: null,
     });
   });
 

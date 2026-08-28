@@ -45,6 +45,7 @@ function board(id: string, name: string) {
     visibility: 'private',
     entityRefs: ['component:default/www'],
     columns: [testColumn({ id: `${id}-column`, title: 'Todo' })],
+    priorities: [],
   };
 }
 

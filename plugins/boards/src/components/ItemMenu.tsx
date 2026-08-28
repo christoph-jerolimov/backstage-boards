@@ -4,6 +4,7 @@ import { useApi, identityApiRef } from '@backstage/frontend-plugin-api';
 import {
   BoardColumn,
   BoardItem,
+  BoardPriority,
   fridayISO,
   isTextRef,
   refDisplayName,
@@ -28,6 +29,7 @@ export interface ItemActions {
   ) => Promise<void>;
   setItemDueDate: (itemId: string, dueDate: string | null) => Promise<void>;
   setAssignees: (itemId: string, assignees: string[]) => Promise<void>;
+  setItemPriority: (itemId: string, priorityId: string | null) => Promise<void>;
   deleteItem: (itemId: string) => Promise<void>;
 }
 
@@ -38,6 +40,8 @@ export interface ItemActions {
 export function ItemMenu(props: {
   item: BoardItem;
   columns: BoardColumn[];
+  /** The item's board's priorities; empty hides the priority submenu. */
+  priorities: BoardPriority[];
   readonly: boolean;
   actions: ItemActions;
   /** Assignees seen on the board's items, offered for quick assign. */
@@ -45,7 +49,15 @@ export function ItemMenu(props: {
   /** Extra entries for one surface only, rendered after "Open details". */
   extraItems?: ReactNode;
 }) {
-  const { item, columns, readonly, actions, assigneePool, extraItems } = props;
+  const {
+    item,
+    columns,
+    priorities,
+    readonly,
+    actions,
+    assigneePool,
+    extraItems,
+  } = props;
   const identityApi = useApi(identityApiRef);
   const { data: identity } = useQuery({
     queryKey: queryKeys.identity,
@@ -118,6 +130,33 @@ export function ItemMenu(props: {
                 onAction={() => actions.setItemDueDate(item.id, null)}
               >
                 Remove due date
+              </MenuItem>
+            )}
+          </Menu>
+        </SubmenuTrigger>
+      )}
+      {!readonly && priorities.length > 0 && (
+        <SubmenuTrigger>
+          <MenuItem>Priority</MenuItem>
+          <Menu>
+            {[...priorities]
+              .sort((a, b) => a.order - b.order)
+              .map(priority => (
+                <MenuItem
+                  key={priority.id}
+                  onAction={() => actions.setItemPriority(item.id, priority.id)}
+                >
+                  {item.priorityId === priority.id
+                    ? `✓ ${priority.name}`
+                    : priority.name}
+                </MenuItem>
+              ))}
+            {item.priorityId && (
+              <MenuItem
+                color="danger"
+                onAction={() => actions.setItemPriority(item.id, null)}
+              >
+                Remove priority
               </MenuItem>
             )}
           </Menu>

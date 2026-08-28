@@ -28,7 +28,7 @@ import {
 import { Timeline } from './ItemTimeline';
 import { TagsEditor } from './TagsEditor';
 import { InlineEdit } from './common';
-import { StatusBadge } from './StatusBadge';
+import { PriorityChip, StatusBadge } from './StatusBadge';
 
 export function ItemDrawer(props: {
   board: BoardWithContext;
@@ -172,6 +172,11 @@ export function ItemDrawer(props: {
             <StatusBadge
               column={board.columns.find(column => column.id === item.columnId)}
             />
+            <PriorityChip
+              priority={board.priorities.find(
+                priority => priority.id === item.priorityId,
+              )}
+            />
           </Flex>
           <Select
             label="Status"
@@ -190,6 +195,29 @@ export function ItemDrawer(props: {
               }
             }}
           />
+
+          {board.priorities.length > 0 && (
+            <Select
+              label="Priority"
+              isDisabled={readonly}
+              options={[
+                { value: 'none', label: 'None' },
+                ...[...board.priorities]
+                  .sort((a, b) => a.order - b.order)
+                  .map(priority => ({
+                    value: priority.id,
+                    label: priority.name,
+                  })),
+              ]}
+              selectedKey={item.priorityId ?? 'none'}
+              onSelectionChange={async key => {
+                const next = key && String(key) !== 'none' ? String(key) : null;
+                if ((next ?? 'none') !== (item.priorityId ?? 'none')) {
+                  await patchItem({ priorityId: next });
+                }
+              }}
+            />
+          )}
 
           <DueDateField
             dueDate={item.dueDate}

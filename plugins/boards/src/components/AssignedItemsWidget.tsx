@@ -6,6 +6,7 @@ import { useBoardsSignal, useMyItemsQuery } from '../queries';
 import { useBoardsBasePath } from '../routes';
 import { AsyncList, ErrorText } from './common';
 import { DueDateBadge, formatDueDate } from './DueDate';
+import { PriorityChip } from './StatusBadge';
 import {
   filterDueEntries,
   groupMyItems,
@@ -88,6 +89,7 @@ function ItemRow(props: {
       <Flex align="center" gap="2">
         <Text variant="body-small">{entry.item.title}</Text>
         {showStatus && <Badge size="small">{entry.columnTitle}</Badge>}
+        <PriorityChip priority={entry.priority} size="small" />
         <DueDateBadge dueDate={entry.item.dueDate} />
       </Flex>
     </Button>

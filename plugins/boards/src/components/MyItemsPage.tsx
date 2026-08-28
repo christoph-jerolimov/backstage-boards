@@ -45,7 +45,7 @@ import { ItemActions, ItemMenu } from './ItemMenu';
 import { useRowMenu } from './RowMenu';
 import { AsyncList, ErrorText, selectedOption } from './common';
 import { ItemFilterBar, useItemFilter } from './ItemFilterBar';
-import { StatusBadge } from './StatusBadge';
+import { PriorityChip, StatusBadge } from './StatusBadge';
 import { useAsyncAction } from './useAsyncAction';
 
 /** How the my-items group-by menu reads, in {@link MY_ITEMS_PAGE_GROUP_BY} order. */
@@ -70,10 +70,20 @@ function MyItemsTable(props: {
   pool: string[];
   basePath: string;
   showBoardColumn: boolean;
+  /** Render the priority column; on when any listed item has one. */
+  showPriority: boolean;
   onError: (message?: string) => void;
 }) {
-  const { label, entries, boards, pool, basePath, showBoardColumn, onError } =
-    props;
+  const {
+    label,
+    entries,
+    boards,
+    pool,
+    basePath,
+    showBoardColumn,
+    showPriority,
+    onError,
+  } = props;
   const navigate = useNavigate();
   const boardsApi = useApi(boardsApiRef);
   const queryClient = useQueryClient();
@@ -109,6 +119,10 @@ function MyItemsTable(props: {
       guarded(boardId, () =>
         boardsApi.updateItem(boardId, itemId, { assignees }),
       ),
+    setItemPriority: (itemId, priorityId) =>
+      guarded(boardId, () =>
+        boardsApi.updateItem(boardId, itemId, { priorityId }),
+      ),
     deleteItem: itemId =>
       guarded(boardId, () => boardsApi.deleteItem(boardId, itemId)),
   });
@@ -119,6 +133,7 @@ function MyItemsTable(props: {
       <ItemMenu
         item={entry.item}
         columns={boards.get(entry.boardId)?.columns ?? []}
+        priorities={boards.get(entry.boardId)?.priorities ?? []}
         readonly={!canWrite(entry) || !!entry.item.externalManager}
         actions={actionsOf(entry.boardId)}
         assigneePool={pool}
@@ -149,6 +164,7 @@ function MyItemsTable(props: {
           {showBoardColumn ? <Column>Board</Column> : null}
           <Column isRowHeader>Item</Column>
           <Column>Status</Column>
+          {showPriority ? <Column>Priority</Column> : null}
           <Column>Due</Column>
           <Column>Tags</Column>
           <Column>Actions</Column>
@@ -183,6 +199,11 @@ function MyItemsTable(props: {
                   <Badge size="small">{entry.columnTitle}</Badge>
                 )}
               </Cell>
+              {showPriority ? (
+                <Cell>
+                  <PriorityChip priority={entry.priority} />
+                </Cell>
+              ) : null}
               <Cell>
                 <DueDateBadge dueDate={entry.item.dueDate} />
               </Cell>
@@ -287,6 +308,8 @@ export function MyItemsList() {
     () => groupMyItems(filtered, groupBy),
     [filtered, groupBy],
   );
+  // one decision for the whole listing, so every group shows the same columns
+  const showPriority = filtered.some(entry => entry.priority);
 
   return (
     <Flex direction="column" gap="4">
@@ -351,6 +374,7 @@ export function MyItemsList() {
                 pool={pool}
                 basePath={basePath}
                 showBoardColumn={groupBy !== 'board'}
+                showPriority={showPriority}
                 onError={setActionError}
               />
             </div>

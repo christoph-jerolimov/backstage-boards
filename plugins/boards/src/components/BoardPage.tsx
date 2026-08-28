@@ -55,7 +55,7 @@ export function BoardPageContent(props: {
     boardId,
     openItem,
   );
-  const filter = useItemFilter(items ?? []);
+  const filter = useItemFilter(items ?? [], board?.priorities);
 
   useBoardsSignal(() => invalidateBoard(queryClient, boardId), { boardId });
 
@@ -135,6 +135,7 @@ export function BoardPageContent(props: {
 
       <BoardDialogs
         board={board}
+        items={filter.filteredItems}
         canWrite={canWrite}
         archived={archived}
         open={dialog}

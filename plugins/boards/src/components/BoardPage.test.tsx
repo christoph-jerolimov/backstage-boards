@@ -10,6 +10,7 @@ import {
   testBoardsApi,
   testColumn,
   testItem,
+  testPriorities,
 } from './__testUtils__/testHelpers';
 
 const identityApi = {
@@ -37,6 +38,7 @@ const board = {
     testColumn({ id: 'column-1', title: 'Todo' }),
     testColumn({ id: 'column-2', title: 'Done', position: 2000 }),
   ],
+  priorities: [],
 };
 
 const items = [
@@ -403,6 +405,25 @@ describe('BoardPage actions menu', () => {
     expect(
       screen.getAllByRole('menuitem').map(entry => entry.textContent),
     ).toEqual(['Recent changes…', 'Archived items…', 'Duplicate board…']);
+  });
+
+  it('offers the priority matrix only on boards with priorities', async () => {
+    renderBoard({ board: { priorities: testPriorities() } });
+    await openBoardMenu();
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: 'Priority matrix…' }),
+    );
+    expect(
+      await screen.findByRole('table', { name: 'Priority matrix' }),
+    ).toBeInTheDocument();
+  });
+
+  it('offers no matrix entry without priorities', async () => {
+    renderBoard();
+    await openBoardMenu();
+    expect(
+      screen.queryByRole('menuitem', { name: 'Priority matrix…' }),
+    ).not.toBeInTheDocument();
   });
 
   it('opens the recent changes dialog', async () => {

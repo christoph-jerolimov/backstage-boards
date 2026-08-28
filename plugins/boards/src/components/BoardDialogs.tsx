@@ -9,6 +9,7 @@ import {
   Text,
 } from '@backstage/ui';
 import {
+  BoardItem,
   BoardWithContext,
   RETENTION_DAYS,
 } from '@internal/plugin-boards-common';
@@ -16,6 +17,7 @@ import { boardsApiRef } from '../api';
 import { ArchivedItemsDialog } from './ArchivedItemsDialog';
 import { BoardSettingsDialog } from './BoardSettingsDialog';
 import { DuplicateBoardDialog } from './DuplicateBoardDialog';
+import { PriorityMatrixDialog } from './PriorityMatrixDialog';
 import { RecentChangesDialog } from './RecentChangesDialog';
 import { ShareDialog } from './ShareDialog';
 
@@ -26,6 +28,7 @@ export type BoardDialogKind =
   | 'changes'
   | 'archived'
   | 'duplicate'
+  | 'matrix'
   | 'delete';
 
 /**
@@ -34,6 +37,8 @@ export type BoardDialogKind =
  */
 export function BoardDialogs(props: {
   board: BoardWithContext;
+  /** The board's items after the active filters, for the matrix. */
+  items: BoardItem[];
   canWrite: boolean;
   /** Archived boards are deleted for good instead of being archived. */
   archived: boolean;
@@ -44,7 +49,7 @@ export function BoardDialogs(props: {
   /** Runs after the board itself was deleted. */
   onDeleted: () => Promise<void> | void;
 }) {
-  const { board, canWrite, archived, open, onClose, onChanged } = props;
+  const { board, items, canWrite, archived, open, onClose, onChanged } = props;
   const boardsApi = useApi(boardsApiRef);
   // BUI dialogs report their own close; every kind closes the same way
   const openChange = (isOpen: boolean) => {
@@ -85,6 +90,13 @@ export function BoardDialogs(props: {
       <DuplicateBoardDialog
         board={board}
         isOpen={open === 'duplicate'}
+        onOpenChange={openChange}
+      />
+
+      <PriorityMatrixDialog
+        board={board}
+        items={items}
+        isOpen={open === 'matrix'}
         onOpenChange={openChange}
       />
 
