@@ -103,6 +103,46 @@ export async function invalidateMyItems(client: QueryClient): Promise<void> {
 }
 
 /**
+ * Shared machinery for the optimistic item mutations below: the item is
+ * patched in the cache immediately, a server rejection rolls the cache
+ * back and surfaces the error.
+ */
+function useOptimisticItemMutation<TInput extends { itemId: string }>(
+  boardId: string,
+  onError: (message: string) => void,
+  options: {
+    mutationFn: (input: TInput) => Promise<unknown>;
+    /** The optimistic change applied to the item being mutated. */
+    patch: (item: BoardItem, input: TInput) => BoardItem;
+  },
+) {
+  const client = useQueryClient();
+  const queryKey = queryKeys.items(boardId);
+  return useMutation({
+    mutationFn: options.mutationFn,
+    onMutate: async (input: TInput) => {
+      await client.cancelQueries({ queryKey });
+      const previous = client.getQueryData<BoardItem[]>(queryKey);
+      client.setQueryData<BoardItem[]>(queryKey, items =>
+        (items ?? []).map(item =>
+          item.id === input.itemId ? options.patch(item, input) : item,
+        ),
+      );
+      return { previous };
+    },
+    onError: (error, _input, context) => {
+      if (context?.previous) {
+        client.setQueryData(queryKey, context.previous);
+      }
+      onError((error as Error).message);
+    },
+    onSettled: () => {
+      client.invalidateQueries({ queryKey });
+    },
+  });
+}
+
+/**
  * Optimistic item move: the card lands in the target column immediately;
  * a server rejection rolls the cache back.
  */
@@ -111,44 +151,21 @@ export function useMoveItem(
   onError: (message: string) => void,
 ) {
   const boardsApi = useApi(boardsApiRef);
-  const client = useQueryClient();
-  return useMutation({
-    mutationFn: (input: {
-      itemId: string;
-      columnId: string;
-      position?: number;
-    }) =>
+  return useOptimisticItemMutation<{
+    itemId: string;
+    columnId: string;
+    position?: number;
+  }>(boardId, onError, {
+    mutationFn: input =>
       boardsApi.moveItem(boardId, input.itemId, {
         columnId: input.columnId,
         position: input.position,
       }),
-    onMutate: async input => {
-      await client.cancelQueries({ queryKey: queryKeys.items(boardId) });
-      const previous = client.getQueryData<BoardItem[]>(
-        queryKeys.items(boardId),
-      );
-      client.setQueryData<BoardItem[]>(queryKeys.items(boardId), items =>
-        (items ?? []).map(item =>
-          item.id === input.itemId
-            ? {
-                ...item,
-                columnId: input.columnId,
-                position: input.position ?? item.position,
-              }
-            : item,
-        ),
-      );
-      return { previous };
-    },
-    onError: (error, _input, context) => {
-      if (context?.previous) {
-        client.setQueryData(queryKeys.items(boardId), context.previous);
-      }
-      onError((error as Error).message);
-    },
-    onSettled: () => {
-      client.invalidateQueries({ queryKey: queryKeys.items(boardId) });
-    },
+    patch: (item, input) => ({
+      ...item,
+      columnId: input.columnId,
+      position: input.position ?? item.position,
+    }),
   });
 }
 
@@ -158,30 +175,13 @@ export function useRenameItem(
   onError: (message: string) => void,
 ) {
   const boardsApi = useApi(boardsApiRef);
-  const client = useQueryClient();
-  return useMutation({
-    mutationFn: (input: { itemId: string; title: string }) =>
-      boardsApi.updateItem(boardId, input.itemId, { title: input.title }),
-    onMutate: async input => {
-      await client.cancelQueries({ queryKey: queryKeys.items(boardId) });
-      const previous = client.getQueryData<BoardItem[]>(
-        queryKeys.items(boardId),
-      );
-      client.setQueryData<BoardItem[]>(queryKeys.items(boardId), items =>
-        (items ?? []).map(item =>
-          item.id === input.itemId ? { ...item, title: input.title } : item,
-        ),
-      );
-      return { previous };
+  return useOptimisticItemMutation<{ itemId: string; title: string }>(
+    boardId,
+    onError,
+    {
+      mutationFn: input =>
+        boardsApi.updateItem(boardId, input.itemId, { title: input.title }),
+      patch: (item, input) => ({ ...item, title: input.title }),
     },
-    onError: (error, _input, context) => {
-      if (context?.previous) {
-        client.setQueryData(queryKeys.items(boardId), context.previous);
-      }
-      onError((error as Error).message);
-    },
-    onSettled: () => {
-      client.invalidateQueries({ queryKey: queryKeys.items(boardId) });
-    },
-  });
+  );
 }
