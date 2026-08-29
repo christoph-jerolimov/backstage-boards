@@ -63,7 +63,9 @@ describe('ItemDrawerHost', () => {
   });
 
   it('shows the listing snapshot until the board’s items arrive', async () => {
-    renderHost({ listItems: jest.fn((_boardId: string) => new Promise(() => {})) });
+    renderHost({
+      listItems: jest.fn((_boardId: string) => new Promise(() => {})),
+    });
     expect(
       await screen.findByRole('dialog', { name: 'Item Snapshot title' }),
     ).toBeInTheDocument();
