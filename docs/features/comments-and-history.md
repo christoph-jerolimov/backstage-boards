@@ -6,13 +6,22 @@ block of the [item details drawer](item-details.md).
 
 ## Comments
 
-Anyone with write access can comment. Comments support a markdown subset,
-and two kinds of references are linked automatically:
+Anyone with write access can comment. Comments support a markdown subset —
+bold, italics, inline code, code blocks, links, lists, headings (`#` through
+`######`), and GitHub-style pipe tables (a header row, a `| --- |` separator
+row, and body rows). Table cells render the inline formatting and links too.
+Raw HTML is never rendered.
+
+Two kinds of references are linked automatically:
 
 - **Catalog entity refs** — writing a ref like `system:default/example`
   turns it into a link to that entity's catalog page.
-- **Mentions** — `@`-mentioning a user renders as a link to their catalog
-  page and [notifies them](watching-and-notifications.md).
+- **Mentions** — `@`-mentioning renders as a link to the catalog page.
+  Mentions accept the `@jane` shorthand (a user in the default namespace)
+  and full entity refs of any kind, such as `@group:default/team-a` or
+  `@component:webserver-example`. Mentioned users and groups are also
+  [notified](watching-and-notifications.md); mentions of other entity
+  kinds just link.
 
 Comments are editable by their author. Every edit keeps the previous text as
 a version, and the comment's history can be inspected — nothing is silently

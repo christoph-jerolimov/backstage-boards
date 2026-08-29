@@ -22,9 +22,11 @@ always visible who is following a board or an item.
 
 ## Mention notifications
 
-`@`-mentioning a user in a comment notifies them directly, whether or not
-they watch the item — see
-[Comments and history](comments-and-history.md).
+`@`-mentioning a user or group in a comment or description notifies them
+directly, whether or not they watch the item — see
+[Comments and history](comments-and-history.md). Mentions of other entity
+kinds (such as `@component:webserver-example`) render as links but notify
+nobody.
 
 ## Scheduled reminders
 
