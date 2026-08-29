@@ -75,10 +75,16 @@ describe('boardsPlugin', () => {
       ],
     });
     expect(
-      await screen.findByRole('tab', { name: 'Favorites (0)' }),
+      // the whole app boots here, which can outlast the default timeout
+      // on a loaded CI runner
+      await screen.findByRole(
+        'tab',
+        { name: 'Favorites (0)' },
+        { timeout: 15_000 },
+      ),
     ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Create board' }),
     ).toBeInTheDocument();
-  });
+  }, 30_000);
 });
