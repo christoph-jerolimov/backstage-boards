@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { VisuallyHidden } from 'react-aria';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { BreadcrumbEntry, useApi } from '@backstage/frontend-plugin-api';
@@ -43,7 +44,7 @@ import {
 import { GroupLabel } from './GroupLabel';
 import { ItemDrawerHost } from './ItemDrawerHost';
 import { ItemActions, ItemMenu } from './ItemMenu';
-import { useRowMenu } from './RowMenu';
+import { ActionsCellContent, useRowMenu, utilityColumnStyle } from './RowMenu';
 import { AsyncList, ErrorText, selectedOption } from './common';
 import { ItemFilterBar, useItemFilter } from './ItemFilterBar';
 import { PriorityChip, StatusBadge } from './StatusBadge';
@@ -176,7 +177,9 @@ function MyItemsTable(props: {
           {showPriority ? <Column>Priority</Column> : null}
           <Column>Due</Column>
           <Column>Tags</Column>
-          <Column>Actions</Column>
+          <Column style={utilityColumnStyle}>
+            <VisuallyHidden>Actions</VisuallyHidden>
+          </Column>
         </TableHeader>
         <TableBody>
           {entries.map(entry => (
@@ -217,7 +220,11 @@ function MyItemsTable(props: {
                 <DueDateBadge dueDate={entry.item.dueDate} />
               </Cell>
               <Cell>{entry.item.tags.join(', ')}</Cell>
-              <Cell>{rowMenu.rowActions(entry)}</Cell>
+              <Cell>
+                <ActionsCellContent>
+                  {rowMenu.rowActions(entry)}
+                </ActionsCellContent>
+              </Cell>
             </Row>
           ))}
         </TableBody>

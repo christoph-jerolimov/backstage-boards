@@ -22,14 +22,15 @@ React Aria's `Column` accepts `aria-label` (required when it has no children) an
 ## Decisions
 
 - Add to `RowMenu.tsx` (where the row-menu plumbing already lives):
-  - `export const utilityColumnStyle = { width: 0 } as const;` — applied via `style` on each utility `Column`, letting the auto table layout shrink it to content.
+  - `export const utilityColumnStyle = { width: 56 } as const;` — BUI tables render with `table-layout: fixed; width: 100%`, so utility columns need an explicit small width (a zero/auto width clips the content entirely under fixed layout — caught by the functional e2e run). 56px = the small icon button plus the cell padding, mirroring the library's own 40px selection-column width. The archived dialog's column holds a text "Restore" button and gets `width: 112` instead.
   - `export function ActionsCellContent({ children })` — a `display: flex; justify-content: flex-end` div wrapped around the actions cell's content, so the button hugs the right edge whatever width the browser settles on.
-- Each utility column becomes `<Column aria-label="Actions" style={utilityColumnStyle} />` (respectively `aria-label="Favorite"`); the favorite cell needs no alignment wrapper (leading column, left-aligned is right).
+- Each utility column becomes `<Column style={utilityColumnStyle}><VisuallyHidden>Actions</VisuallyHidden></Column>` (respectively "Favorite"); the favorite cell needs no alignment wrapper (leading column, left-aligned is right). React Aria's `Column` turned out to drop `aria-label` from the rendered `<th>` (verified in a scratch render), so the accessible name comes from visually hidden text (`react-aria`'s `VisuallyHidden`) instead — which also keeps the header's `textContent`, so the existing header-text test assertions hold unchanged.
 - Alternative considered: React Aria `width`/`defaultWidth` props — rejected, they only apply inside `ResizableTableContainer`, which none of these tables use.
-- Tests asserting header text lists change from `['…', 'Actions']` to `['…', '']` (the header cell renders empty) — assert the accessible name via `getByRole('columnheader', { name: 'Actions' })` instead where useful.
+- First attempt `width: 0` (auto-layout min-content sizing) failed in the real browser: BUI's fixed table layout honors the zero literally and clips the buttons; unit tests (jsdom, no CSS) could not catch it — the functional Playwright run did.
+- Tests asserting header text lists stay valid: the visually hidden label keeps 'Actions'/'Favorite' in the header's text content.
 
 ## Risks / Trade-offs
 
-- [`width: 0` relies on auto table layout minimum-content sizing] → all four tables use the default layout; verified visually and by screenshot regen.
-- [Header-text assertions in `ArchivedItemsDialog.test.tsx` and `MyItemsPage.test.tsx` break] → update them alongside the change.
+- [Fixed widths must fit their control across themes/zoom] → 56px carries ~28px of slack over the icon button; verified visually in the live app and by screenshot regen.
+- [Header-text assertions in `ArchivedItemsDialog.test.tsx` and `MyItemsPage.test.tsx` break] → not needed after all; the visually hidden label preserves the asserted text.
 - [`board-table` and `my-items` screenshot baselines change] → regenerate light and dark; kanban/drawer/settings/matrix/home show no tables and stay untouched (the board list page has no screenshot test).

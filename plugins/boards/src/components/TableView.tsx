@@ -1,4 +1,5 @@
 import { Fragment, useState } from 'react';
+import { VisuallyHidden } from 'react-aria';
 import {
   Cell,
   Column,
@@ -19,7 +20,12 @@ import {
 } from './grouping';
 import { GroupLabel } from './GroupLabel';
 import { ItemMenu } from './ItemMenu';
-import { RowMenuHandle, useRowMenu } from './RowMenu';
+import {
+  ActionsCellContent,
+  RowMenuHandle,
+  useRowMenu,
+  utilityColumnStyle,
+} from './RowMenu';
 import type { BoardActions } from './BoardView';
 import { formatDate, RefDisplay } from './common';
 import { AssigneeAvatars } from './AssigneeAvatars';
@@ -74,7 +80,9 @@ function ItemsTable(props: {
         <Column id="updatedAt" allowsSorting>
           Updated
         </Column>
-        <Column>Actions</Column>
+        <Column style={utilityColumnStyle}>
+          <VisuallyHidden>Actions</VisuallyHidden>
+        </Column>
       </TableHeader>
       <TableBody>
         {sorted.map(item => (
@@ -108,7 +116,11 @@ function ItemsTable(props: {
               <RefDisplay refString={item.createdBy} />
             </Cell>
             <Cell>{formatDate(item.updatedAt)}</Cell>
-            <Cell>{rowMenu.rowActions(item)}</Cell>
+            <Cell>
+              <ActionsCellContent>
+                {rowMenu.rowActions(item)}
+              </ActionsCellContent>
+            </Cell>
           </Row>
         ))}
       </TableBody>

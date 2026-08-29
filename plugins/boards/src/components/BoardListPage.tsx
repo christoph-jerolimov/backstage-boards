@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { VisuallyHidden } from 'react-aria';
 import { useNavigate } from 'react-router-dom';
 import { useApi } from '@backstage/frontend-plugin-api';
 import {
@@ -38,7 +39,7 @@ import {
 } from '../queries';
 import { BoardsFilterBar, useBoardFilter } from './BoardsFilterBar';
 import { MyItemsList } from './MyItemsPage';
-import { useRowMenu } from './RowMenu';
+import { ActionsCellContent, useRowMenu, utilityColumnStyle } from './RowMenu';
 import { AsyncList, EntityRefList, ErrorText } from './common';
 import {
   DEFAULT_PAGE_SIZE,
@@ -98,11 +99,15 @@ function BoardsTable(props: {
     <>
       <TableRoot aria-label={label} onRowAction={key => navigate(String(key))}>
         <TableHeader>
-          <Column>Favorite</Column>
+          <Column style={utilityColumnStyle}>
+            <VisuallyHidden>Favorite</VisuallyHidden>
+          </Column>
           <Column isRowHeader>Name</Column>
           <Column>Entities</Column>
           <Column>Access</Column>
-          <Column>Actions</Column>
+          <Column style={utilityColumnStyle}>
+            <VisuallyHidden>Actions</VisuallyHidden>
+          </Column>
         </TableHeader>
         <TableBody>
           {boards.map(board => (
@@ -125,7 +130,11 @@ function BoardsTable(props: {
                 <EntityRefList entityRefs={board.entityRefs} />
               </Cell>
               <Cell>{board.access}</Cell>
-              <Cell>{rowMenu.rowActions(board)}</Cell>
+              <Cell>
+                <ActionsCellContent>
+                  {rowMenu.rowActions(board)}
+                </ActionsCellContent>
+              </Cell>
             </Row>
           ))}
         </TableBody>
