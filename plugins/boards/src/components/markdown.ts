@@ -3,9 +3,10 @@
  * never emitted; the renderer builds React elements from these tokens.
  *
  * Supported: **bold**, *italic* / _italic_, `inline code`, fenced code
- * blocks, [links](https://...), unordered/ordered lists, paragraphs, and
- * automatic linking of catalog entity refs such as `system:default/example`
- * or `user:christoph`. Refs with the `text:` prefix are never linked.
+ * blocks, [links](https://...), unordered/ordered lists, ATX headings,
+ * GitHub pipe tables, paragraphs, and automatic linking of catalog entity
+ * refs such as `system:default/example` or `user:christoph`. Refs with
+ * the `text:` prefix are never linked.
  */
 
 export type InlineToken =
@@ -16,26 +17,26 @@ export type InlineToken =
   | { type: 'link'; href: string; children: InlineToken[] }
   | { type: 'entity'; entityRef: string };
 
-import { findMentions } from '@internal/plugin-boards-common';
+import { findMentions, NON_ENTITY_KINDS } from '@internal/plugin-boards-common';
 
 export type BlockToken =
   | { type: 'paragraph'; children: InlineToken[] }
   | { type: 'codeBlock'; value: string }
-  | { type: 'list'; ordered: boolean; items: InlineToken[][] };
+  | { type: 'list'; ordered: boolean; items: InlineToken[][] }
+  | { type: 'heading'; level: number; children: InlineToken[] }
+  | { type: 'table'; header: InlineToken[][]; rows: InlineToken[][][] };
 
 // kind:namespace/name or kind:name or namespace/name, per catalog ref
 // shorthand rules. `text:` is explicitly excluded from linking.
 const ENTITY_REF_PATTERN =
   /\b([a-zA-Z][a-zA-Z0-9]*):(?:([a-zA-Z0-9_.-]+)\/)?([a-zA-Z0-9_.-]+)\b/g;
 
-const NON_ENTITY_PREFIXES = new Set(['text', 'http', 'https', 'mailto']);
-
 function autolinkBareRefs(text: string): InlineToken[] {
   const tokens: InlineToken[] = [];
   let last = 0;
   for (const match of text.matchAll(ENTITY_REF_PATTERN)) {
     const [full, kind] = match;
-    if (NON_ENTITY_PREFIXES.has(kind.toLocaleLowerCase('en-US'))) {
+    if (NON_ENTITY_KINDS.has(kind.toLocaleLowerCase('en-US'))) {
       continue;
     }
     if (match.index! > last) {
@@ -135,6 +136,36 @@ function parseInline(text: string): InlineToken[] {
   return tokens;
 }
 
+const HEADING_PATTERN = /^(#{1,6})\s+(.*)$/;
+
+// `| --- | :---: |`-style separator row that turns the preceding pipe
+// line into a table header. Alignment colons are tolerated but ignored.
+function isTableSeparator(line: string): boolean {
+  return (
+    line.includes('|') &&
+    /^\s*\|?(\s*:?-+:?\s*\|)*\s*:?-+:?\s*\|?\s*$/.test(line)
+  );
+}
+
+function splitTableRow(line: string): string[] {
+  let row = line.trim();
+  if (row.startsWith('|')) {
+    row = row.slice(1);
+  }
+  if (row.endsWith('|')) {
+    row = row.slice(0, -1);
+  }
+  return row.split('|').map(cell => cell.trim());
+}
+
+function startsTable(lines: string[], index: number): boolean {
+  return (
+    lines[index].includes('|') &&
+    index + 1 < lines.length &&
+    isTableSeparator(lines[index + 1])
+  );
+}
+
 export function parseMarkdown(text: string): BlockToken[] {
   const blocks: BlockToken[] = [];
   const lines = text.split('\n');
@@ -145,6 +176,30 @@ export function parseMarkdown(text: string): BlockToken[] {
 
     if (line.trim() === '') {
       index += 1;
+      continue;
+    }
+
+    const headingMatch = line.match(HEADING_PATTERN);
+    if (headingMatch) {
+      blocks.push({
+        type: 'heading',
+        level: headingMatch[1].length,
+        children: parseInline(headingMatch[2].trim()),
+      });
+      index += 1;
+      continue;
+    }
+
+    if (startsTable(lines, index)) {
+      const header = splitTableRow(line).map(parseInline);
+      index += 2; // header and separator rows
+      const rows: InlineToken[][][] = [];
+      while (index < lines.length && lines[index].includes('|')) {
+        const cells = splitTableRow(lines[index]);
+        rows.push(header.map((_, cell) => parseInline(cells[cell] ?? '')));
+        index += 1;
+      }
+      blocks.push({ type: 'table', header, rows });
       continue;
     }
 
@@ -184,7 +239,9 @@ export function parseMarkdown(text: string): BlockToken[] {
       index < lines.length &&
       lines[index].trim() !== '' &&
       !lines[index].trimStart().startsWith('```') &&
-      !lines[index].match(/^\s*([-*]|\d+\.)\s+/)
+      !lines[index].match(/^\s*([-*]|\d+\.)\s+/) &&
+      !lines[index].match(HEADING_PATTERN) &&
+      !startsTable(lines, index)
     ) {
       paragraphLines.push(lines[index]);
       index += 1;

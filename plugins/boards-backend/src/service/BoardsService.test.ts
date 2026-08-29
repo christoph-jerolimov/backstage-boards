@@ -2375,6 +2375,31 @@ describe('BoardsService', () => {
       expect(call.payload.title).toMatch(/mentioned/i);
     });
 
+    it('does not notify for mentions of non-principal entities', async () => {
+      const { board, item } = await setupWatchedItem();
+      await service.addComment(
+        alice,
+        board.id,
+        item.id,
+        'runs on @component:webserver-example',
+      );
+      expect(notifications.send).not.toHaveBeenCalled();
+    });
+
+    it('notifies only principals in mixed mentions', async () => {
+      const { board, item } = await setupWatchedItem();
+      await service.addComment(
+        alice,
+        board.id,
+        item.id,
+        'deploy @component:webserver-example cc @user:default/carol',
+      );
+      expect(notifications.send).toHaveBeenCalledTimes(1);
+      const call = notifications.send.mock.calls[0][0];
+      expect(recipientRefs(call)).toEqual(['user:default/carol']);
+      expect(call.payload.title).toMatch(/mentioned/i);
+    });
+
     it('notifies mentions in description edits', async () => {
       const { board, item } = await setupWatchedItem();
       await service.updateItem(alice, board.id, item.id, {
