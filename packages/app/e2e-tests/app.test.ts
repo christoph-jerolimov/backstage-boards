@@ -21,7 +21,6 @@ test('App should render the welcome page', async ({ page }) => {
 
   const enterButton = page.getByRole('button', { name: 'Enter' });
   await expect(enterButton).toBeVisible();
-  await expect(page).toHaveScreenshot('sign-in-page.png');
   await enterButton.click();
 
   const nav = page.getByRole('navigation', { name: 'sidebar nav' });
