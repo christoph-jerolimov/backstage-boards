@@ -86,7 +86,7 @@
 
 - [x] 4.1 Run `yarn prettier:check`, `yarn lint:all`, `yarn tsc:full`,
       and `yarn workspace @internal/plugin-boards test`; all pass.
-- [ ] 4.2 Manually exercise a board with priorities and an external
+- [x] 4.2 Manually exercise a board with priorities and an external
       item: select across groups, switch group-by (selection stays),
       run each bulk action, archive a batch, and confirm the
       `board-table` e2e screenshot still passes (regenerate once if
