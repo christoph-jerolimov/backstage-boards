@@ -191,9 +191,12 @@ export function testBoardsApi(
 ): jest.Mocked<BoardsApi> {
   return {
     listBoards: jest.fn().mockResolvedValue({ boards: [], total: 0 }),
-    listFilterOptions: jest
-      .fn()
-      .mockResolvedValue({ total: 0, favorites: 0, entityRefs: [], creators: [] }),
+    listFilterOptions: jest.fn().mockResolvedValue({
+      total: 0,
+      favorites: 0,
+      entityRefs: [],
+      creators: [],
+    }),
     createBoard: jest.fn(),
     listMyItems: jest.fn().mockResolvedValue([]),
     getBoard: jest.fn(),

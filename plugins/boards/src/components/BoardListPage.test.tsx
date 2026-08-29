@@ -484,7 +484,6 @@ describe('BoardListPage', () => {
       expect(catalogApi.getEntities).not.toHaveBeenCalled();
       expect(boardsApi.listFilterOptions).toHaveBeenCalled();
     });
-
   });
 
   describe('favorites tab filter bar', () => {
