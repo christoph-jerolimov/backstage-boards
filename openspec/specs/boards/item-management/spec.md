@@ -599,7 +599,6 @@ SHALL NOT change any item.
 - **THEN** the assignee matrix entry is offered, and opening it changes
   no item
 
-<<<<<<< HEAD
 ### Requirement: Item menu in details drawer
 The item details drawer SHALL offer the same item actions menu as the item's card and table row — move to another column, the quick due-date entries, the priority submenu (when the board defines priorities), the assignee submenu, and delete — subject to the same write-access and externally-managed restrictions as elsewhere. The "Open details" entry SHALL be omitted, since the details are already open. The drawer SHALL NOT show a standalone delete button; deletion is offered through the menu. Deleting the item from the drawer's menu SHALL close the drawer. For users who cannot modify the item (read-only access or an externally managed item) the drawer SHALL NOT offer an empty menu.
 
@@ -687,7 +686,7 @@ The set of visible columns SHALL be stored per user through the user settings st
 
 - **WHEN** the user opens the column menu on either view
 - **THEN** no entry offers hiding the title column and the tables always render it
-=======
+
 ### Requirement: Table row selection
 The board's table view SHALL let users with write access select item
 rows via a leading checkbox per row, tracked by item id. Each rendered
@@ -793,4 +792,3 @@ item.
   assignees
 - **THEN** all assignees are removed from every selected item, and
   reopening the dropdown shows a checkmark on "No assignee"
->>>>>>> origin/main
