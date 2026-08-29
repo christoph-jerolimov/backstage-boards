@@ -95,7 +95,7 @@ Deleting a priority that no item uses SHALL simply remove it. Deleting a priorit
 
 ### Requirement: Priority display
 
-The kanban card SHALL show its item's priority — the name, rendered with the priority's color when one is set and neutrally otherwise. The board table view and the my-items listing SHALL show a priority column only when at least one listed item has a priority; otherwise the column SHALL be absent. The item details drawer SHALL show the item's priority. The "Assigned items" home page widget SHALL show each item's priority when set.
+The kanban card SHALL show its item's priority — the name, rendered with the priority's color when one is set and neutrally otherwise. The board table view and the my-items listing SHALL show a priority column only when at least one listed item has a priority and the user has not hidden the column through the view's column menu; otherwise the column SHALL be absent. The item details drawer SHALL show the item's priority. The "Assigned items" home page widget SHALL show each item's priority when set.
 
 #### Scenario: Card shows the priority
 
@@ -108,6 +108,11 @@ The kanban card SHALL show its item's priority — the name, rendered with the p
 - **THEN** no priority column is shown
 - **WHEN** at least one item has a priority
 - **THEN** the priority column appears and shows each item's priority, empty for items without one
+
+#### Scenario: Table column can be hidden by the user
+
+- **WHEN** a user hides the Priority column through the column menu on a board table or on the my-items listing, while listed items use priorities
+- **THEN** that view shows no priority column for that user until they re-enable it
 
 #### Scenario: My-items column only when used
 
