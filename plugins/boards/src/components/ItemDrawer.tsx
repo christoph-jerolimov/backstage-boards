@@ -236,7 +236,7 @@ export function ItemDrawer(props: {
                 gridTemplateColumns: 'max-content 1fr',
                 columnGap: 16,
                 rowGap: 8,
-                alignItems: 'start',
+                alignItems: 'baseline',
               }}
             >
               <Text variant="body-small" color="secondary">
