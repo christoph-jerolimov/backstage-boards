@@ -1,4 +1,10 @@
-import { expect, request, test, type Page } from '@playwright/test';
+import {
+  expect,
+  request,
+  test,
+  type APIRequestContext,
+  type Page,
+} from '@playwright/test';
 
 /*
  * Screenshots of every boards surface, in light and dark mode
@@ -24,6 +30,15 @@ const BACKEND_URL =
  * counts and my-items groups stay identical from run to run.
  */
 const BOARD_NAME = 'Sprint planning';
+
+/**
+ * A second board, referencing a catalog entity, for the entity page's
+ * Boards tab. It is neither favorited nor holds items assigned to the
+ * guest user, so it appears on no other captured surface (except the
+ * boards list's "All" tab count).
+ */
+const ROADMAP_BOARD_NAME = 'Website roadmap';
+const ENTITY_REF = 'component:default/example-website';
 
 /**
  * The single instant every screenshot pretends to be taken at. The
@@ -83,6 +98,9 @@ async function seedShowcaseBoard(): Promise<string> {
     const { boards }: { boards: { id: string; name: string }[] } = await (
       await api.get('/api/boards/boards', { headers })
     ).json();
+    if (!boards.some(entry => entry.name === ROADMAP_BOARD_NAME)) {
+      await seedRoadmapBoard(api, headers);
+    }
     const existing = boards.find(entry => entry.name === BOARD_NAME);
     if (existing) {
       return existing.id;
@@ -163,6 +181,51 @@ async function seedShowcaseBoard(): Promise<string> {
   } finally {
     await api.dispose();
   }
+}
+
+/**
+ * Creates the roadmap board, links it to the catalog entity, and asks
+ * the catalog to reprocess that entity so the derived
+ * `boards/is-referenced` label — which reveals the entity's Boards
+ * tab — appears without waiting for the next processing cycle.
+ */
+async function seedRoadmapBoard(
+  api: APIRequestContext,
+  headers: Record<string, string>,
+) {
+  const board = await (
+    await api.post('/api/boards/boards', {
+      headers,
+      data: { name: ROADMAP_BOARD_NAME },
+    })
+  ).json();
+  await api.patch(`/api/boards/boards/${board.id}`, {
+    headers,
+    data: { entityRefs: [ENTITY_REF] },
+  });
+  const [todo, inProgress]: Column[] = board.columns;
+  const priorities: Priority[] = board.priorities;
+  const priority = (name: string) =>
+    priorities.find(entry => entry.name === name)?.id;
+  const item = (data: Record<string, unknown>) =>
+    api.post(`/api/boards/boards/${board.id}/items`, { headers, data });
+  await item({
+    columnId: todo.id,
+    title: 'Fix responsive header',
+    priorityId: priority('high'),
+    tags: ['frontend'],
+  });
+  await item({
+    columnId: todo.id,
+    title: 'Refresh landing page copy',
+    priorityId: priority('medium'),
+  });
+  await item({ columnId: inProgress.id, title: 'Migrate images to the CDN' });
+
+  await api.post('/api/catalog/refresh', {
+    headers,
+    data: { entityRef: ENTITY_REF },
+  });
 }
 
 async function openBoard(page: Page, boardId: string) {
@@ -347,4 +410,55 @@ test('the home page', async ({ page }) => {
     page.getByRole('button', { name: `Open board ${BOARD_NAME}` }).first(),
   ).toBeVisible();
   await expect(page).toHaveScreenshot('home.png');
+});
+
+test('the catalog entity boards tab', async ({ page }) => {
+  // a cold catalog labels the entity only after it reprocessed it; give
+  // that more room than the default test timeout
+  test.setTimeout(180_000);
+  await seedShowcaseBoard();
+  await freezeTime(page);
+
+  // the Boards tab exists only once the derived label is on the entity
+  const api = await request.newContext({ baseURL: BACKEND_URL });
+  try {
+    const auth = await api.get('/api/auth/guest/refresh', {
+      headers: { accept: 'application/json' },
+    });
+    const token = (await auth.json()).backstageIdentity.token as string;
+    const headers = { authorization: `Bearer ${token}` };
+    await expect
+      .poll(
+        async () => {
+          const entity = await (
+            await api.get(
+              '/api/catalog/entities/by-name/component/default/example-website',
+              { headers },
+            )
+          ).json();
+          return entity?.metadata?.labels?.['boards/is-referenced'];
+        },
+        { timeout: 120_000, intervals: [2_000] },
+      )
+      .toBeTruthy();
+  } finally {
+    await api.dispose();
+  }
+
+  await page.goto('/');
+  // guest sign-in page appears on the first navigation of a session
+  await page
+    .getByRole('button', { name: 'Enter' })
+    .click({ timeout: 10_000 })
+    .catch(() => undefined);
+  await page.getByRole('link', { name: 'example-website' }).click();
+  // the entity page's tab bar is a "Content navigation" of links
+  await page
+    .getByRole('navigation', { name: 'Content navigation' })
+    .getByRole('link', { name: 'Boards' })
+    .click();
+
+  // the tab embeds the full roadmap board
+  await expect(page.getByText('Fix responsive header')).toBeVisible();
+  await expect(page).toHaveScreenshot('catalog-tab.png');
 });
