@@ -1,13 +1,22 @@
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: backstage
-  description: An example of a Backstage application.
-  # Example for optional annotations
-  # annotations:
-  #   github.com/project-slug: backstage/backstage
-  #   backstage.io/techdocs-ref: dir:.
+  name: backstage-boards
+  title: Backstage Boards
+  description: >-
+    Backstage app with shareable kanban boards that live inside the developer
+    portal and can be assigned to catalog entities.
+  annotations:
+    github.com/project-slug: christoph-jerolimov/backstage-boards
+    backstage.io/techdocs-ref: dir:.
+  tags:
+    - boards
+    - kanban
+  links:
+    - url: https://github.com/christoph-jerolimov/backstage-boards
+      title: Source on GitHub
+      icon: github
 spec:
   type: website
-  owner: john@example.com
+  owner: guests
   lifecycle: experimental

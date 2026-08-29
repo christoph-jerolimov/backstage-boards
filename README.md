@@ -180,6 +180,7 @@ board-specific lives in `plugins/`.
 | `plugins/boards-backend`                | Boards backend: storage, `/api/boards` REST API, permissions, notifications.  |
 | `plugins/boards-common`                 | Types and helpers shared by the frontend, backend, and future sync modules.   |
 | `plugins/catalog-backend-module-boards` | Catalog processor labelling the entities a board references.                  |
+| `docs`                                  | User and admin documentation, served as TechDocs (`mkdocs.yml` at the root).  |
 | `openspec/specs`                        | The behaviour specs the plugins are built against.                            |
 
 Each plugin has its own README with the details.
@@ -229,6 +230,21 @@ The boards backend and the catalog module belong together: without
 `@internal/plugin-catalog-backend-module-boards` no entity is ever labelled and
 the entity "Boards" tab appears nowhere. Both are already registered in
 `packages/backend/src/index.ts`.
+
+## Important notes
+
+1. **Catalog users** — the sign-in resolver must map signed-in users to
+   catalog user entities, or assignments and the "my" features (My items,
+   the Assigned items card, reminders) have nothing to attach to.
+2. **Security** — board access granted to a group follows the catalog's
+   group membership: anyone who can create or edit group entities in the
+   catalog can add themselves to a group and thereby gain access to every
+   board shared with that group. Restrict who can register and modify
+   catalog org data accordingly.
+3. **Database** — all boards, items, comments, and history live in the
+   plugin's own database. Point `backend.database` at a persistent database
+   with backups: unlike catalog data, board content cannot be re-ingested
+   from anywhere if it is lost.
 
 ## Specs
 
