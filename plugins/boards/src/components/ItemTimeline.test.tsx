@@ -49,7 +49,7 @@ const entries: TimelineEntry[] = [
   },
 ];
 
-function renderBlock() {
+function renderBlock(composer?: React.ReactNode) {
   renderWithProviders(
     <ActivityBlock
       boardId="board-1"
@@ -57,6 +57,7 @@ function renderBlock() {
       entries={entries}
       canWrite
       onChanged={jest.fn().mockResolvedValue(undefined)}
+      composer={composer}
     />,
     { apis: [[boardsApiRef, testBoardsApi()]] },
   );
@@ -118,5 +119,33 @@ describe('ActivityBlock', () => {
       'moved this item',
     );
     expect(createdChange).toBeLessThan(movedChange);
+  });
+});
+
+describe('ActivityBlock composer placement', () => {
+  const composer = <div>THE COMPOSER</div>;
+
+  it('renders the composer before the list when newest first', () => {
+    renderBlock(composer);
+    const [composerAt, newest] = panelOrder('THE COMPOSER', 'moved this item');
+    expect(composerAt).toBeLessThan(newest);
+  });
+
+  it('moves the composer after the list when oldest first', async () => {
+    renderBlock(composer);
+    await userEvent.click(screen.getByRole('button', { name: 'Newest first' }));
+    const [oldest, composerAt] = panelOrder(
+      'created this item',
+      'THE COMPOSER',
+    );
+    expect(oldest).toBeLessThan(composerAt);
+  });
+
+  it('shows the composer on the Comments tab but not on Changes', async () => {
+    renderBlock(composer);
+    await userEvent.click(screen.getByRole('tab', { name: 'Comments' }));
+    expect(screen.getByText('THE COMPOSER')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('tab', { name: 'Changes' }));
+    expect(screen.queryByText('THE COMPOSER')).not.toBeInTheDocument();
   });
 });

@@ -12,11 +12,8 @@ import { boardsApiRef } from '../api';
 import { queryKeys, useItemsQuery, useMoveItem } from '../queries';
 import { WatchButton } from './WatchButton';
 import { EditableMarkdown } from './EditableMarkdown';
-import {
-  AssigneesField,
-  DrawerSection,
-  ItemMetadata,
-} from './ItemDrawerFields';
+import { AssigneesField, DrawerSection } from './ItemDrawerFields';
+import { useDraft } from './drafts';
 import { ActivityBlock } from './ItemTimeline';
 import { ChecklistEditor } from './ChecklistEditor';
 import { TagsEditor } from './TagsEditor';
@@ -42,7 +39,12 @@ export function ItemDrawer(props: {
   const { board, item, canWrite, onClose, onChanged } = props;
   const boardsApi = useApi(boardsApiRef);
   const readonly = !canWrite || !!item.externalManager;
-  const [newComment, setNewComment] = useState('');
+  // unsent input survives closing the drawer and reloading the browser
+  const [newComment, setNewComment, clearNewComment] = useDraft(
+    `comment-${board.id}-${item.id}`,
+  );
+  const [descriptionDraft, setDescriptionDraft, clearDescriptionDraft] =
+    useDraft(`description-${board.id}-${item.id}`);
   const [actionError, setActionError] = useState<string>();
 
   const queryClient = useQueryClient();
@@ -111,7 +113,7 @@ export function ItemDrawer(props: {
     const text = newComment.trim();
     if (!text) return;
     await boardsApi.addComment(board.id, item.id, text);
-    setNewComment('');
+    clearNewComment();
     await changed();
   };
 
@@ -227,37 +229,60 @@ export function ItemDrawer(props: {
               />
             </Flex>
 
-            <AssigneesField
-              assignees={item.assignees}
-              readonly={readonly}
-              onChange={assignees => patchItem({ assignees })}
-            />
+            {/* borderless label/value table for the list-shaped fields */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'max-content 1fr',
+                columnGap: 16,
+                rowGap: 8,
+                alignItems: 'start',
+              }}
+            >
+              <Text variant="body-small" color="secondary">
+                Assignees
+              </Text>
+              <AssigneesField
+                assignees={item.assignees}
+                readonly={readonly}
+                onChange={assignees => patchItem({ assignees })}
+              />
+              <Text variant="body-small" color="secondary">
+                Tags
+              </Text>
+              <TagsEditor
+                tags={item.tags}
+                canEdit={!readonly}
+                suggestions={props.tagSuggestions ?? []}
+                onChange={tags => patchItem({ tags })}
+              />
+            </div>
           </DrawerSection>
 
-          <DrawerSection title="Tags">
-            <TagsEditor
-              tags={item.tags}
-              canEdit={!readonly}
-              suggestions={props.tagSuggestions ?? []}
-              onChange={tags => patchItem({ tags })}
-            />
-          </DrawerSection>
-
-          <DrawerSection title="Description">
-            <EditableMarkdown
-              text={item.description ?? ''}
-              canEdit={!readonly}
-              versionCount={item.descriptionVersionCount}
-              allowEmpty
-              emptyText="No description yet."
-              editAriaLabel="Edit description"
-              loadVersions={() =>
-                boardsApi.listDescriptionVersions(board.id, item.id)
-              }
-              versionsKey={queryKeys.descriptionVersions(board.id, item.id)}
-              onSave={description => patchItem({ description })}
-            />
-          </DrawerSection>
+          <EditableMarkdown
+            title={
+              <Text variant="body-medium" weight="bold" as="h3">
+                Description
+              </Text>
+            }
+            text={item.description ?? ''}
+            canEdit={!readonly}
+            versionCount={item.descriptionVersionCount}
+            allowEmpty
+            emptyText="No description yet."
+            editAriaLabel="Edit description"
+            draft={descriptionDraft || undefined}
+            onDraftChange={text =>
+              text === null
+                ? clearDescriptionDraft()
+                : setDescriptionDraft(text)
+            }
+            loadVersions={() =>
+              boardsApi.listDescriptionVersions(board.id, item.id)
+            }
+            versionsKey={queryKeys.descriptionVersions(board.id, item.id)}
+            onSave={description => patchItem({ description })}
+          />
 
           <DrawerSection title="Checklist">
             <ChecklistEditor
@@ -267,33 +292,36 @@ export function ItemDrawer(props: {
             />
           </DrawerSection>
 
-          <DrawerSection title="Activity">
-            <ItemMetadata item={item} />
-            {canWrite && (
-              <Flex direction="column" gap="2">
-                <TextAreaField
-                  aria-label="New comment"
-                  placeholder="Write a comment… (markdown subset, entity refs like system:default/example auto-link)"
-                  value={newComment}
-                  onChange={setNewComment}
-                />
-                <div>
-                  <Button variant="primary" size="small" onPress={addComment}>
-                    Comment
-                  </Button>
-                </div>
-              </Flex>
-            )}
-            {timeline && (
-              <ActivityBlock
-                boardId={board.id}
-                itemId={item.id}
-                entries={timeline}
-                canWrite={canWrite}
-                onChanged={changed}
-              />
-            )}
-          </DrawerSection>
+          {timeline && (
+            <ActivityBlock
+              boardId={board.id}
+              itemId={item.id}
+              entries={timeline}
+              canWrite={canWrite}
+              onChanged={changed}
+              composer={
+                canWrite ? (
+                  <Flex direction="column" gap="2">
+                    <TextAreaField
+                      aria-label="New comment"
+                      placeholder="Write a comment… (markdown subset, entity refs like system:default/example auto-link)"
+                      value={newComment}
+                      onChange={setNewComment}
+                    />
+                    <div>
+                      <Button
+                        variant="primary"
+                        size="small"
+                        onPress={addComment}
+                      >
+                        Comment
+                      </Button>
+                    </div>
+                  </Flex>
+                ) : undefined
+              }
+            />
+          )}
         </Flex>
       </div>
     </>

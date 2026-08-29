@@ -1,5 +1,7 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { storageApiRef } from '@backstage/frontend-plugin-api';
+import { mockApis } from '@backstage/frontend-test-utils';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
 import { todayISO } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
@@ -56,11 +58,14 @@ function renderDrawer(
     item?: ReturnType<typeof testItem>;
     canWrite?: boolean;
     priorities?: ReturnType<typeof testPriorities>;
+    storage?: ReturnType<typeof mockApis.storage>;
   } = {},
 ) {
   const boardsApi = testBoardsApi({
     getTimeline: jest.fn().mockResolvedValue(timeline),
+    addComment: jest.fn().mockResolvedValue(undefined),
   });
+  const storage = over.storage ?? mockApis.storage();
   const onClose = jest.fn();
   const onChanged = jest.fn().mockResolvedValue(undefined);
   renderWithProviders(
@@ -76,10 +81,16 @@ function renderDrawer(
       apis: [
         [boardsApiRef, boardsApi],
         [catalogApiRef, catalogApi],
+        [storageApiRef, storage],
       ],
     },
   );
-  return { boardsApi, onClose, onChanged };
+  return { boardsApi, onClose, onChanged, storage };
+}
+
+/** The bucket the drawer keeps unsent input in. */
+function draftsBucket(storage: ReturnType<typeof mockApis.storage>) {
+  return storage.forBucket('boards-item-drafts');
 }
 
 describe('ItemDrawer', () => {
@@ -93,9 +104,10 @@ describe('ItemDrawer', () => {
     expect(screen.getByText('No due date')).toBeInTheDocument();
     expect(screen.getByText('Unassigned')).toBeInTheDocument();
     expect(screen.getByText('No description yet.')).toBeInTheDocument();
-    expect(await screen.findAllByRole('link', { name: 'alice' })).toHaveLength(
-      2,
-    );
+    // no created-by/updated-by metadata block anymore
+    expect(await screen.findByText('Looks good')).toBeInTheDocument();
+    expect(screen.queryByText(/Created by/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Updated by/)).not.toBeInTheDocument();
   });
 
   it('closes on the close button, the backdrop and Escape', async () => {
@@ -372,23 +384,36 @@ describe('ItemDrawer', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('groups the drawer into headlined sections, tags before description', () => {
+  it('groups the drawer into sections with a field table, no Activity heading', () => {
     renderDrawer();
-    for (const title of [
-      'Details',
-      'Tags',
-      'Description',
-      'Checklist',
-      'Activity',
-    ]) {
+    for (const title of ['Details', 'Description', 'Checklist']) {
       expect(screen.getByRole('heading', { name: title })).toBeInTheDocument();
     }
-    const tags = screen.getByRole('heading', { name: 'Tags' });
+    // assignees and tags are labelled table rows, not headlined sections
+    expect(screen.getByText('Assignees')).toBeInTheDocument();
+    expect(screen.getByText('Tags')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Tags' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Activity' }),
+    ).not.toBeInTheDocument();
+    const tags = screen.getByText('Tags');
     const description = screen.getByRole('heading', { name: 'Description' });
     expect(
       tags.compareDocumentPosition(description) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+  });
+
+  it('offers the description controls beside its heading', () => {
+    renderDrawer();
+    const headingRow = screen.getByRole('heading', { name: 'Description' })
+      .parentElement as HTMLElement;
+    // empty description offers "Add"; the button sits in the heading row
+    expect(
+      within(headingRow).getByRole('button', { name: 'Add' }),
+    ).toBeInTheDocument();
   });
 
   it('keeps the watch control in the header', () => {
@@ -413,20 +438,100 @@ describe('ItemDrawer', () => {
     ).toBeTruthy();
   });
 
-  it('places the comment composer above the timeline', async () => {
+  it('places the composer in the tab panel, beside where the comment lands', async () => {
     renderDrawer();
     await screen.findByText('Looks good');
-    const composer = screen.getByRole('textbox', { name: 'New comment' });
-    const tabs = screen.getByRole('tab', { name: 'Combined' });
+    const panel = screen.getByRole('tabpanel');
+    // newest first: the composer comes before the newest entry
+    const composer = within(panel).getByRole('textbox', {
+      name: 'New comment',
+    });
     expect(
-      composer.compareDocumentPosition(tabs) & Node.DOCUMENT_POSITION_FOLLOWING,
+      composer.compareDocumentPosition(screen.getByText('Looks good')) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+
+    // oldest first: the composer moves after the timeline
+    await userEvent.click(screen.getByRole('button', { name: 'Newest first' }));
+    const flipped = screen.getByRole('textbox', { name: 'New comment' });
+    expect(
+      screen.getByText('Looks good').compareDocumentPosition(flipped) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('hides the composer on the Changes tab', async () => {
+    renderDrawer();
+    await screen.findByText('Looks good');
+    await userEvent.click(screen.getByRole('tab', { name: 'Changes' }));
+    expect(
+      screen.queryByRole('textbox', { name: 'New comment' }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('tab', { name: 'Comments' }));
+    expect(
+      screen.getByRole('textbox', { name: 'New comment' }),
+    ).toBeInTheDocument();
+  });
+
+  it('persists the comment draft until the comment is added', async () => {
+    const storage = mockApis.storage();
+    const { boardsApi } = renderDrawer({ storage });
+    await screen.findByText('Looks good');
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'New comment' }),
+      'half a thought',
+    );
+    await waitFor(() =>
+      expect(
+        draftsBucket(storage).snapshot<string>('comment-board-1-item-1').value,
+      ).toBe('half a thought'),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Comment' }));
+    expect(boardsApi.addComment).toHaveBeenCalledWith(
+      'board-1',
+      'item-1',
+      'half a thought',
+    );
+    await waitFor(() =>
+      expect(
+        draftsBucket(storage).snapshot('comment-board-1-item-1').presence,
+      ).toBe('absent'),
+    );
+  });
+
+  it('restores a stored comment draft', async () => {
+    const storage = mockApis.storage();
+    draftsBucket(storage).set('comment-board-1-item-1', 'unsent words');
+    renderDrawer({ storage });
+    await screen.findByText('Looks good');
+    expect(screen.getByRole('textbox', { name: 'New comment' })).toHaveValue(
+      'unsent words',
+    );
+  });
+
+  it('persists the description draft and clears it on save', async () => {
+    const storage = mockApis.storage();
+    draftsBucket(storage).set('description-board-1-item-1', 'draft notes');
+    const { boardsApi } = renderDrawer({ storage });
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+    const editor = screen.getByRole('textbox', { name: 'Edit description' });
+    // the editor opens with the stored draft instead of the saved text
+    expect(editor).toHaveValue('draft notes');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(boardsApi.updateItem).toHaveBeenCalledWith('board-1', 'item-1', {
+      description: 'draft notes',
+    });
+    await waitFor(() =>
+      expect(
+        draftsBucket(storage).snapshot('description-board-1-item-1').presence,
+      ).toBe('absent'),
+    );
   });
 
   it('adds a comment', async () => {
     const { boardsApi } = renderDrawer();
     await userEvent.type(
-      screen.getByRole('textbox', { name: 'New comment' }),
+      await screen.findByRole('textbox', { name: 'New comment' }),
       'Nice work',
     );
     await userEvent.click(screen.getByRole('button', { name: 'Comment' }));
@@ -439,7 +544,9 @@ describe('ItemDrawer', () => {
 
   it('does not add an empty comment', async () => {
     const { boardsApi } = renderDrawer();
-    await userEvent.click(screen.getByRole('button', { name: 'Comment' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Comment' }),
+    );
     expect(boardsApi.addComment).not.toHaveBeenCalled();
   });
 

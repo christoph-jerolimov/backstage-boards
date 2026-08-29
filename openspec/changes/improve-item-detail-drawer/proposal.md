@@ -18,6 +18,14 @@ Follow-up refinements (same change, second round):
 - **The checklist offers its entry field directly** — no "Add" button to press before typing.
 - **Tags move above the description.**
 
+Third round:
+
+- **The Activity heading and the created-by/updated-by metadata lines go away** — the tab row identifies the block on its own.
+- **Assignees and tags render as one borderless label/value table** in the Details section: labels on the left, the chips and add controls on the right.
+- **The Description heading becomes a flex row** with the Add/Edit and History controls on its right.
+- **The comment composer moves into the activity tabs**: shown on the Combined and Comments tabs only, before the timeline when newest-first and after it when oldest-first — always adjacent to where the new comment will appear.
+- **Comment and description drafts survive reload**: in-progress text is persisted per user through the Backstage storage (user settings) API and cleared once the comment is added or the description saved.
+
 ## Capabilities
 
 ### New Capabilities
@@ -31,6 +39,8 @@ None.
 - `boards/item-priorities`: The "Edit priority from drawer and item menu" requirement changes — the drawer's priority display and priority editor merge into one accessible interactive badge control; read-only users see only the plain badge.
 - `boards/item-management` (second round): The "Arbitrary due date in details view" requirement changes — the due-date display and editor merge into one badge control with quick options plus a full date picker behind "Pick a date…"; the "Structured details drawer" requirement (added by this change) is adjusted for the new section order (tags before description) and the watch control in the header.
 - `boards/item-checklists`: The "Checklist editing in the item details drawer" requirement changes — the entry field is offered directly instead of behind an Add button.
+- `boards/comments-and-history` (third round): the composer moves inside the Combined/Comments tabs with ordering-dependent placement, and a new requirement covers per-user draft persistence for comments and description edits.
+- `boards/item-management` (third round): the "Structured details drawer" requirement is adjusted — no Activity heading or metadata block, assignees/tags as a borderless label/value table, description heading carrying its controls.
 
 ## Impact
 

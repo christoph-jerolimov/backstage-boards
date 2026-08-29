@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { Button, Flex, Text, TextAreaField } from '@backstage/ui';
 import { useQuery } from '@tanstack/react-query';
 import { CommentVersion } from '@internal/plugin-boards-common';
@@ -21,6 +22,12 @@ export function EditableMarkdown(props: {
   allowEmpty?: boolean;
   emptyText?: string;
   editAriaLabel: string;
+  /** A heading rendered left of the action row (the drawer's sections). */
+  title?: ReactNode;
+  /** A persisted unsaved edit; opening the editor starts from it. */
+  draft?: string;
+  /** Reports the in-progress edit text; `null` once it can be dropped. */
+  onDraftChange?: (text: string | null) => void;
 }) {
   const {
     text,
@@ -31,6 +38,8 @@ export function EditableMarkdown(props: {
     allowEmpty,
     emptyText,
     editAriaLabel,
+    title,
+    onDraftChange,
   } = props;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(text);
@@ -45,6 +54,7 @@ export function EditableMarkdown(props: {
   const save = async () => {
     const next = draft.trim();
     setEditing(false);
+    onDraftChange?.(null);
     if (next === text.trim()) {
       return;
     }
@@ -53,37 +63,52 @@ export function EditableMarkdown(props: {
     }
   };
 
+  const actions = (
+    <Flex gap="1" justify={title ? undefined : 'end'}>
+      {versionCount > 1 && (
+        <Button
+          variant="tertiary"
+          size="small"
+          onPress={() => setShowVersions(!showVersions)}
+        >
+          {showVersions ? 'Hide history' : 'History'}
+        </Button>
+      )}
+      {canEdit && !editing && (
+        <Button
+          variant="tertiary"
+          size="small"
+          onPress={() => {
+            // a persisted unsaved edit beats the saved text
+            setDraft(props.draft || text);
+            setEditing(true);
+          }}
+        >
+          {text ? 'Edit' : 'Add'}
+        </Button>
+      )}
+    </Flex>
+  );
+
   return (
     <div>
-      <Flex gap="1" justify="end">
-        {versionCount > 1 && (
-          <Button
-            variant="tertiary"
-            size="small"
-            onPress={() => setShowVersions(!showVersions)}
-          >
-            {showVersions ? 'Hide history' : 'History'}
-          </Button>
-        )}
-        {canEdit && !editing && (
-          <Button
-            variant="tertiary"
-            size="small"
-            onPress={() => {
-              setDraft(text);
-              setEditing(true);
-            }}
-          >
-            {text ? 'Edit' : 'Add'}
-          </Button>
-        )}
-      </Flex>
+      {title ? (
+        <Flex align="center" justify="between" gap="2">
+          {title}
+          {actions}
+        </Flex>
+      ) : (
+        actions
+      )}
       {editing ? (
         <Flex direction="column" gap="2">
           <TextAreaField
             aria-label={editAriaLabel}
             value={draft}
-            onChange={setDraft}
+            onChange={next => {
+              setDraft(next);
+              onDraftChange?.(next);
+            }}
             // eslint-disable-next-line jsx-a11y/no-autofocus -- focus moves into a field the user just revealed
             autoFocus
           />
@@ -91,7 +116,10 @@ export function EditableMarkdown(props: {
             <Button
               variant="secondary"
               size="small"
-              onPress={() => setEditing(false)}
+              onPress={() => {
+                setEditing(false);
+                onDraftChange?.(null);
+              }}
             >
               Cancel
             </Button>

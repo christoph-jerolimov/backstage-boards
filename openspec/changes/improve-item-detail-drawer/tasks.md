@@ -31,3 +31,12 @@
 - [x] 6.4 Show the checklist entry field directly (no Add button, no autofocus on mount) with Enter committing and clearing for the next entry; verify by updating `ChecklistEditor`/`ItemDrawer` tests (type directly, no button press) and the read-only case (no textbox).
 - [x] 6.5 Move Tags above Description in the drawer; verify with a section-order assertion in `ItemDrawer.test.tsx`.
 - [x] 6.6 Re-run all checks (plugin unit tests, `yarn tsc`, `yarn lint:all`, `yarn prettier:check`), the affected Playwright specs, and regenerate + review the `item-drawer.png` baselines (light and dark).
+
+## 7. Third round: leaner layout, composer in the tabs, persisted drafts
+
+- [x] 7.1 Remove the "Activity" heading and the `ItemMetadata` created-by/updated-by block from the drawer (deleting the now-unused component); verify via updated `ItemDrawer.test.tsx` assertions (no Activity heading, no metadata lines).
+- [x] 7.2 Render assignees and tags as a borderless label/value grid in the Details section (labels left; chips plus add controls right; `AssigneesField` without its own label wrapper, `TagsEditor` in the tags cell) and drop the separate Tags section; verify via updated section/order assertions and the existing assignee/tag interaction tests staying green.
+- [x] 7.3 Add a `title` slot to `EditableMarkdown` that renders the heading and the action row (History toggle, Add/Edit) in one flex row, used by the drawer's Description block; verify with an `EditableMarkdown` or drawer test asserting the heading row contains the controls.
+- [x] 7.4 Move the comment composer into `ActivityBlock` via a `composer` slot shown only on the Combined and Comments tabs — before the list when newest first, after it when oldest first; verify with `ItemTimeline.test.tsx` placement cases and updated drawer composer tests.
+- [x] 7.5 Add a `useDraft` hook on `storageApiRef` (bucket `boards-item-drafts`, debounced writes, clear on submit) and wire it to the comment composer and, via new `draft`/`onDraftChange` props on `EditableMarkdown`, to the description editor; verify with unit tests using `mockApis.storage` that drafts restore across remounts and clear on add/save/cancel.
+- [x] 7.6 Re-run all checks (plugin unit tests, `yarn tsc`, `yarn lint:all`, `yarn prettier:check`), the affected Playwright specs, and regenerate + review the `item-drawer.png` baselines (light and dark).

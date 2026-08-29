@@ -81,6 +81,14 @@ Extract the block into an `ActivityBlock` (in `ItemTimeline.tsx`) owning two pie
 - **Checklist**: the add field renders permanently while editable (plain `TextField`, no autofocus so opening the drawer doesn't steal focus; Enter commits and clears for the next entry). The Add button and `adding` state go away.
 - **Tags before Description** is only a reorder of the drawer's sections.
 
+### 7. Third round: leaner layout, composer in the tabs, persisted drafts
+
+- **Metadata and Activity heading removed**: `ItemMetadata` and the "Activity" `DrawerSection` wrapper go away; `ActivityBlock` renders directly after the checklist — its tab row is heading enough. The `ItemMetadata` component is deleted (the drawer was its only user).
+- **Assignees + tags as a label/value grid**: a `display: grid; grid-template-columns: max-content 1fr` block in the Details section (no borders); left cells carry the "Assignees"/"Tags" labels, right cells the chips with their add controls inline. `AssigneesField` loses its `DrawerField` wrapper; `TagsEditor` is placed as-is in the tags cell.
+- **Description heading with actions**: `EditableMarkdown` gains an optional `title?: ReactNode` prop. When set, it renders `title` and its action row (History toggle, Add/Edit) in one `justify="between"` flex instead of the right-aligned action row; the description passes the section heading, comments stay unchanged.
+- **Composer inside the tabs**: `ActivityBlock` gains a `composer?: ReactNode` slot, rendered only in the Combined and Comments tab panels — before the list when the ordering is newest first, after it when oldest first. The drawer still owns the composer state and submit handler.
+- **Draft persistence**: a `useDraft(key)` hook (new `drafts.ts`) built on `storageApiRef` (`forBucket('boards-item-drafts')`), which the app backs with the user-settings service (`plugin-user-settings-backend` is installed; plain WebStorage remains the fallback in apps without it). The hook reads the stored snapshot, adopts a later-arriving stored value only while the field is untouched, debounces writes, and exposes `clear()`. The drawer keys drafts as `comment-<boardId>-<itemId>`; `EditableMarkdown` gains optional `draft`/`onDraftChange` props so the description editor prefills from `description-<boardId>-<itemId>` and reports keystrokes/clears — save and cancel both clear the stored draft.
+
 ## Risks / Trade-offs
 
 - [E2e screenshot `item-drawer.png` invalidated by any visual change] → regenerate the snapshot as part of the change; review the new image deliberately.

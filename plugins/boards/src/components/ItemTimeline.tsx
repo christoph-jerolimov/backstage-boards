@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { useApi } from '@backstage/frontend-plugin-api';
 import {
   Button,
@@ -97,7 +98,10 @@ type ActivityOrder = 'newest' | 'oldest';
  * The tabbed view over an item's timeline: comments and changes combined
  * (the default), or either on its own, ordered newest first until the
  * toggle beside the tabs flips it. Filtering and ordering happen here on
- * the client; the server hands the timeline over oldest first.
+ * the client; the server hands the timeline over oldest first. The
+ * caller's comment composer renders inside the Combined and Comments
+ * tabs, adjacent to where the new comment will appear: before the list
+ * when newest first, after it when oldest first.
  */
 export function ActivityBlock(props: {
   boardId: string;
@@ -105,6 +109,7 @@ export function ActivityBlock(props: {
   entries: TimelineEntry[];
   canWrite: boolean;
   onChanged: () => Promise<void>;
+  composer?: ReactNode;
 }) {
   const [tab, setTab] = useState<ActivityTab>('combined');
   const [order, setOrder] = useState<ActivityOrder>('newest');
@@ -134,6 +139,14 @@ export function ActivityBlock(props: {
     />
   );
 
+  const panel = (withComposer: boolean) => (
+    <Flex direction="column" gap="2">
+      {withComposer && order === 'newest' && props.composer}
+      {list}
+      {withComposer && order === 'oldest' && props.composer}
+    </Flex>
+  );
+
   return (
     <Tabs
       selectedKey={tab}
@@ -153,9 +166,9 @@ export function ActivityBlock(props: {
           {order === 'newest' ? 'Newest first' : 'Oldest first'}
         </Button>
       </Flex>
-      <TabPanel id="combined">{list}</TabPanel>
-      <TabPanel id="comments">{list}</TabPanel>
-      <TabPanel id="changes">{list}</TabPanel>
+      <TabPanel id="combined">{panel(true)}</TabPanel>
+      <TabPanel id="comments">{panel(true)}</TabPanel>
+      <TabPanel id="changes">{panel(false)}</TabPanel>
     </Tabs>
   );
 }

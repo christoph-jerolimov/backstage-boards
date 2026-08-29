@@ -43,11 +43,15 @@ The item details drawer SHALL offer the same item actions menu as the item's car
 - **THEN** no item actions menu with zero usable entries is offered
 
 ### Requirement: Structured details drawer
-The item details drawer SHALL group its content into visually separated, headlined sections so each block is identifiable at a glance: the item's fields (status, priority, due date, assignees), the tags, the description, the checklist, and the activity block SHALL each be introduced by a visible heading or label, in that order — tags above the description. The watch control SHALL sit in the drawer header, beside the item menu and close buttons.
+The item details drawer SHALL group its content into visually separated sections so each block is identifiable at a glance, in this order: the item's fields (status, priority, due date badges, then assignees and tags), the description, the checklist, and the activity block. Assignees and tags SHALL render as a borderless label/value table — the labels on the left, the chips and their add controls on the right of the same row. The description's heading row SHALL carry the description's edit and history controls on its right. The activity block is identified by its tabs; the drawer SHALL NOT show a separate "Activity" heading and SHALL NOT show a created-by/updated-by metadata block. The watch control SHALL sit in the drawer header, beside the item menu and close buttons.
 
-#### Scenario: Sections carry headings
+#### Scenario: Sections and field table
 - **WHEN** a user opens the item details drawer
-- **THEN** the field area, tags, description, checklist, and activity block each appear under a visible heading or label, with the tags above the description
+- **THEN** the field area, description, and checklist each appear under a visible heading or label, the assignees and tags form a borderless label/value table with their add controls in the value column, and the activity tabs follow without an extra heading or metadata lines
+
+#### Scenario: Description controls beside the heading
+- **WHEN** a user with write access views an item with an edited description
+- **THEN** the "Description" heading row offers the edit control and the history toggle on its right side
 
 #### Scenario: Watch control in the header
 - **WHEN** a user opens the item details drawer
