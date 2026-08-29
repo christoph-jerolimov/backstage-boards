@@ -37,8 +37,9 @@ supported for people outside the catalog.
 
 ## Description
 
-The description supports a markdown subset and auto-links catalog entity
-refs. Its heading row carries the edit and history controls: every save
+The description supports the same markdown subset as comments — including
+headings and tables — and auto-links catalog entity refs and `@`-mentions.
+Its heading row carries the edit and history controls: every save
 creates a new version, and the history dialog lets you inspect earlier
 versions. An in-progress edit survives closing the drawer or reloading the
 browser — see [Comments and history](comments-and-history.md).

@@ -106,9 +106,12 @@ board-specific lives in `plugins/`.
 ### Comments and history
 
 - **Comments** — editable, with full version history.
+- **Markdown subset** — bold, italics, code, links, lists, headings, and
+  pipe tables render safely; raw HTML never does.
 - **Auto-linking** — catalog entity refs in comment text become links.
-- **Mentions** — `@`-mention users in comments; mentions render as entity
-  links.
+- **Mentions** — `@`-mention users, groups, or any catalog entity
+  (`@jane`, `@group:default/team-a`, `@component:webserver-example`);
+  mentions render as entity links.
 - **Change history** — every non-comment change is recorded with who, when,
   and what.
 - **Unified timeline** — comments and changes merged in the item detail view.
@@ -148,7 +151,8 @@ board-specific lives in `plugins/`.
 - **Watching** — watch a whole board or a single item; watchers are listed.
 - **Change notifications** — watched changes arrive as Backstage
   notifications, grouped per user.
-- **Mention notifications** — being mentioned in a comment notifies you.
+- **Mention notifications** — being mentioned in a comment notifies you;
+  only user and group mentions notify.
 - **Scheduled reminders** — optional, configurable reminders about due and
   overdue items.
 - **Live updates** — open boards refresh via Backstage signals; the signals
@@ -169,7 +173,11 @@ board-specific lives in `plugins/`.
   in the Backstage actions registry with typed schemas.
 - **Same rules as the API** — actions enforce the same permissions and
   produce the same history and notifications as the UI.
-- **`list-items`** — a read-only query action honoring the item filters.
+- **Name-based references** — statuses (column titles), priorities, and
+  permission principals are passed as strings, never as database ids;
+  unknown or ambiguous values fail the action with the valid values listed.
+- **Read-only queries** — `list-items` honoring the item filters, plus
+  `list-statuses` and `list-priorities` to discover a board's valid values.
 - **External managers** — integrations can create and update items carrying
   the external-management marker.
 

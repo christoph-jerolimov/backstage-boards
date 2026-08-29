@@ -49,6 +49,22 @@ describe('autolinkEntities', () => {
     ]);
   });
 
+  it('links full-entity-ref mentions of any kind', () => {
+    expect(autolinkEntities('see @component:webserver-example please')).toEqual(
+      [
+        { type: 'text', value: 'see ' },
+        { type: 'entity', entityRef: 'component:default/webserver-example' },
+        { type: 'text', value: ' please' },
+      ],
+    );
+  });
+
+  it('never links text: mentions', () => {
+    expect(autolinkEntities('read @text:foo')).toEqual([
+      { type: 'text', value: 'read @text:foo' },
+    ]);
+  });
+
   it('does not treat emails as mentions', () => {
     expect(autolinkEntities('mail jane@example.com')).toEqual([
       { type: 'text', value: 'mail jane@example.com' },
@@ -134,5 +150,74 @@ describe('parseMarkdown', () => {
       type: 'entity',
       entityRef: 'system:default/payments',
     });
+  });
+
+  it('parses headings with inline formatting', () => {
+    const blocks = parseMarkdown('## Rollout **plan**');
+    expect(blocks).toEqual([
+      {
+        type: 'heading',
+        level: 2,
+        children: [
+          { type: 'text', value: 'Rollout ' },
+          { type: 'bold', children: [{ type: 'text', value: 'plan' }] },
+        ],
+      },
+    ]);
+  });
+
+  it('keeps hashtags without a space as paragraph text', () => {
+    const [block] = parseMarkdown('#hashtag');
+    expect(block).toEqual({
+      type: 'paragraph',
+      children: [{ type: 'text', value: '#hashtag' }],
+    });
+  });
+
+  it('parses pipe tables with inline formatting and entity refs', () => {
+    const blocks = parseMarkdown(
+      '| Name | Owner |\n| --- | --- |\n| **api** | user:jane |\n| web |',
+    );
+    expect(blocks).toEqual([
+      {
+        type: 'table',
+        header: [
+          [{ type: 'text', value: 'Name' }],
+          [{ type: 'text', value: 'Owner' }],
+        ],
+        rows: [
+          [
+            [{ type: 'bold', children: [{ type: 'text', value: 'api' }] }],
+            [{ type: 'entity', entityRef: 'user:jane' }],
+          ],
+          [[{ type: 'text', value: 'web' }], []],
+        ],
+      },
+    ]);
+  });
+
+  it('keeps pipe lines without a separator row as paragraph text', () => {
+    const blocks = parseMarkdown('either | or');
+    expect(blocks).toEqual([
+      {
+        type: 'paragraph',
+        children: [{ type: 'text', value: 'either | or' }],
+      },
+    ]);
+  });
+
+  it('does not swallow a table into a preceding paragraph', () => {
+    const blocks = parseMarkdown(
+      'intro text\n| a | b |\n| --- | --- |\n| 1 | 2 |',
+    );
+    expect(blocks.map(block => block.type)).toEqual(['paragraph', 'table']);
+    expect(paragraphChildren(blocks[0])).toEqual([
+      { type: 'text', value: 'intro text' },
+    ]);
+  });
+
+  it('ends a paragraph at a heading line', () => {
+    const blocks = parseMarkdown('intro text\n# Title');
+    expect(blocks.map(block => block.type)).toEqual(['paragraph', 'heading']);
   });
 });

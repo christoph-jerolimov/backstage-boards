@@ -66,7 +66,7 @@ When a board's content changes (items, comments, columns, or board settings), th
 - **THEN** the signal contains only the board (and optionally item) id, and clients fetch actual data through the authorized API
 
 ### Requirement: Mention notifications
-When a saved comment or item description contains @-mentions (`@user:...`, `@group:...`, or `@name` shorthand for `user:default/name`), the backend SHALL send a mention notification to each mentioned principal, whether or not they watch the item or board. The acting user SHALL NOT be notified for mentioning themselves, and a principal who is both mentioned and watching SHALL receive only the mention notification for that event.
+When a saved comment or item description contains @-mentions (`@user:...`, `@group:...`, or `@name` shorthand for `user:default/name`), the backend SHALL send a mention notification to each mentioned principal, whether or not they watch the item or board. The acting user SHALL NOT be notified for mentioning themselves, and a principal who is both mentioned and watching SHALL receive only the mention notification for that event. Mentions of entities of any other kind (e.g. `@component:...`) SHALL NOT produce notifications.
 
 #### Scenario: Non-watcher is notified on mention
 - **WHEN** a user saves a comment containing `@user:default/carol` and carol watches neither the item nor the board
@@ -79,6 +79,10 @@ When a saved comment or item description contains @-mentions (`@user:...`, `@gro
 #### Scenario: No self- or double-notification
 - **WHEN** a watching user is mentioned in a comment by another user
 - **THEN** they receive exactly one notification for that comment (the mention), and the author receives none for mentioning themselves
+
+#### Scenario: Non-principal mention notifies nobody
+- **WHEN** a user saves a comment containing `@component:webserver-example` and no user/group mentions
+- **THEN** no mention notification is sent for that comment
 
 ### Requirement: Configurable item reminders
 
