@@ -15,5 +15,5 @@
 
 ## 4. End-to-end and regression
 
-- [ ] 4.1 Update `plugins/boards/e2e-tests/home-widgets.test.ts` and `plugins/boards/e2e-tests/my-items-menu.test.ts` to assert the drawer opens in place (dialog visible, URL unchanged) and closes back to the host page; visually confirm the overlay renders above the homepage widgets. Verify with `yarn playwright test home-widgets my-items-menu` passing.
-- [ ] 4.2 Regression pass: board page drawer still driven by `?item=` (open a `/boards/<boardId>?item=<itemId>` deep link), boards-page "My items" tab gets the in-place drawer via the shared `MyItemsList`, and full plugin suite is green. Verify with `yarn test plugins/boards` and `yarn lint` passing.
+- [x] 4.1 Update `plugins/boards/e2e-tests/home-widgets.test.ts` and `plugins/boards/e2e-tests/my-items-menu.test.ts` to assert the drawer opens in place (dialog visible, URL unchanged) and closes back to the host page; visually confirm the overlay renders above the homepage widgets. Verify with `yarn playwright test home-widgets my-items-menu` passing.
+- [x] 4.2 Regression pass: board page drawer still driven by `?item=` (open a `/boards/<boardId>?item=<itemId>` deep link), boards-page "My items" tab gets the in-place drawer via the shared `MyItemsList`, and full plugin suite is green. Verify with `yarn test plugins/boards` and `yarn lint` passing.

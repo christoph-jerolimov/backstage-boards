@@ -110,7 +110,9 @@ test.describe('my-items item drawer', () => {
     await seedAssignedBoard(name, ['Drawer card']);
     await openMyItems(page, name);
 
+    // scoped to this run's board: my-items lists every assigned item
     await page
+      .getByRole('grid', { name: `My items on ${name}` })
       .getByRole('button', { name: 'Actions for Drawer card' })
       .click();
     await page.getByRole('menuitem', { name: 'Open details' }).click();

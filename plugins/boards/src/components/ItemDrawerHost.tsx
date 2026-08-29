@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { BoardItem, levelIncludes } from '@internal/plugin-boards-common';
@@ -50,7 +51,10 @@ export function ItemDrawerHost(props: {
     return null;
   }
   const canWrite = levelIncludes(board.access, 'write') && !board.archivedAt;
-  return (
+  // A portal, because a host may sit inside a transformed ancestor (the
+  // home page grid positions its cells with CSS transforms), which would
+  // trap the drawer's fixed positioning inside that cell.
+  return createPortal(
     <ItemDrawer
       board={board}
       item={item}
@@ -61,6 +65,7 @@ export function ItemDrawerHost(props: {
         await invalidateBoard(queryClient, boardId);
         await invalidateMyItems(queryClient);
       }}
-    />
+    />,
+    document.body,
   );
 }

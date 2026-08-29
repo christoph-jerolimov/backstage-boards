@@ -85,7 +85,13 @@ See proposal.md for motivation. Current mechanics that shape the design:
    rendering. While the board is still loading, the host renders nothing
    (my-items has it cached; the homepage fetch is one small request).
 
-5. **Hosts change only their activation handlers.**
+5. **The host renders the drawer through a portal to `document.body`.**
+   The home page grid positions its cells with CSS transforms, and a
+   transformed ancestor traps `position: fixed` descendants — without the
+   portal the drawer and its backdrop render inside the widget cell
+   (verified visually). The board page keeps its direct render.
+
+6. **Hosts change only their activation handlers.**
    - `AssignedItemsWidget.tsx`: `openItem` sets host state instead of
      `navigate`; `openBoard` unchanged.
    - `MyItemsPage.tsx` (`MyItemsList`): `TableRoot onRowAction` and
@@ -97,9 +103,9 @@ See proposal.md for motivation. Current mechanics that shape the design:
 ## Risks / Trade-offs
 
 - [Drawer overlay on a crowded homepage: another widget or the app shell
-  could render above zIndex 901] → verify visually via the existing
-  home-widgets e2e test; the drawer already renders outside `/boards/*`
-  today (catalog entity tab), so the pattern is proven.
+  could render above zIndex 901, and the grid's CSS transforms capture
+  fixed positioning] → the host portals the drawer to `document.body`
+  (Decision 5), verified visually and by the home-widgets e2e test.
 - [Stale snapshot flash: drawer opens with `listMyItems` data, then
   re-renders with fresh item] → acceptable; same fields, sub-second, and
   strictly better than navigating away.
