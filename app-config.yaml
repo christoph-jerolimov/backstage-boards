@@ -172,6 +172,11 @@ catalog:
   rules:
     - allow: [Component, System, API, Resource, Location]
   locations:
+    # The app's own catalog entity; carries the TechDocs (mkdocs.yml + docs/)
+    # for the boards plugin, shown under Docs in the running app.
+    - type: file
+      target: ../../catalog-info.yaml
+
     # Local example data, file locations are relative to the backend process, typically `packages/backend`
     - type: file
       target: ../../examples/entities.yaml

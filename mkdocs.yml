@@ -1,0 +1,22 @@
+site_name: Backstage Boards
+site_description: Shareable kanban boards inside the Backstage developer portal
+
+plugins:
+  - techdocs-core
+
+nav:
+  - Overview: index.md
+  - Installation: installation.md
+  - Configuration: configuration.md
+  - Features:
+      - The boards list: features/boards.md
+      - Board views: features/board.md
+      - Working with items: features/items.md
+      - The item details drawer: features/item-details.md
+      - Priorities: features/priorities.md
+      - Comments and history: features/comments-and-history.md
+      - Sharing a board: features/sharing.md
+      - My items: features/my-items.md
+      - Catalog integration: features/catalog-entities.md
+      - Watching and notifications: features/watching-and-notifications.md
+      - Home page cards: features/home-page.md
