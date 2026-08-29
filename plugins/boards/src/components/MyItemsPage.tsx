@@ -41,6 +41,7 @@ import {
   MY_ITEMS_PAGE_GROUP_BY,
 } from './grouping';
 import { GroupLabel } from './GroupLabel';
+import { ItemDrawerHost } from './ItemDrawerHost';
 import { ItemActions, ItemMenu } from './ItemMenu';
 import { useRowMenu } from './RowMenu';
 import { AsyncList, ErrorText, selectedOption } from './common';
@@ -73,6 +74,8 @@ function MyItemsTable(props: {
   /** Render the priority column; on when any listed item has one. */
   showPriority: boolean;
   onError: (message?: string) => void;
+  /** Opens the entry's detail drawer in place. */
+  onOpenItem: (entry: MyBoardItem) => void;
 }) {
   const {
     label,
@@ -83,6 +86,7 @@ function MyItemsTable(props: {
     showBoardColumn,
     showPriority,
     onError,
+    onOpenItem,
   } = props;
   const navigate = useNavigate();
   const boardsApi = useApi(boardsApiRef);
@@ -108,7 +112,12 @@ function MyItemsTable(props: {
   };
 
   const actionsOf = (boardId: string): ItemActions => ({
-    openItem: itemId => navigate(`${boardPath(boardId)}?item=${itemId}`),
+    openItem: itemId => {
+      const entry = byId.get(itemId);
+      if (entry) {
+        onOpenItem(entry);
+      }
+    },
     moveItem: (itemId, target) =>
       guarded(boardId, () => boardsApi.moveItem(boardId, itemId, target)),
     setItemDueDate: (itemId, dueDate) =>
@@ -156,7 +165,7 @@ function MyItemsTable(props: {
         onRowAction={key => {
           const entry = byId.get(String(key));
           if (entry) {
-            navigate(`${boardPath(entry.boardId)}?item=${entry.item.id}`);
+            onOpenItem(entry);
           }
         }}
       >
@@ -281,6 +290,9 @@ export function MyItemsList() {
   const basePath = useBoardsBasePath();
   const [actionError, setActionError] = useState<string | undefined>();
   const [groupBy, setGroupBy] = useState<MyItemsGroupBy>('board');
+  // the open drawer, held as its own copy so it survives the row
+  // disappearing (e.g. after the user unassigns themselves)
+  const [openEntry, setOpenEntry] = useState<MyBoardItem | undefined>();
 
   const { data: entries, isLoading, error, refetch } = useMyItemsQuery();
 
@@ -376,11 +388,20 @@ export function MyItemsList() {
                 showBoardColumn={groupBy !== 'board'}
                 showPriority={showPriority}
                 onError={setActionError}
+                onOpenItem={setOpenEntry}
               />
             </div>
           ))
         }
       </AsyncList>
+      {openEntry && (
+        <ItemDrawerHost
+          boardId={openEntry.boardId}
+          itemId={openEntry.item.id}
+          fallbackItem={openEntry.item}
+          onClose={() => setOpenEntry(undefined)}
+        />
+      )}
     </Flex>
   );
 }
