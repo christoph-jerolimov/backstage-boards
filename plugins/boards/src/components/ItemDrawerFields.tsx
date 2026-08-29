@@ -5,6 +5,18 @@ import { DueDateBadge } from './DueDate';
 import { PrincipalPicker } from './PrincipalPicker';
 import { formatDate, RefChips, RefDisplay } from './common';
 
+/** A headlined section of the drawer body, grouping related blocks. */
+export function DrawerSection(props: { title: string; children: ReactNode }) {
+  return (
+    <Flex direction="column" gap="2">
+      <Text variant="body-medium" weight="bold" as="h3">
+        {props.title}
+      </Text>
+      {props.children}
+    </Flex>
+  );
+}
+
 /** A labelled block of the drawer body. */
 export function DrawerField(props: { label: string; children: ReactNode }) {
   return (

@@ -53,6 +53,7 @@ async function openMenu(options: {
   priorities?: BoardPriority[];
   extraItems?: ReactNode;
   catalogApi?: unknown;
+  showOpenDetails?: boolean;
 }) {
   const actions = testActions();
   const item = options.item ?? testItem();
@@ -67,6 +68,7 @@ async function openMenu(options: {
         actions={actions}
         assigneePool={options.assigneePool ?? []}
         extraItems={options.extraItems}
+        showOpenDetails={options.showOpenDetails}
       />
     </MenuTrigger>,
     {
@@ -77,7 +79,9 @@ async function openMenu(options: {
     },
   );
   await userEvent.click(screen.getByRole('button', { name: 'Actions' }));
-  await screen.findByRole('menuitem', { name: 'Open details' });
+  await screen.findByRole('menuitem', {
+    name: options.showOpenDetails === false ? 'Move to column' : 'Open details',
+  });
   return { actions, item };
 }
 
@@ -93,6 +97,13 @@ describe('ItemMenu', () => {
       'Assignee',
       'Delete item',
     ]);
+  });
+
+  it('drops Open details when the details are already open', async () => {
+    await openMenu({ showOpenDetails: false });
+    expect(
+      screen.getAllByRole('menuitem').map(entry => entry.textContent),
+    ).toEqual(['Move to column', 'Due date', 'Assignee', 'Delete item']);
   });
 
   it('offers only Open details on read-only items', async () => {

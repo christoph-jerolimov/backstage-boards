@@ -28,22 +28,24 @@ const board = testBoard({
 
 const timeline = [
   {
+    kind: 'change',
+    at: '2026-08-01T10:00:00.000Z',
+    change: {
+      id: 'change-1',
+      actorRef: 'text:Importer',
+      type: 'created',
+      at: '2026-08-01T10:00:00.000Z',
+    },
+  },
+  {
     kind: 'comment',
+    at: '2026-08-05T10:00:00.000Z',
     comment: {
       id: 'comment-1',
       authorRef: 'user:default/jane',
       text: 'Looks good',
       createdAt: '2026-08-05T10:00:00.000Z',
       versionCount: 1,
-    },
-  },
-  {
-    kind: 'change',
-    change: {
-      id: 'change-1',
-      actorRef: 'text:Importer',
-      type: 'created',
-      at: '2026-08-01T10:00:00.000Z',
     },
   },
 ];
@@ -85,8 +87,8 @@ describe('ItemDrawer', () => {
     expect(
       screen.getByRole('dialog', { name: 'Item Ship the docs' }),
     ).toBeInTheDocument();
-    // the status badge and the status select both name the column
-    expect(screen.getAllByText('Todo').length).toBeGreaterThan(0);
+    // the status badge is the one place naming the column
+    expect(screen.getByText('Todo')).toBeInTheDocument();
     expect(screen.getByText('No due date')).toBeInTheDocument();
     expect(screen.getByText('Unassigned')).toBeInTheDocument();
     expect(screen.getByText('No description yet.')).toBeInTheDocument();
@@ -118,41 +120,69 @@ describe('ItemDrawer', () => {
     });
   });
 
-  it('moves the item to another status', async () => {
+  it('moves the item to another status via the badge', async () => {
     const { boardsApi } = renderDrawer();
-    await userEvent.click(screen.getByRole('button', { name: /Status/ }));
-    await userEvent.click(await screen.findByRole('option', { name: 'Done' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Change status: Todo' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Done' }),
+    );
     expect(boardsApi.moveItem).toHaveBeenCalledWith('board-1', 'item-1', {
       columnId: 'column-2',
     });
   });
 
-  it('offers no priority field on a board without priorities', () => {
+  it('offers no priority control on a board without priorities', () => {
     renderDrawer();
     expect(
-      screen.queryByRole('button', { name: /Priority/ }),
+      screen.queryByRole('button', { name: /Change priority/ }),
     ).not.toBeInTheDocument();
   });
 
-  it('sets the priority from the drawer', async () => {
+  it('sets the priority from the drawer badge', async () => {
     const { boardsApi } = renderDrawer({ priorities: testPriorities() });
-    await userEvent.click(screen.getByRole('button', { name: /Priority/ }));
-    await userEvent.click(await screen.findByRole('option', { name: 'high' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Change priority: No priority' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'high' }),
+    );
     expect(boardsApi.updateItem).toHaveBeenCalledWith('board-1', 'item-1', {
       priorityId: 'priority-2',
     });
   });
 
-  it('clears the priority via the None option', async () => {
+  it('clears the priority via the No priority entry', async () => {
     const { boardsApi } = renderDrawer({
       item: testItem({ priorityId: 'priority-2' }),
       priorities: testPriorities(),
     });
-    await userEvent.click(screen.getByRole('button', { name: /Priority/ }));
-    await userEvent.click(await screen.findByRole('option', { name: 'None' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Change priority: high' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'No priority' }),
+    );
     expect(boardsApi.updateItem).toHaveBeenCalledWith('board-1', 'item-1', {
       priorityId: null,
     });
+  });
+
+  it('shows plain badges without pickers to readers', () => {
+    renderDrawer({
+      canWrite: false,
+      item: testItem({ priorityId: 'priority-1' }),
+      priorities: testPriorities(),
+    });
+    expect(screen.getByText('Todo')).toBeInTheDocument();
+    expect(screen.getByText('critical')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Change status/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Change priority/ }),
+    ).not.toBeInTheDocument();
   });
 
   it('sets and clears the due date', async () => {
@@ -256,18 +286,93 @@ describe('ItemDrawer', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('deletes the item and closes', async () => {
+  it('offers the item menu without Open details and no standalone delete button', async () => {
+    renderDrawer({ priorities: testPriorities() });
+    expect(
+      screen.queryByRole('button', { name: 'Delete item' }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Actions for Ship the docs' }),
+    );
+    expect(
+      (await screen.findAllByRole('menuitem')).map(entry => entry.textContent),
+    ).toEqual([
+      'Move to column',
+      'Due date',
+      'Priority',
+      'Assignee',
+      'Delete item',
+    ]);
+  });
+
+  it('deletes the item from the menu and closes', async () => {
     const { boardsApi, onClose } = renderDrawer();
-    await userEvent.click(screen.getByRole('button', { name: 'Delete item' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Actions for Ship the docs' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Delete item' }),
+    );
     expect(boardsApi.deleteItem).toHaveBeenCalledWith('board-1', 'item-1');
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 
-  it('shows the activity timeline with comments and changes', async () => {
+  it('moves the item from the menu', async () => {
+    const { boardsApi } = renderDrawer();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Actions for Ship the docs' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Move to column' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Done' }),
+    );
+    expect(boardsApi.moveItem).toHaveBeenCalledWith('board-1', 'item-1', {
+      columnId: 'column-2',
+    });
+  });
+
+  it('hides the item menu from readers', () => {
+    renderDrawer({ canWrite: false });
+    expect(
+      screen.queryByRole('button', { name: 'Actions for Ship the docs' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('groups the drawer into headlined sections', () => {
     renderDrawer();
-    expect(await screen.findByText('Looks good')).toBeInTheDocument();
+    for (const title of [
+      'Details',
+      'Description',
+      'Checklist',
+      'Tags',
+      'Activity',
+    ]) {
+      expect(screen.getByRole('heading', { name: title })).toBeInTheDocument();
+    }
+  });
+
+  it('shows the activity timeline with comments and changes, newest first', async () => {
+    renderDrawer();
+    const comment = await screen.findByText('Looks good');
     expect(screen.getByText('Importer')).toBeInTheDocument();
-    expect(screen.getByText(/created this item/)).toBeInTheDocument();
+    const change = screen.getByText(/created this item/);
+    // the older change entry renders below the newer comment
+    expect(
+      comment.compareDocumentPosition(change) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('places the comment composer above the timeline', async () => {
+    renderDrawer();
+    await screen.findByText('Looks good');
+    const composer = screen.getByRole('textbox', { name: 'New comment' });
+    const tabs = screen.getByRole('tab', { name: 'Combined' });
+    expect(
+      composer.compareDocumentPosition(tabs) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it('adds a comment', async () => {
@@ -310,7 +415,10 @@ describe('ItemDrawer', () => {
       screen.getByText('This item is managed by “jira” and read-only.'),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Delete item' }),
+      screen.queryByRole('button', { name: /Actions for/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Change status/ }),
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('combobox', { name: 'Add assignee' }),
