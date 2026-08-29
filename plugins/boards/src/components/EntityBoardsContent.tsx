@@ -5,6 +5,7 @@ import { stringifyEntityRef } from '@backstage/catalog-model';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { boardsQueryClient, useBoardsByEntityQuery } from '../queries';
 import { BoardPageContent } from './BoardPage';
+import { BoardsAccessRestricted, RequireBoardsUse } from './RequireBoardsUse';
 
 function EntityBoardsList() {
   const { entity } = useEntity();
@@ -52,8 +53,13 @@ function EntityBoardsList() {
 /** Shows the boards assigned to the current catalog entity, in full. */
 export function EntityBoardsContent() {
   return (
-    <QueryClientProvider client={boardsQueryClient}>
-      <EntityBoardsList />
-    </QueryClientProvider>
+    // The tab itself is offered by the entity filter (which cannot consult
+    // permissions), so viewers without `boards.use` get the restricted state
+    // here and no boards API call is ever made on their behalf.
+    <RequireBoardsUse fallback={<BoardsAccessRestricted />}>
+      <QueryClientProvider client={boardsQueryClient}>
+        <EntityBoardsList />
+      </QueryClientProvider>
+    </RequireBoardsUse>
   );
 }

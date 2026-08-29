@@ -9,8 +9,14 @@ import {
   BoardsActionsRegistry,
   registerActions,
 } from './actions';
+import { NotAllowedError } from '@backstage/errors';
+import { AuthorizeResult } from '@backstage/plugin-permission-common';
 import { BoardsService } from './service/BoardsService';
-import { createTestService, testLogger } from './service/testUtils';
+import {
+  createTestService,
+  testLogger,
+  testPermissionGuard,
+} from './service/testUtils';
 
 /** The principal shapes this harness hands out. */
 type TestPrincipal =
@@ -152,6 +158,7 @@ describe('actions', () => {
       service,
       auth,
       userInfo,
+      permissionGuard: testPermissionGuard(),
     });
   });
 
@@ -389,5 +396,68 @@ describe('actions', () => {
         aliceCredentials,
       ),
     ).rejects.toThrow(/read-only/);
+  });
+  it('denies every action without boards.use', async () => {
+    const board = await registry.invoke<BoardOutput>(
+      'create-board',
+      { name: 'B' },
+      aliceCredentials,
+    );
+
+    const denied = createRegistry();
+    registerActions({
+      actionsRegistry: denied.registry,
+      service,
+      auth,
+      userInfo,
+      permissionGuard: testPermissionGuard({
+        'boards.use': AuthorizeResult.DENY,
+      }),
+    });
+
+    await expect(
+      denied.invoke('list-items', { boardId: board.id }, aliceCredentials),
+    ).rejects.toThrow(NotAllowedError);
+    await expect(
+      denied.invoke(
+        'update-board',
+        { boardId: board.id, name: 'Nope' },
+        aliceCredentials,
+      ),
+    ).rejects.toThrow(NotAllowedError);
+    // nothing changed
+    const boards = await knex('boards').where('id', board.id);
+    expect(boards[0].name).toBe('B');
+  });
+
+  it('gates create-board on boards.new.create', async () => {
+    const restricted = createRegistry();
+    registerActions({
+      actionsRegistry: restricted.registry,
+      service,
+      auth,
+      userInfo,
+      permissionGuard: testPermissionGuard({
+        'boards.new.create': AuthorizeResult.DENY,
+      }),
+    });
+
+    await expect(
+      restricted.invoke('create-board', { name: 'Nope' }, aliceCredentials),
+    ).rejects.toThrow(/boards\.new\.create/);
+    expect(await knex('boards')).toHaveLength(0);
+
+    // with only use granted, non-creating actions still work
+    const board = await registry.invoke<BoardOutput>(
+      'create-board',
+      { name: 'B' },
+      aliceCredentials,
+    );
+    const updated = await restricted.invoke<IdOutput>(
+      'update-board',
+      { boardId: board.id, name: 'Renamed' },
+      aliceCredentials,
+    );
+    expect(updated.id).toBe(board.id);
   });
 });

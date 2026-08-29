@@ -11,6 +11,7 @@ import Router from 'express-promise-router';
 import { Request } from 'express';
 import { BoardsService } from './service/BoardsService';
 import { BoardsPrincipal } from './service/access';
+import { BoardsPermissionGuard } from './permissions';
 
 function isString(value: unknown): value is string {
   return typeof value === 'string';
@@ -35,6 +36,7 @@ export interface RouterOptions {
   auth: Pick<AuthService, 'isPrincipal'>;
   userInfo: Pick<UserInfoService, 'getUserInfo'>;
   logger: LoggerService;
+  permissionGuard: BoardsPermissionGuard;
 }
 
 /** A query parameter as a string, or undefined when it is absent or repeated. */
@@ -91,16 +93,13 @@ export async function resolvePrincipal(
 export async function createRouter(
   options: RouterOptions,
 ): Promise<express.Router> {
-  const { service } = options;
+  const { service, permissionGuard } = options;
   const router = Router();
   router.use(express.json());
 
   const principalOf = (req: Request) => resolvePrincipal(req, options);
-
-  router.get('/my-items', async (req, res) => {
-    const principal = await principalOf(req);
-    res.json({ items: await service.listMyItems(principal) });
-  });
+  const credentialsOf = (req: Request) =>
+    options.httpAuth.credentials(req, { allow: ['user', 'service', 'none'] });
 
   // ---- service-to-service
 
@@ -109,7 +108,9 @@ export async function createRouter(
   // principals: the answer ignores board visibility, so exposing it to users
   // would leak the existence of boards they cannot read. The plugin's router
   // allows unauthenticated requests through (public boards), so this handler
-  // has to demand service credentials itself.
+  // has to demand service credentials itself. Registered before the
+  // `boards.use` gate: this route is not user-invoked, so the plugin-level
+  // framework permissions do not apply to it.
   router.get('/service/entity-references', async (req, res) => {
     await options.httpAuth.credentials(req, { allow: ['service'] });
     const entityRef = req.query.entityRef;
@@ -117,6 +118,21 @@ export async function createRouter(
       throw new InputError('entityRef is required');
     }
     res.json({ referenced: await service.isEntityReferenced(entityRef) });
+  });
+
+  // Every user-invoked route below requires the `boards.use` framework
+  // permission. With the permission framework disabled or the allow-all
+  // policy this always passes, keeping the framework optional; anonymous
+  // credentials are evaluated too, so public boards stay reachable exactly
+  // as far as the installation's policy allows.
+  router.use(async (req, _res, next) => {
+    await permissionGuard.requireUse(await credentialsOf(req));
+    next();
+  });
+
+  router.get('/my-items', async (req, res) => {
+    const principal = await principalOf(req);
+    res.json({ items: await service.listMyItems(principal) });
   });
 
   // ---- boards
@@ -147,6 +163,7 @@ export async function createRouter(
   });
 
   router.post('/boards', async (req, res) => {
+    await permissionGuard.requireCreate(await credentialsOf(req));
     const principal = await principalOf(req);
     const board = await service.createBoard(principal, {
       name: req.body.name,
@@ -217,6 +234,8 @@ export async function createRouter(
   });
 
   router.post('/boards/:boardId/duplicate', async (req, res) => {
+    // duplicating brings a new board into existence, so it is gated like create
+    await permissionGuard.requireCreate(await credentialsOf(req));
     const principal = await principalOf(req);
     res.status(201).json(
       await service.duplicateBoard(principal, req.params.boardId, {

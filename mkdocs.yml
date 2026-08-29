@@ -8,6 +8,7 @@ nav:
   - Overview: index.md
   - Installation: installation.md
   - Configuration: configuration.md
+  - Permission framework: permissions.md
   - Features:
       - The boards list: features/boards.md
       - Board views: features/board.md

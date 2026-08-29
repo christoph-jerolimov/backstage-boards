@@ -1,4 +1,5 @@
 import { LoggerService } from '@backstage/backend-plugin-api';
+import { AuthorizeResult } from '@backstage/plugin-permission-common';
 import {
   NotificationSendOptions,
   NotificationService,
@@ -6,6 +7,7 @@ import {
 import { SignalsService } from '@backstage/plugin-signals-node';
 import knexFactory, { Knex } from 'knex';
 import { applyDatabaseMigrations } from '../database/migrations';
+import { BoardsPermissionGuard } from '../permissions';
 import { BoardsPrincipal } from './access';
 import { BoardsService, BoardsServiceOptions } from './BoardsService';
 
@@ -41,6 +43,23 @@ export const syncService: BoardsPrincipal = {
 };
 
 export const anonymous: BoardsPrincipal = { type: 'anonymous' };
+
+/**
+ * A permission guard whose decisions come from the given map by permission
+ * name. Missing entries are ALLOW — the framework's answer under the
+ * allow-all policy or with permissions disabled, so a guard built with no
+ * argument reproduces the plugin's default behavior.
+ */
+export function testPermissionGuard(
+  decisions: Record<string, AuthorizeResult.ALLOW | AuthorizeResult.DENY> = {},
+): BoardsPermissionGuard {
+  return new BoardsPermissionGuard({
+    authorize: async requests =>
+      requests.map(({ permission }) => ({
+        result: decisions[permission.name] ?? AuthorizeResult.ALLOW,
+      })),
+  });
+}
 
 /** The bit of a better-sqlite3 connection the pool hook reaches for. */
 type SqliteConnection = { pragma(source: string): unknown };

@@ -8,6 +8,7 @@ import { RETENTION_DAYS } from '@internal/plugin-boards-common';
 import { AnyZodObject } from 'zod/v3';
 import { BoardsService } from './service/BoardsService';
 import { BoardsPrincipal } from './service/access';
+import { BoardsPermissionGuard } from './permissions';
 
 /**
  * The registry surface these actions use: none of them declares secrets, so
@@ -26,6 +27,7 @@ export interface ActionsOptions {
   service: BoardsService;
   auth: Pick<AuthService, 'isPrincipal'>;
   userInfo: Pick<UserInfoService, 'getUserInfo'>;
+  permissionGuard: BoardsPermissionGuard;
 }
 
 export async function credentialsToPrincipal(
@@ -57,8 +59,21 @@ const VISIBILITIES = [
 
 export function registerActions(options: ActionsOptions): void {
   const { actionsRegistry, service } = options;
-  const toPrincipal = (credentials: BackstageCredentials) =>
-    credentialsToPrincipal(credentials, options);
+  // Every action goes through here, so the actions door enforces the same
+  // plugin-level framework permissions as the REST router: `boards.use` for
+  // everything, plus `boards.new.create` where a new board comes into
+  // existence.
+  const toPrincipal = async (
+    credentials: BackstageCredentials,
+    access: 'use' | 'create' = 'use',
+  ): Promise<BoardsPrincipal> => {
+    if (access === 'create') {
+      await options.permissionGuard.requireCreate(credentials);
+    } else {
+      await options.permissionGuard.requireUse(credentials);
+    }
+    return credentialsToPrincipal(credentials, options);
+  };
 
   actionsRegistry.register({
     name: 'create-board',
@@ -86,13 +101,16 @@ export function registerActions(options: ActionsOptions): void {
       output: z => z.object({ id: z.string(), name: z.string() }),
     },
     action: async ({ input, credentials }) => {
-      const board = await service.createBoard(await toPrincipal(credentials), {
-        name: input.name,
-        columns: input.columns,
-        entityRefs: input.entityRefs,
-        visibility: input.visibility,
-        admins: input.admins,
-      });
+      const board = await service.createBoard(
+        await toPrincipal(credentials, 'create'),
+        {
+          name: input.name,
+          columns: input.columns,
+          entityRefs: input.entityRefs,
+          visibility: input.visibility,
+          admins: input.admins,
+        },
+      );
       return { output: { id: board.id, name: board.name } };
     },
   });

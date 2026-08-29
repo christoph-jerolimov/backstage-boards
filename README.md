@@ -127,6 +127,9 @@ board-specific lives in `plugins/`.
   just the UI.
 - **Catalog-backed pickers** — share with users and groups picked from the
   catalog.
+- **Optional permission framework integration** — `boards.use` gates the
+  plugin per user like a feature flag, and `boards.new.create` decides who
+  may create boards; with the allow-all policy nothing changes.
 
 ### Catalog integration
 

@@ -32,6 +32,7 @@ import { EntityRefList, InlineEdit, selectedOption } from './common';
 import { FavoriteButton } from './FavoriteButton';
 import { WatchButton } from './WatchButton';
 import { BoardDialogKind } from './BoardDialogs';
+import { useBoardsCreateAllowed } from './RequireBoardsUse';
 
 /** Every layout the board page can be shown in. */
 export const ALL_BOARD_VIEW_MODES = ['board', 'table'] as const;
@@ -71,6 +72,9 @@ export function BoardHeader(props: {
   const { board, canWrite, isAdmin, view, groupBy, guarded } = props;
   const { onViewChange, onGroupByChange, onOpenDialog } = props;
   const boardsApi = useApi(boardsApiRef);
+  // duplicating creates a new board, which the framework's
+  // `boards.new.create` permission may reserve for some users
+  const canCreate = useBoardsCreateAllowed();
 
   return (
     <>
@@ -182,12 +186,14 @@ export function BoardHeader(props: {
                   Priority matrix…
                 </MenuItem>
               )}
-              <MenuItem
-                iconStart={<RiFileCopyLine size={16} />}
-                onAction={() => onOpenDialog('duplicate')}
-              >
-                Duplicate board…
-              </MenuItem>
+              {canCreate && (
+                <MenuItem
+                  iconStart={<RiFileCopyLine size={16} />}
+                  onAction={() => onOpenDialog('duplicate')}
+                >
+                  Duplicate board…
+                </MenuItem>
+              )}
               {isAdmin && (
                 <MenuItem
                   iconStart={<RiSettings3Line size={16} />}

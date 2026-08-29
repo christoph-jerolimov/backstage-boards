@@ -49,6 +49,7 @@ import {
 } from './TablePagination';
 import { FavoriteButton, FavoriteStar } from './FavoriteButton';
 import { useAsyncAction } from './useAsyncAction';
+import { useBoardsCreateAllowed } from './RequireBoardsUse';
 
 /** The shared board actions menu: row button and right-click alike. */
 function BoardMenu(props: {
@@ -221,6 +222,9 @@ export function BoardListPage() {
   const [tab, setTab] = useState<string>('favorites');
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState('');
+  // the framework's `boards.new.create` permission may reserve board
+  // creation for some users; existing boards stay fully usable
+  const canCreate = useBoardsCreateAllowed();
   const {
     error,
     pending: creating,
@@ -270,9 +274,11 @@ export function BoardListPage() {
         <Text variant="title-medium" as="h1">
           Boards
         </Text>
-        <Button variant="primary" onPress={() => setCreateOpen(true)}>
-          Create board
-        </Button>
+        {canCreate && (
+          <Button variant="primary" onPress={() => setCreateOpen(true)}>
+            Create board
+          </Button>
+        )}
       </Flex>
       {error && <ErrorText>{error}</ErrorText>}
       <Tabs selectedKey={tab} onSelectionChange={key => setTab(String(key))}>

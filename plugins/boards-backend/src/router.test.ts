@@ -22,7 +22,14 @@ import {
 } from '@internal/plugin-boards-common';
 import { createRouter, RouterHttpAuth } from './router';
 import { BoardsService } from './service/BoardsService';
-import { createTestService, alice, bob, testLogger } from './service/testUtils';
+import {
+  createTestService,
+  alice,
+  bob,
+  testLogger,
+  testPermissionGuard,
+} from './service/testUtils';
+import { AuthorizeResult } from '@backstage/plugin-permission-common';
 
 const USERS: Record<
   string,
@@ -159,6 +166,7 @@ describe('createRouter', () => {
         auth,
         userInfo,
         logger: testLogger,
+        permissionGuard: testPermissionGuard(),
       }),
     );
     app.use(errorMiddleware());
@@ -766,5 +774,118 @@ describe('createRouter', () => {
         .set('x-test-service', 'plugin:catalog')
         .expect(400);
     });
+  });
+});
+
+describe('framework permissions', () => {
+  let knex: Knex;
+  let service: BoardsService;
+
+  beforeEach(async () => {
+    const testService = await createTestService();
+    knex = testService.knex;
+    service = testService.service;
+  });
+
+  afterEach(async () => {
+    await knex.destroy();
+  });
+
+  async function appDeciding(
+    decisions: Record<string, AuthorizeResult.ALLOW | AuthorizeResult.DENY>,
+  ) {
+    const app = express();
+    app.use(
+      await createRouter({
+        service,
+        httpAuth,
+        auth,
+        userInfo,
+        logger: testLogger,
+        permissionGuard: testPermissionGuard(decisions),
+      }),
+    );
+    app.use(errorMiddleware());
+    return app;
+  }
+
+  it('denies every user-invoked endpoint without boards.use', async () => {
+    const board = await service.createBoard(alice, { name: 'Existing' });
+    const app = await appDeciding({ 'boards.use': AuthorizeResult.DENY });
+
+    await request(app).get('/boards').set('x-test-user', 'alice').expect(403);
+    await request(app).get('/my-items').set('x-test-user', 'alice').expect(403);
+    await request(app)
+      .get(`/boards/${board.id}/items`)
+      .set('x-test-user', 'alice')
+      .expect(403);
+    const mutation = await request(app)
+      .patch(`/boards/${board.id}`)
+      .set('x-test-user', 'alice')
+      .send({ name: 'Renamed' })
+      .expect(403);
+    expect(mutation.body.error.name).toBe('NotAllowedError');
+    // nothing was changed by the denied mutation
+    expect((await service.getBoard(alice, board.id)).name).toBe('Existing');
+  });
+
+  it('evaluates anonymous callers too', async () => {
+    await service.createBoard(alice, {
+      name: 'Public',
+      visibility: 'public-read',
+    });
+    const denied = await appDeciding({ 'boards.use': AuthorizeResult.DENY });
+    await request(denied).get('/boards').expect(403);
+
+    const allowed = await appDeciding({ 'boards.use': AuthorizeResult.ALLOW });
+    const listing = await request(allowed).get('/boards').expect(200);
+    expect(body<{ boards: BoardListEntry[] }>(listing).boards).toHaveLength(1);
+  });
+
+  it('gates creating and duplicating on boards.new.create', async () => {
+    const board = await service.createBoard(alice, { name: 'Source' });
+    const app = await appDeciding({
+      'boards.use': AuthorizeResult.ALLOW,
+      'boards.new.create': AuthorizeResult.DENY,
+    });
+
+    // everything else keeps working with only boards.use
+    await request(app).get('/boards').set('x-test-user', 'alice').expect(200);
+
+    await request(app)
+      .post('/boards')
+      .set('x-test-user', 'alice')
+      .send({ name: 'New board' })
+      .expect(403);
+    await request(app)
+      .post(`/boards/${board.id}/duplicate`)
+      .set('x-test-user', 'alice')
+      .send({ name: 'Copy', copyColumns: true })
+      .expect(403);
+    // no board came into existence
+    expect(
+      body<{ boards: BoardListEntry[] }>(
+        await request(app)
+          .get('/boards')
+          .set('x-test-user', 'alice')
+          .expect(200),
+      ).boards,
+    ).toHaveLength(1);
+  });
+
+  it('leaves the service-to-service endpoint outside the gate', async () => {
+    await service.createBoard(alice, {
+      name: 'Board',
+      entityRefs: ['component:default/payments'],
+    });
+    const app = await appDeciding({
+      'boards.use': AuthorizeResult.DENY,
+      'boards.new.create': AuthorizeResult.DENY,
+    });
+    const response = await request(app)
+      .get('/service/entity-references?entityRef=component:default/payments')
+      .set('x-test-service', 'plugin:catalog')
+      .expect(200);
+    expect(response.body).toEqual({ referenced: true });
   });
 });

@@ -59,7 +59,7 @@ A small helper wrapping `PermissionsService`:
 
 - `requireUse(credentials)` — authorizes `boards.use`; throws `NotAllowedError` on DENY.
 - `requireCreate(credentials)` — authorizes `boards.new.create`; throws on DENY.
-- Service principals skip the guard entirely: they already receive implicit `admin` in the share model, `ServerPermissionClient` allows them anyway, and gating them would break plugin-to-plugin integrations. User **and anonymous** credentials go through `authorize()`, so a policy can decide about anonymous visitors too.
+- The guard passes every caller's credentials to `authorize()` and lets the permissions service decide: `ServerPermissionClient` (verified at `@backstage/plugin-permission-node@0.11.3`) short-circuits service principals itself — ALLOW, while still honoring their access restrictions, which an explicit bypass in the guard would have ignored — returns ALLOW for everything when `permission.enabled` is false, and evaluates anonymous (`none`) credentials token-lessly so a policy can decide about anonymous visitors too.
 
 Enforcement points:
 
