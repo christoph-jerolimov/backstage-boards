@@ -1,5 +1,26 @@
 # boards/item-management Specification (delta)
 
+## MODIFIED Requirements
+
+### Requirement: Arbitrary due date in details view
+
+The item details drawer SHALL present the item's due date as a single combined display-and-editor control: the due-date badge itself (or a "No due date" placeholder). For users with write access on a non-externally-managed item, the badge SHALL open a menu on click and on right-click offering today, tomorrow, this week (the upcoming Friday), a "pick a date" entry, and — when a due date is set — a remove entry; it SHALL be keyboard-focusable and operable via the keyboard and SHALL carry a visible affordance making its select capability discoverable. The "pick a date" entry SHALL replace the badge with a focused date input so the user can pick any calendar date; leaving the input SHALL restore the badge. Read-only users and externally managed items SHALL see only the plain due-date display without a picker.
+
+#### Scenario: Quick option from the badge
+
+- **WHEN** a user with write access opens the drawer's due-date control and picks "Tomorrow"
+- **THEN** the item's due date becomes tomorrow's date and the badge shows it
+
+#### Scenario: Pick a date in the drawer
+
+- **WHEN** a user with write access chooses "Pick a date…" and selects a date three weeks out in the focused date input
+- **THEN** the item's due date is updated to that date and the badge shows it
+
+#### Scenario: Remove the due date
+
+- **WHEN** a user with write access opens the due-date control of an item with a due date and picks the remove entry
+- **THEN** the item has no due date and the control shows the "No due date" placeholder
+
 ## ADDED Requirements
 
 ### Requirement: Item menu in details drawer
@@ -22,11 +43,15 @@ The item details drawer SHALL offer the same item actions menu as the item's car
 - **THEN** no item actions menu with zero usable entries is offered
 
 ### Requirement: Structured details drawer
-The item details drawer SHALL group its content into visually separated, headlined sections so each block is identifiable at a glance: the item's fields (status, priority, due date, assignees), the description, the checklist, the tags, and the activity block SHALL each be introduced by a visible heading or label.
+The item details drawer SHALL group its content into visually separated, headlined sections so each block is identifiable at a glance: the item's fields (status, priority, due date, assignees), the tags, the description, the checklist, and the activity block SHALL each be introduced by a visible heading or label, in that order — tags above the description. The watch control SHALL sit in the drawer header, beside the item menu and close buttons.
 
 #### Scenario: Sections carry headings
 - **WHEN** a user opens the item details drawer
-- **THEN** the field area, description, checklist, tags, and activity block each appear under a visible heading or label
+- **THEN** the field area, tags, description, checklist, and activity block each appear under a visible heading or label, with the tags above the description
+
+#### Scenario: Watch control in the header
+- **WHEN** a user opens the item details drawer
+- **THEN** the watch control appears in the drawer header next to the item menu and close buttons
 
 ### Requirement: Combined status display and editor in details drawer
 The item details drawer SHALL show the item's status as a single control: the status badge itself. For users with write access on a non-externally-managed item, the badge SHALL open a status picker listing the board's columns on click and on right-click, SHALL be keyboard-focusable and operable via the keyboard, and SHALL carry a visible affordance (such as a dropdown indicator) making its select capability discoverable. Choosing a column SHALL move the item to that column. The drawer SHALL NOT additionally show a separate status select. For read-only users and externally managed items the plain, non-interactive badge SHALL be shown without a picker or affordance.

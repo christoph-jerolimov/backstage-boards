@@ -35,9 +35,7 @@ describe('ChecklistEditor', () => {
     renderWithProviders(
       <ChecklistEditor checklist={entries} canEdit onChange={onChange} />,
     );
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Add checklist entry' }),
-    );
+    // the entry field is offered directly, no button press first
     const field = screen.getByRole('textbox', { name: 'Add checklist entry' });
     await userEvent.type(field, '   {Enter}');
     expect(onChange).not.toHaveBeenCalled();
@@ -106,7 +104,7 @@ describe('ChecklistEditor', () => {
       />,
     );
     expect(
-      screen.queryByRole('button', { name: 'Add checklist entry' }),
+      screen.queryByRole('textbox', { name: 'Add checklist entry' }),
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: /Remove checklist entry/ }),

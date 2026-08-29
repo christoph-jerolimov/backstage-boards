@@ -1,7 +1,7 @@
-import { useRef, useState } from 'react';
-import { Button, Checkbox, Flex, Text } from '@backstage/ui';
+import { useState } from 'react';
+import { Button, Checkbox, Flex, Text, TextField } from '@backstage/ui';
 import { ChecklistEntry } from '@internal/plugin-boards-common';
-import { InlineAddField, InlineEdit } from './common';
+import { InlineEdit } from './common';
 
 /**
  * Compact `1/3` progress label for a card; success-colored once every
@@ -33,8 +33,9 @@ export function ChecklistBadge(props: { checklist?: ChecklistEntry[] }) {
 
 /**
  * The checklist as checkbox rows with click-to-edit labels, per-entry
- * removal and an Add button that turns into a text field, mirroring
- * TagsEditor. Without `canEdit` the rows render as plain read-only state.
+ * removal and an always-present entry field — typing and Enter is all
+ * adding takes. Without `canEdit` the rows render as plain read-only
+ * state.
  */
 export function ChecklistEditor(props: {
   checklist: ChecklistEntry[];
@@ -42,9 +43,7 @@ export function ChecklistEditor(props: {
   onChange: (checklist: ChecklistEntry[]) => Promise<void> | void;
 }) {
   const { checklist, canEdit, onChange } = props;
-  const [adding, setAdding] = useState(false);
   const [input, setInput] = useState('');
-  const addButtonRef = useRef<HTMLButtonElement>(null);
 
   const add = () => {
     const text = input.trim();
@@ -52,12 +51,6 @@ export function ChecklistEditor(props: {
       onChange([...checklist, { text, checked: false }]);
     }
     setInput('');
-  };
-
-  const closeToButton = () => {
-    setAdding(false);
-    setInput('');
-    requestAnimationFrame(() => addButtonRef.current?.focus());
   };
 
   return (
@@ -130,33 +123,21 @@ export function ChecklistEditor(props: {
           </Flex>
         ))
       )}
-      {canEdit &&
-        (adding ? (
-          <InlineAddField
-            ariaLabel="Add checklist entry"
-            placeholder="Add checklist entry…"
-            value={input}
-            onChange={setInput}
-            onSubmit={add}
-            onBlur={() => {
+      {canEdit && (
+        <TextField
+          aria-label="Add checklist entry"
+          placeholder="Add checklist entry…"
+          value={input}
+          onChange={setInput}
+          onBlur={add}
+          onKeyDown={event => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
               add();
-              setAdding(false);
-            }}
-            onCancel={closeToButton}
-          />
-        ) : (
-          <div>
-            <Button
-              ref={addButtonRef}
-              aria-label="Add checklist entry"
-              variant="tertiary"
-              size="small"
-              onPress={() => setAdding(true)}
-            >
-              Add
-            </Button>
-          </div>
-        ))}
+            }
+          }}
+        />
+      )}
     </Flex>
   );
 }

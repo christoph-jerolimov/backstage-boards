@@ -274,7 +274,12 @@ describe('MyItemsList', () => {
       await screen.findByRole('row', { name: /Ship the docs/ }),
     );
     await screen.findByRole('dialog', { name: 'Item Ship the docs' });
-    await userEvent.click(screen.getByRole('button', { name: 'Clear' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Change due date' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Remove due date' }),
+    );
     expect(boardsApi.updateItem).toHaveBeenCalledWith('board-1', 'item-1', {
       dueDate: null,
     });

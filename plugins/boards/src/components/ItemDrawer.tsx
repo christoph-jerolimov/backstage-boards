@@ -15,14 +15,17 @@ import { EditableMarkdown } from './EditableMarkdown';
 import {
   AssigneesField,
   DrawerSection,
-  DueDateField,
   ItemMetadata,
 } from './ItemDrawerFields';
 import { ActivityBlock } from './ItemTimeline';
 import { ChecklistEditor } from './ChecklistEditor';
 import { TagsEditor } from './TagsEditor';
 import { ErrorText, InlineEdit } from './common';
-import { PrioritySelect, StatusBadgeSelect } from './ItemBadgeSelects';
+import {
+  DueDateSelect,
+  PrioritySelect,
+  StatusBadgeSelect,
+} from './ItemBadgeSelects';
 import { ItemActions, ItemMenu } from './ItemMenu';
 import { RowActionsMenu } from './RowMenu';
 import { assigneePool } from './grouping';
@@ -159,6 +162,18 @@ export function ItemDrawer(props: {
               }
             />
             <Flex align="center" gap="1">
+              <WatchButton
+                watching={!!item.watching}
+                targetLabel="this item"
+                onToggle={async watching => {
+                  await boardsApi.setWatchItem(board.id, item.id, watching);
+                  await onChanged();
+                }}
+                loadWatchers={() =>
+                  boardsApi.listItemWatchers(board.id, item.id)
+                }
+                watchersKey={queryKeys.itemWatchers(board.id, item.id)}
+              />
               {!readonly && (
                 <RowActionsMenu label={`Actions for ${item.title}`}>
                   <ItemMenu
@@ -205,34 +220,27 @@ export function ItemDrawer(props: {
                   onSelect={priorityId => patchItem({ priorityId })}
                 />
               )}
+              <DueDateSelect
+                dueDate={item.dueDate}
+                readonly={readonly}
+                onChange={dueDate => patchItem({ dueDate })}
+              />
             </Flex>
-
-            <DueDateField
-              dueDate={item.dueDate}
-              readonly={readonly}
-              onChange={dueDate => patchItem({ dueDate })}
-            />
 
             <AssigneesField
               assignees={item.assignees}
               readonly={readonly}
               onChange={assignees => patchItem({ assignees })}
             />
+          </DrawerSection>
 
-            <div>
-              <WatchButton
-                watching={!!item.watching}
-                targetLabel="this item"
-                onToggle={async watching => {
-                  await boardsApi.setWatchItem(board.id, item.id, watching);
-                  await onChanged();
-                }}
-                loadWatchers={() =>
-                  boardsApi.listItemWatchers(board.id, item.id)
-                }
-                watchersKey={queryKeys.itemWatchers(board.id, item.id)}
-              />
-            </div>
+          <DrawerSection title="Tags">
+            <TagsEditor
+              tags={item.tags}
+              canEdit={!readonly}
+              suggestions={props.tagSuggestions ?? []}
+              onChange={tags => patchItem({ tags })}
+            />
           </DrawerSection>
 
           <DrawerSection title="Description">
@@ -256,15 +264,6 @@ export function ItemDrawer(props: {
               checklist={item.checklist}
               canEdit={!readonly}
               onChange={checklist => patchItem({ checklist })}
-            />
-          </DrawerSection>
-
-          <DrawerSection title="Tags">
-            <TagsEditor
-              tags={item.tags}
-              canEdit={!readonly}
-              suggestions={props.tagSuggestions ?? []}
-              onChange={tags => patchItem({ tags })}
             />
           </DrawerSection>
 

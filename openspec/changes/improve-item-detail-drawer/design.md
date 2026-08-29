@@ -73,6 +73,14 @@ Extract the block into an `ActivityBlock` (in `ItemTimeline.tsx`) owning two pie
 - State is per-drawer-instance (resets on close). Persisting the preference is out of scope.
 - Alternative considered: three `TabPanel`s each with its own list — rejected as it triplicates the list markup for no benefit.
 
+### 6. Second round: due-date badge, header watch, inline add controls
+
+- **`DueDateSelect`** joins the badge controls in `ItemBadgeSelects.tsx`. The shared `BadgeSelect` trigger takes arbitrary content, so the due-date chip renders the `DueDateBadge` wording (urgency colors preserved) or a "No due date" placeholder in a neutral chip. Menu entries: Today / Tomorrow / This week (Fri) — via the same `todayISO`/`tomorrowISO`/`fridayISO` helpers the item menu uses — plus "Pick a date…" and a danger "Remove due date" when set. "Pick a date…" swaps the chip for the existing styled `<input type="date">` (auto-focused, `aria-label="Due date"`); committing a value or leaving the input restores the chip. The whole chip opens the menu (consistent with status/priority and keyboard-reachable); the raw input is only one menu entry away, which keeps a single, accessible interaction model instead of splitting text-click and chevron-click behaviors. `DueDateField` in `ItemDrawerFields.tsx` is replaced.
+- **Assignees**: `RefChip` gains a `plain` prop that drops the border while keeping avatar, link, and the remove button; `AssigneesField` renders chips and the `PrincipalPicker` in one wrapping row, picker after the chips.
+- **Watch button** moves into the drawer's header flex (menu → watch → close ordering keeps the destructive-free corner stable); the Details section keeps status/priority/due date/assignees.
+- **Checklist**: the add field renders permanently while editable (plain `TextField`, no autofocus so opening the drawer doesn't steal focus; Enter commits and clears for the next entry). The Add button and `adding` state go away.
+- **Tags before Description** is only a reorder of the drawer's sections.
+
 ## Risks / Trade-offs
 
 - [E2e screenshot `item-drawer.png` invalidated by any visual change] → regenerate the snapshot as part of the change; review the new image deliberately.

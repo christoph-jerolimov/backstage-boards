@@ -1,6 +1,11 @@
 import { fireEvent, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { PrioritySelect, StatusBadgeSelect } from './ItemBadgeSelects';
+import { tomorrowISO } from '@internal/plugin-boards-common';
+import {
+  DueDateSelect,
+  PrioritySelect,
+  StatusBadgeSelect,
+} from './ItemBadgeSelects';
 import {
   renderWithProviders,
   testColumn,
@@ -183,6 +188,70 @@ describe('PrioritySelect', () => {
       />,
     );
     expect(screen.queryByText('No priority')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+});
+
+describe('DueDateSelect', () => {
+  it('sets a quick option from the badge', async () => {
+    const onChange = jest.fn();
+    renderWithProviders(<DueDateSelect readonly={false} onChange={onChange} />);
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Change due date' }),
+    );
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Tomorrow' }));
+    expect(onChange).toHaveBeenCalledWith(tomorrowISO());
+  });
+
+  it('offers a focused date input behind Pick a date', async () => {
+    const onChange = jest.fn();
+    renderWithProviders(<DueDateSelect readonly={false} onChange={onChange} />);
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Change due date' }),
+    );
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: 'Pick a date…' }),
+    );
+    const input = await screen.findByLabelText('Due date');
+    expect(input).toHaveFocus();
+    fireEvent.change(input, { target: { value: '2026-09-04' } });
+    expect(onChange).toHaveBeenCalledWith('2026-09-04');
+    expect(screen.queryByLabelText('Due date')).not.toBeInTheDocument();
+  });
+
+  it('removes the due date via the danger entry', async () => {
+    const onChange = jest.fn();
+    renderWithProviders(
+      <DueDateSelect
+        dueDate="2026-09-04"
+        readonly={false}
+        onChange={onChange}
+      />,
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Change due date' }),
+    );
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: 'Remove due date' }),
+    );
+    expect(onChange).toHaveBeenCalledWith(null);
+  });
+
+  it('offers no remove entry without a due date', async () => {
+    renderWithProviders(
+      <DueDateSelect readonly={false} onChange={jest.fn()} />,
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Change due date' }),
+    );
+    expect(
+      screen.queryByRole('menuitem', { name: 'Remove due date' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders the plain display when read-only', () => {
+    renderWithProviders(<DueDateSelect readonly onChange={jest.fn()} />);
+    expect(screen.getByText('No due date')).toBeInTheDocument();
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 });

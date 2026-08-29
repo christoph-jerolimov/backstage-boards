@@ -1,13 +1,17 @@
 import { useState } from 'react';
 import type { MouseEvent, ReactNode } from 'react';
-import { Button, Menu, MenuItem, MenuTrigger } from '@backstage/ui';
+import { Button, Menu, MenuItem, MenuTrigger, Text } from '@backstage/ui';
 import { RiArrowDownSLine } from '@remixicon/react';
 import {
   BoardColumn,
   BoardPriority,
   ColumnColor,
+  fridayISO,
+  todayISO,
+  tomorrowISO,
 } from '@internal/plugin-boards-common';
 import { ColorDot, colorHex, PriorityChip, StatusBadge } from './StatusBadge';
+import { DueDateBadge } from './DueDate';
 
 /**
  * The status-chip look on a real menu-trigger button: the badge is the
@@ -19,7 +23,9 @@ import { ColorDot, colorHex, PriorityChip, StatusBadge } from './StatusBadge';
 function BadgeSelect(props: {
   ariaLabel: string;
   color?: ColumnColor;
-  text: string;
+  /** Renders the color dot in front (status and priority chips). */
+  dot?: boolean;
+  label: ReactNode;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -50,8 +56,8 @@ function BadgeSelect(props: {
             whiteSpace: 'nowrap',
           }}
         >
-          <ColorDot color={props.color} size={8} />
-          {props.text}
+          {props.dot && <ColorDot color={props.color} size={8} />}
+          {props.label}
           <RiArrowDownSLine aria-hidden size={14} />
         </Button>
         {props.children}
@@ -80,7 +86,8 @@ export function StatusBadgeSelect(props: {
     <BadgeSelect
       ariaLabel={`Change status: ${title}`}
       color={current?.color}
-      text={title}
+      dot
+      label={title}
     >
       <Menu>
         {props.columns.map(column => (
@@ -123,7 +130,8 @@ export function PrioritySelect(props: {
     <BadgeSelect
       ariaLabel={`Change priority: ${name}`}
       color={current?.color}
-      text={name}
+      dot
+      label={name}
     >
       <Menu>
         {[...props.priorities]
@@ -151,6 +159,85 @@ export function PrioritySelect(props: {
         >
           {current ? 'No priority' : '✓ No priority'}
         </MenuItem>
+      </Menu>
+    </BadgeSelect>
+  );
+}
+
+/**
+ * The item's due date as a badge that is also the way to change it: the
+ * quick options open under it, and "Pick a date…" swaps the chip for a
+ * focused date input so any calendar date stays reachable. Read-only
+ * surfaces get the plain due-date display.
+ */
+export function DueDateSelect(props: {
+  dueDate?: string;
+  readonly: boolean;
+  onChange: (dueDate: string | null) => void;
+}) {
+  const { dueDate, readonly, onChange } = props;
+  const [picking, setPicking] = useState(false);
+
+  const display = dueDate ? (
+    <DueDateBadge dueDate={dueDate} />
+  ) : (
+    <Text variant="body-x-small" color="secondary">
+      No due date
+    </Text>
+  );
+
+  if (readonly) {
+    return display;
+  }
+
+  if (picking) {
+    return (
+      <input
+        type="date"
+        aria-label="Due date"
+        defaultValue={dueDate ?? todayISO()}
+        // eslint-disable-next-line jsx-a11y/no-autofocus -- the user just asked for the picker; focus belongs on it
+        autoFocus
+        onChange={event => {
+          if (event.target.value) {
+            onChange(event.target.value);
+            setPicking(false);
+          }
+        }}
+        onBlur={() => setPicking(false)}
+        onKeyDown={event => {
+          if (event.key === 'Escape') {
+            event.preventDefault();
+            setPicking(false);
+          }
+        }}
+        style={{
+          background: 'var(--bui-bg-neutral-1)',
+          color: 'inherit',
+          border: '1px solid var(--bui-border-1)',
+          borderRadius: 4,
+          padding: '2px 8px',
+          font: 'inherit',
+          fontSize: '0.85em',
+        }}
+      />
+    );
+  }
+
+  return (
+    <BadgeSelect ariaLabel="Change due date" label={display}>
+      <Menu>
+        <MenuItem onAction={() => onChange(todayISO())}>Today</MenuItem>
+        <MenuItem onAction={() => onChange(tomorrowISO())}>Tomorrow</MenuItem>
+        <MenuItem onAction={() => onChange(fridayISO())}>
+          This week (Fri)
+        </MenuItem>
+        <MenuItem onAction={() => setPicking(true)}>Pick a date…</MenuItem>
+        {dueDate && (
+          <MenuItem color="danger" onAction={() => onChange(null)}>
+            Remove due date
+          </MenuItem>
+        )}
       </Menu>
     </BadgeSelect>
   );

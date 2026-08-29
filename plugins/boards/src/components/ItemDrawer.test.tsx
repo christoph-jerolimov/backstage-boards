@@ -1,6 +1,7 @@
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
+import { todayISO } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
 import { ItemDrawer } from './ItemDrawer';
 import {
@@ -185,13 +186,47 @@ describe('ItemDrawer', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('sets and clears the due date', async () => {
+  it('sets a quick due date from the badge', async () => {
+    const { boardsApi } = renderDrawer();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Change due date' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Today' }),
+    );
+    expect(boardsApi.updateItem).toHaveBeenCalledWith('board-1', 'item-1', {
+      dueDate: todayISO(),
+    });
+  });
+
+  it('removes the due date from the badge menu', async () => {
     const { boardsApi } = renderDrawer({
       item: testItem({ dueDate: '2026-09-04' }),
     });
-    await userEvent.click(screen.getByRole('button', { name: 'Clear' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Change due date' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Remove due date' }),
+    );
     expect(boardsApi.updateItem).toHaveBeenCalledWith('board-1', 'item-1', {
       dueDate: null,
+    });
+  });
+
+  it('picks an arbitrary due date behind Pick a date', async () => {
+    const { boardsApi } = renderDrawer();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Change due date' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Pick a date…' }),
+    );
+    fireEvent.change(await screen.findByLabelText('Due date'), {
+      target: { value: '2026-09-18' },
+    });
+    expect(boardsApi.updateItem).toHaveBeenCalledWith('board-1', 'item-1', {
+      dueDate: '2026-09-18',
     });
   });
 
@@ -256,9 +291,6 @@ describe('ItemDrawer', () => {
     expect(boardsApi.updateItem).toHaveBeenCalledWith('board-1', 'item-1', {
       checklist: [{ text: 'write docs', checked: true }],
     });
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Add checklist entry' }),
-    );
     await userEvent.type(
       screen.getByRole('textbox', { name: 'Add checklist entry' }),
       'announce{Enter}',
@@ -282,7 +314,7 @@ describe('ItemDrawer', () => {
       screen.getByRole('checkbox', { name: /"write docs" as not done/ }),
     ).toBeDisabled();
     expect(
-      screen.queryByRole('button', { name: 'Add checklist entry' }),
+      screen.queryByRole('textbox', { name: 'Add checklist entry' }),
     ).not.toBeInTheDocument();
   });
 
@@ -340,17 +372,33 @@ describe('ItemDrawer', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('groups the drawer into headlined sections', () => {
+  it('groups the drawer into headlined sections, tags before description', () => {
     renderDrawer();
     for (const title of [
       'Details',
+      'Tags',
       'Description',
       'Checklist',
-      'Tags',
       'Activity',
     ]) {
       expect(screen.getByRole('heading', { name: title })).toBeInTheDocument();
     }
+    const tags = screen.getByRole('heading', { name: 'Tags' });
+    const description = screen.getByRole('heading', { name: 'Description' });
+    expect(
+      tags.compareDocumentPosition(description) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('keeps the watch control in the header', () => {
+    renderDrawer();
+    const watch = screen.getByRole('button', { name: 'Watch this item' });
+    const details = screen.getByRole('heading', { name: 'Details' });
+    // the watch button renders in the header, above every section
+    expect(
+      watch.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it('shows the activity timeline with comments and changes, newest first', async () => {

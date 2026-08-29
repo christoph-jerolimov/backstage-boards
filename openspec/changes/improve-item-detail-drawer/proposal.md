@@ -10,6 +10,14 @@ The item detail drawer has grown organically and is getting cluttered: status an
 - **Rework the activity block.** Comments and changes are still available combined, but newest first by default, with tabs to switch between "Combined", "Comments", and "Changes" and a control to flip the ordering between "Newest first" and "Oldest first". The new-comment composer moves above this block so writing a comment never requires scrolling past the history.
 - Status changes made from the drawer go through the optimistic move mutation, closing an existing gap against the "Optimistic item moves" requirement (implementation alignment, no new spec text).
 
+Follow-up refinements (same change, second round):
+
+- **Due date becomes a badge control too.** Like status and priority, the due-date text is the control: its menu offers Today, Tomorrow, This week (Friday), "Pick a date…", and a remove entry when set. "Pick a date…" swaps the chip for a focused date input so any calendar date stays reachable. The always-visible date input and separate Clear button go away.
+- **Assignees lose the chip borders and the add control moves inline** behind the existing assignees instead of sitting on its own row below.
+- **The watch button moves into the drawer header**, next to the item menu and close buttons.
+- **The checklist offers its entry field directly** — no "Add" button to press before typing.
+- **Tags move above the description.**
+
 ## Capabilities
 
 ### New Capabilities
@@ -21,6 +29,8 @@ None.
 - `boards/comments-and-history`: The "Unified timeline in item detail view" requirement changes — the detail view's activity block gains Combined/Comments/Changes tabs (Combined remains the default), a newest-first default ordering with a user-facing toggle, and the comment composer placed above the timeline.
 - `boards/item-management`: New requirements for the drawer — the full item menu is offered in the drawer (replacing the standalone delete button), the drawer content is grouped into headlined sections, and the drawer's status display and status editor merge into one accessible interactive badge control.
 - `boards/item-priorities`: The "Edit priority from drawer and item menu" requirement changes — the drawer's priority display and priority editor merge into one accessible interactive badge control; read-only users see only the plain badge.
+- `boards/item-management` (second round): The "Arbitrary due date in details view" requirement changes — the due-date display and editor merge into one badge control with quick options plus a full date picker behind "Pick a date…"; the "Structured details drawer" requirement (added by this change) is adjusted for the new section order (tags before description) and the watch control in the header.
+- `boards/item-checklists`: The "Checklist editing in the item details drawer" requirement changes — the entry field is offered directly instead of behind an Add button.
 
 ## Impact
 

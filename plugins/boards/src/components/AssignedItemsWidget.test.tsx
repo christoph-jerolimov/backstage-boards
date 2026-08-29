@@ -220,7 +220,12 @@ describe('AssignedItemsContent', () => {
       await screen.findByRole('button', { name: 'Open item Fix the build' }),
     );
     await screen.findByRole('dialog', { name: 'Item Fix the build' });
-    await userEvent.click(screen.getByRole('button', { name: 'Clear' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Change due date' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Remove due date' }),
+    );
     expect(boardsApi.updateItem).toHaveBeenCalledWith('board-1', 'item-2', {
       dueDate: null,
     });

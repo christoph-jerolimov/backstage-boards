@@ -22,3 +22,12 @@
 - [x] 5.1 Update `priorities.test.ts` to drive the new priority badge control (menuitem roles, `Change priority` accessible name) and adjust any other e2e locator the rework touched (`my-items-menu.test.ts`, `home-widgets.test.ts` should stay untouched — confirm); verify by running the Playwright suite for the affected specs.
 - [x] 5.2 Regenerate the `item-drawer.png` screenshot baseline and review the new image shows the sectioned layout, badge controls with affordance, menu button, and composer-above-tabs activity block; verify `screenshots.test.ts` passes against the new baseline.
 - [x] 5.3 Run the full plugin checks — `yarn workspace @internal/plugin-boards test`, `yarn lint`, `yarn tsc`, `yarn prettier:check` — and verify all pass.
+
+## 6. Second round: due-date badge, header watch, inline add controls
+
+- [x] 6.1 Build `DueDateSelect` in `ItemBadgeSelects.tsx` (badge trigger showing the due-date wording with urgency colors or "No due date"; menu with Today/Tomorrow/This week (Fri)/"Pick a date…" and a remove entry when set; "Pick a date…" swaps to a focused date input that commits on change and restores the chip on blur/Escape; plain display when read-only), replace `DueDateField` in the drawer, and verify with new `ItemBadgeSelects.test.tsx` cases (quick options, pick-a-date flow, remove, read-only) plus updated `ItemDrawer.test.tsx` due-date cases.
+- [x] 6.2 Make assignee chips borderless via a `plain` prop on `RefChip`/`RefChips` and render the add picker inline after the chips in `AssigneesField`; verify the existing assignee unit tests still pass and the chip row renders without borders.
+- [x] 6.3 Move the `WatchButton` into the drawer header next to the item menu and close buttons; verify via the watch unit test and a header-placement assertion.
+- [x] 6.4 Show the checklist entry field directly (no Add button, no autofocus on mount) with Enter committing and clearing for the next entry; verify by updating `ChecklistEditor`/`ItemDrawer` tests (type directly, no button press) and the read-only case (no textbox).
+- [x] 6.5 Move Tags above Description in the drawer; verify with a section-order assertion in `ItemDrawer.test.tsx`.
+- [x] 6.6 Re-run all checks (plugin unit tests, `yarn tsc`, `yarn lint:all`, `yarn prettier:check`), the affected Playwright specs, and regenerate + review the `item-drawer.png` baselines (light and dark).
