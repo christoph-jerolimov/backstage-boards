@@ -18,12 +18,77 @@ Beyond request handling it also:
 - purges boards and items 30 days after their soft delete via scheduled
   tasks
 
-Sharing model: per-user/per-group grants with `read`/`write`/`admin` levels
-plus board visibility modes (`private`, `logged-in-read`, `logged-in-write`,
-`public-read`, `public-write`). All checks are enforced server-side.
+## Features
 
-Items with an `externalManager` marker (created by service callers such as
-sync integrations) are read-only for regular users.
+The behaviour specs behind every feature live in `openspec/specs/boards/` in
+the repository. The frontend counterpart is `@internal/plugin-boards`.
+
+### Boards and items
+
+- **Boards** — with configurable, optionally colored columns and per-user
+  favorites.
+- **Board listing** — paginated, filterable by free-text search, referenced
+  entity, and creator, with per-status item counts; visibility is evaluated
+  by the listing query itself.
+- **Duplication** — copies columns, priorities, and optionally items (with
+  checklists and tags) and entity references; the copy belongs to the
+  duplicator.
+- **Items** — title, description, tags, due date, priority, checklist, and
+  creator/assignees as catalog refs or free-text `text:` identities.
+- **Item filters on the API** — free-text plus tags (all must match) and
+  assignees (any must match).
+- **Per-board priorities** — up to ten ordered definitions with name and
+  color, managed by admins.
+- **Soft deletes** — deleting archives: boards get a 30-day grace window
+  with unarchive and delete-now, items stay restorable; scheduled tasks
+  purge both after 30 days.
+- **Entity assignment** — a board can reference any number of catalog
+  entities.
+- **Externally managed items** — items carrying an `externalManager` marker
+  (created by service callers such as sync integrations) are read-only for
+  regular users.
+
+### Sharing and permissions
+
+- **Three levels** — `read`, `write`, and `admin`, granted per user or per
+  group; the highest grant wins, with group membership resolved via the
+  catalog.
+- **Public modes** — `private`, `logged-in-read`, `logged-in-write`,
+  `public-read`, and `public-write`.
+- **Server-side enforcement** — every REST and action call is
+  permission-checked; archived boards are read-only.
+
+### Comments and history
+
+- **Versioned comments** — editable, with every version kept; the item
+  description is versioned the same way.
+- **Change audit log** — every non-comment mutation is recorded with who,
+  when, and what changed.
+- **Mentions** — `@`-mentions in comments are parsed and stored.
+
+### Notifications and live updates
+
+- **Watches** — on boards and single items, with watcher listings; watched
+  changes become Backstage notifications, grouped per user.
+- **Mention notifications** — being mentioned in a comment notifies you.
+- **Scheduled reminders** — about due and overdue items (see
+  [Scheduled reminders](#scheduled-reminders)).
+- **Signals** — ids-only signals on board changes so open board views
+  refresh live; data access stays behind the permission-checked API.
+
+### Actions
+
+- **Registry actions** — board, permission, item, comment, and tag
+  operations with typed schemas, enforcing the same permissions and
+  producing the same history and notifications as the REST API.
+- **`list-items`** — a read-only query action honoring the item filters.
+- **External managers** — integrations can create and update items carrying
+  the external-management marker.
+
+### Catalog
+
+- **Entity-references endpoint and proactive refreshes** — see
+  [Catalog entity references](#catalog-entity-references).
 
 ## Scheduled reminders
 

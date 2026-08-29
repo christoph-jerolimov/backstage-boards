@@ -19,11 +19,142 @@ frontend system. Provides:
 - a "Boards" tab on catalog entities listing the boards assigned to them
 - "Assigned items" and "Boards" cards for the Backstage home page
 
-The repository README's Features section lists every behaviour in detail;
-the specs behind them live in `openspec/specs/boards/`.
-
 UI is composed from Backstage UI components with react-aria used where no
 Backstage UI component exists (drag & drop, the drawer overlay).
+
+## Features
+
+The behaviour specs behind every feature live in `openspec/specs/boards/` in
+the repository. The backend counterpart is
+`@internal/plugin-boards-backend`.
+
+### Boards
+
+- **Board list** — paginated "Favorites" and "All" tabs, with per-status item
+  counts on every row.
+- **Board filters** — filter the list by free-text search, referenced entity,
+  and creator, with the filter options scoped to your own boards.
+- **Favorites** — per-user, toggled from the row menu.
+- **Configurable columns** — add, rename, reorder, and remove columns per
+  board, and insert a column at any position.
+- **Column colors** — shown as a dot in the kanban header and as the status
+  badge color everywhere else.
+- **Duplicate a board** — optionally copying items and entity references.
+- **Archived boards** — read-only, with an alert stating the purge date and
+  offering "Unarchive" and "Delete now" to admins.
+- **Row and context menus** — board rows carry an actions menu that also opens
+  at the pointer on right-click.
+
+### Items
+
+- **Kanban and table views** — two switchable views over the same items.
+- **Drag & drop** — with a drop indicator and an accessible "Move to column"
+  menu as keyboard fallback.
+- **Optimistic updates** — moves and edits apply instantly and roll back on
+  failure.
+- **Filter bar** — free-text search plus tag (all must match) and assignee
+  (any must match) filters, applied to both views.
+- **Grouping** — group the board by assignee or by priority.
+- **Table sorting.**
+- **Configurable table columns** — choose which columns the table shows.
+- **Utility columns** — the table's leading selection and trailing actions
+  columns stay put regardless of configuration.
+- **Row selection and bulk actions** — multi-select table rows and change
+  assignee or priority for all of them at once.
+- **Archived items** — a table of archived items with who archived them and
+  when, and a restore action.
+- **Externally managed items** — items owned by an integration render
+  read-only and marked as such.
+- **Item detail drawer** — structured into fields, description, checklist,
+  and activity sections, and openable in place from any view.
+- **Combined badges** — status, priority, and due date in the drawer are
+  badges that double as their own keyboard-operable editors.
+- **Assignee avatars** — stacked on cards, with display name and full entity
+  ref in the tooltip.
+- **Assignee × status matrix** — a per-board dialog counting items per
+  assignee and column, with clickable headers and sum rows.
+- **"Add another"** — the create dialog can stay open to add several items in
+  a row.
+- **Card and row context menus** — the item menu also opens at the pointer on
+  right-click.
+
+### Due dates
+
+- **Urgency colors** — due-date badges color by how close (or past) the date
+  is.
+- **Quick due-date menu** — Today, Tomorrow, and This week directly on the
+  card.
+- **Arbitrary dates** — a full date picker in the details drawer, plus a
+  remove entry.
+- **Group by due date** — overdue first, then by date, undated last.
+
+### Priorities
+
+- **Board settings editor** — admins manage up to ten ordered priorities
+  with name and color.
+- **Everywhere they matter** — priorities appear on cards, in the table, as a
+  filter, as a grouping, and in the home page widget.
+- **Status × priority matrix** — a dialog counting items per column and
+  priority, with toggleable headers and sums.
+- **Graceful absence** — a board without priorities shows no priority UI at
+  all.
+
+### Checklists
+
+- **Per-item checklist** — plain-text entries ticked off in the details
+  drawer.
+- **Progress badge** — cards show a done count like `1/3`, styled when
+  complete.
+
+### My items
+
+- **Cross-board page** — everything assigned to you, across all boards you
+  can access.
+- **Own filter bar and grouping** — including grouping by due date and by
+  tags.
+- **Menu parity** — the same item actions as on the board itself.
+
+### Comments and history
+
+- **Comments** — editable, with full version history.
+- **Auto-linking** — catalog entity refs in comment text become links.
+- **Mentions** — `@`-mention users in comments; mentions render as entity
+  links.
+- **Unified timeline** — comments and the item's change history merged in
+  the detail view.
+- **Description history** — the item description is versioned too.
+- **Drafts survive reload** — unsent comment and description edits are stored
+  per user until saved or cancelled.
+- **Recent changes** — a board-wide view of the latest activity.
+
+### Sharing
+
+- **Share dialog** — grant `read`, `write`, or `admin` per user or group,
+  and pick one of the five public visibility modes.
+- **Catalog-backed pickers** — share with users and groups picked from the
+  catalog.
+
+### Catalog integration
+
+- **Entity "Boards" tab** — shown only on entities at least one board
+  references (see below).
+- **Display names** — assignees and creators show their catalog display
+  name, with the raw ref in a tooltip.
+
+### Watching and live updates
+
+- **Watching** — watch a whole board or a single item; watchers are listed.
+- **Live refresh** — open board views refresh automatically on Backstage
+  signals.
+
+### Home page
+
+- **Assigned items card** — your due work at a glance, with scope and
+  grouping settings.
+- **Boards card** — your favorite (or all) boards, with an item-count
+  setting.
+- **Well-behaved cards** — defined loading, empty, and failure states, and
+  they refresh on board signals.
 
 ## When the entity "Boards" tab appears
 
