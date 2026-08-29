@@ -257,19 +257,6 @@ test('the home page', async ({ page }) => {
   await seedShowcaseBoard();
   await freezeTime(page);
 
-  // the stock joke widget fetches a public API; serve it a fixed joke so
-  // the card renders the same everywhere, networked or not
-  await page.route('**/official-joke-api.appspot.com/**', route =>
-    route.fulfill({
-      json: {
-        id: 1,
-        type: 'programming',
-        setup: 'Why do programmers prefer dark mode?',
-        punchline: 'Because light attracts bugs.',
-      },
-    }),
-  );
-
   await page.goto('/home');
   // guest sign-in page appears on the first navigation of a session
   await page
@@ -286,7 +273,8 @@ test('the home page', async ({ page }) => {
     page.getByRole('button', { name: 'Edit', exact: true }),
   ).toBeVisible();
 
-  await expect(page.getByText('Because light attracts bugs.')).toBeVisible();
+  // both boards cards list the showcase board
+  await expect(page.getByText('Assigned items')).toBeVisible();
   await expect(
     page.getByRole('button', { name: `Open board ${BOARD_NAME}` }).first(),
   ).toBeVisible();
