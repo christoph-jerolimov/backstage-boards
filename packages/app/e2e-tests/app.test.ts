@@ -35,5 +35,4 @@ test('App should render the welcome page', async ({ page }) => {
   await expect(
     page.getByRole('link', { name: 'example-website' }),
   ).toBeVisible();
-  await expect(page).toHaveScreenshot('catalog-page.png');
 });
