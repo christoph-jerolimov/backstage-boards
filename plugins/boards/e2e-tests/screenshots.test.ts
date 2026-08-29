@@ -152,6 +152,13 @@ async function seedShowcaseBoard(): Promise<string> {
     });
     await item({ columnId: done.id, title: 'Update dependencies' });
 
+    // an archived (soft-deleted) item, so the archived-items dialog has
+    // a row; it never shows up in any column
+    const old = await item({ columnId: done.id, title: 'Old announcement' });
+    await api.delete(`/api/boards/boards/${board.id}/items/${old.id}`, {
+      headers,
+    });
+
     return board.id;
   } finally {
     await api.dispose();
@@ -208,27 +215,77 @@ test('the item drawer shows description, checklist, and timeline', async ({
   await expect(page).toHaveScreenshot('item-drawer.png');
 });
 
-test('the priority matrix and board settings dialogs', async ({ page }) => {
+test('every board dialog', async ({ page }) => {
   const boardId = await seedShowcaseBoard();
   await openBoard(page, boardId);
 
-  await page.getByRole('button', { name: 'More board actions' }).click();
-  await page.getByRole('menuitem', { name: 'Priority matrix…' }).click();
-  const matrix = page.getByRole('dialog');
-  await expect(
-    matrix.getByRole('table', { name: 'Priority matrix' }),
-  ).toBeVisible();
-  await expect(page).toHaveScreenshot('priority-matrix.png');
-  // the dialog carries an icon close and the footer button; use the latter
-  await matrix.getByRole('button', { name: 'Close' }).last().click();
+  /**
+   * Opens one dialog from the board's actions menu, waits for `ready`
+   * inside it, screenshots the page, and closes it again with Escape —
+   * which never activates a dialog's own (possibly destructive) buttons.
+   */
+  const dialogShot = async (
+    menuItem: string,
+    ready: (dialog: ReturnType<Page['getByRole']>) => Promise<void>,
+    screenshot: string,
+  ) => {
+    await page.getByRole('button', { name: 'More board actions' }).click();
+    await page.getByRole('menuitem', { name: menuItem }).click();
+    const dialog = page.getByRole('dialog');
+    await ready(dialog);
+    await expect(page).toHaveScreenshot(screenshot);
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+  };
 
-  await page.getByRole('button', { name: 'More board actions' }).click();
-  await page.getByRole('menuitem', { name: 'Board settings…' }).click();
-  const settings = page.getByRole('dialog');
-  await expect(
-    settings.getByRole('button', { name: 'Delete priority critical' }),
-  ).toBeVisible();
-  await expect(page).toHaveScreenshot('board-settings.png');
+  await dialogShot(
+    'Priority matrix…',
+    dialog =>
+      expect(
+        dialog.getByRole('table', { name: 'Priority matrix' }),
+      ).toBeVisible(),
+    'priority-matrix.png',
+  );
+  await dialogShot(
+    'Assignee matrix…',
+    dialog => expect(dialog.getByText('guest').first()).toBeVisible(),
+    'assignee-matrix.png',
+  );
+  await dialogShot(
+    'Recent changes…',
+    dialog =>
+      expect(dialog.getByText('Design login flow').first()).toBeVisible(),
+    'recent-changes.png',
+  );
+  await dialogShot(
+    'Archived items…',
+    dialog => expect(dialog.getByText('Old announcement')).toBeVisible(),
+    'archived-items.png',
+  );
+  await dialogShot(
+    'Duplicate board…',
+    dialog => expect(dialog.getByRole('textbox').first()).toBeVisible(),
+    'duplicate-board.png',
+  );
+  await dialogShot(
+    'Board settings…',
+    dialog =>
+      expect(
+        dialog.getByRole('button', { name: 'Delete priority critical' }),
+      ).toBeVisible(),
+    'board-settings.png',
+  );
+  await dialogShot(
+    'Share…',
+    dialog => expect(dialog.getByText(`Share “${BOARD_NAME}”`)).toBeVisible(),
+    'share-board.png',
+  );
+  await dialogShot(
+    'Archive board…',
+    dialog =>
+      expect(dialog.getByText(/The board becomes read-only/)).toBeVisible(),
+    'archive-board.png',
+  );
 });
 
 test('the my-items table', async ({ page }) => {
@@ -251,24 +308,22 @@ test('the my-items table', async ({ page }) => {
     grid.getByRole('row', { name: /Fix flaky pipeline/ }),
   ).toBeVisible();
   await expect(page).toHaveScreenshot('my-items.png');
+
+  // the create-board dialog lives on this page
+  await page.getByRole('button', { name: 'Create board' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(
+    dialog.getByRole('textbox', { name: 'Board name' }),
+  ).toBeVisible();
+  await expect(page).toHaveScreenshot('create-board.png');
+  // this dialog ignores Escape while its name field has focus
+  await dialog.getByRole('button', { name: 'Cancel' }).click();
+  await expect(dialog).toBeHidden();
 });
 
 test('the home page', async ({ page }) => {
   await seedShowcaseBoard();
   await freezeTime(page);
-
-  // the stock joke widget fetches a public API; serve it a fixed joke so
-  // the card renders the same everywhere, networked or not
-  await page.route('**/official-joke-api.appspot.com/**', route =>
-    route.fulfill({
-      json: {
-        id: 1,
-        type: 'programming',
-        setup: 'Why do programmers prefer dark mode?',
-        punchline: 'Because light attracts bugs.',
-      },
-    }),
-  );
 
   await page.goto('/home');
   // guest sign-in page appears on the first navigation of a session
@@ -286,7 +341,8 @@ test('the home page', async ({ page }) => {
     page.getByRole('button', { name: 'Edit', exact: true }),
   ).toBeVisible();
 
-  await expect(page.getByText('Because light attracts bugs.')).toBeVisible();
+  // both boards cards list the showcase board
+  await expect(page.getByText('Assigned items')).toBeVisible();
   await expect(
     page.getByRole('button', { name: `Open board ${BOARD_NAME}` }).first(),
   ).toBeVisible();

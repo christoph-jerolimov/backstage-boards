@@ -51,6 +51,10 @@ app:
               timeZone: Europe/Stockholm
             - label: TYO
               timeZone: Asia/Tokyo
+    # The default layout shows only the boards cards side by side; every
+    # other widget stays available through the page's Edit mode. The grid
+    # narrows to 10 columns below its lg breakpoint, so the cards are 5
+    # wide — anything wider reflows below instead of sitting side by side.
     - page:home:
         config:
           defaultConfig:
@@ -60,51 +64,16 @@ app:
               width: 12
               height: 2
               deletable: false
-            - component: GettingStarted
-              column: 0
-              row: 1
-              width: 4
-              height: 11
-            - component: HomePageStarredEntities
-              column: 4
-              row: 2
-              width: 4
-              height: 4
-            - component: HomePageRandomJoke
-              column: 8
-              row: 2
-              width: 4
-              height: 4
-            - component: HomePageToolkit
-              column: 4
-              row: 6
-              width: 4
-              height: 3
-            - component: HomePageWorldClock
-              column: 8
-              row: 6
-              width: 4
-              height: 3
-            - component: HomePageMostVisited
-              column: 4
-              row: 9
-              width: 4
-              height: 4
-            - component: HomePageRecentlyVisited
-              column: 8
-              row: 9
-              width: 4
-              height: 4
             - component: BoardsAssignedItems
-              column: 4
-              row: 13
-              width: 4
-              height: 6
+              column: 0
+              row: 2
+              width: 5
+              height: 8
             - component: BoardsList
-              column: 8
-              row: 13
-              width: 4
-              height: 6
+              column: 5
+              row: 2
+              width: 5
+              height: 8
 
 organization:
   name: My Company
