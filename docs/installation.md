@@ -1,30 +1,12 @@
 # Installation
 
-This page is for admins. It covers running this app as-is and installing the
-boards plugins into an existing Backstage instance.
-
-## Running this app
-
-Requirements: Node.js 22 or 24 and Yarn 4 (via
-[Corepack](https://nodejs.org/api/corepack.html): `corepack enable`).
-
-```sh
-yarn install
-yarn start
-```
-
-This starts the frontend on <http://localhost:3000> and the backend on
-<http://localhost:7007>. Boards are at <http://localhost:3000/boards>.
-
-The default development configuration signs you in as the guest user and
-stores boards in an in-memory SQLite database, so boards are gone after a
-backend restart; point `backend.database` at PostgreSQL (as
-`app-config.production.yaml` does) to keep them. The boards-specific options
-are covered in [Configuration](configuration.md).
+How to install the boards plugins into your Backstage app. Once installed,
+continue with the boards-specific options in
+[Configuration](configuration.md).
 
 ## The plugins
 
-Everything board-specific lives in four internal packages:
+Boards ships as four packages:
 
 | Package                                          | Side     | Purpose                                                          |
 | ------------------------------------------------ | -------- | ---------------------------------------------------------------- |
@@ -32,6 +14,15 @@ Everything board-specific lives in four internal packages:
 | `@internal/plugin-boards-backend`                | backend  | Storage, the `/api/boards` REST API, permissions, notifications. |
 | `@internal/plugin-boards-common`                 | shared   | Types and helpers used by both sides.                            |
 | `@internal/plugin-catalog-backend-module-boards` | backend  | Catalog processor marking the entities a board references.       |
+
+Add them to the right workspaces of your app (the common package comes
+along as a dependency):
+
+```sh
+yarn --cwd packages/app add @internal/plugin-boards
+yarn --cwd packages/backend add @internal/plugin-boards-backend \
+  @internal/plugin-catalog-backend-module-boards
+```
 
 ## Backend
 
@@ -60,9 +51,9 @@ backend.add(import('@backstage/plugin-signals-backend'));
 
 The frontend is built exclusively on the Backstage
 [new frontend system](https://backstage.io/docs/frontend-system/). With
-`app.packages: all` (as in this app's `app-config.yaml`) the plugin is
-discovered automatically from `packages/app/package.json`; there is no
-manual route wiring.
+`app.packages: all` in your `app-config.yaml` the plugin is discovered
+automatically from your app package's dependencies; there is no manual
+route wiring.
 
 The plugin contributes:
 
