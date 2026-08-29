@@ -20,6 +20,13 @@ import { generateProjects } from '@backstage/e2e-test-utils/playwright';
 /** The test files that compare full-page screenshots against baselines. */
 const SCREENSHOT_TESTS = /screenshots\.test\.ts/;
 
+// All baselines live in docs/screenshots (see snapshotDir below), split
+// by theme, named exactly like the shot — ready to embed in docs. The
+// names carry no platform suffix: they are rendered on Linux, matching
+// CI; regenerate them there.
+const LIGHT_SNAPSHOTS = '{snapshotDir}/light/{arg}{ext}';
+const DARK_SNAPSHOTS = '{snapshotDir}/dark/{arg}{ext}';
+
 // Find all packages with e2e-test folders. Environments without a Chrome
 // channel install (e.g. containers with a preinstalled Chromium) can point
 // PLAYWRIGHT_CHROMIUM_PATH at a browser binary instead.
@@ -45,16 +52,21 @@ const baseProjects = generateProjects().map(project =>
 // gain a dark twin.
 const projects = baseProjects.flatMap(project => {
   const name = String(project.name);
+  const light = (base: typeof project) => ({
+    ...base,
+    snapshotPathTemplate: LIGHT_SNAPSHOTS,
+  });
   const dark = (base: typeof project, darkName: string) => ({
     ...base,
     name: darkName,
     use: { ...base.use, colorScheme: 'dark' as const },
+    snapshotPathTemplate: DARK_SNAPSHOTS,
   });
   if (!name.includes('boards')) {
-    return [project, dark(project, `${name}-dark`)];
+    return [light(project), dark(project, `${name}-dark`)];
   }
   const screenshots = {
-    ...project,
+    ...light(project),
     name: `${name}-screenshots`,
     testMatch: SCREENSHOT_TESTS,
   };
@@ -82,16 +94,18 @@ export default defineConfig({
   expect: {
     timeout: 30_000,
 
-    // Screenshot baselines live next to the test files (in
-    // `*-snapshots/` folders) and are compared with a small tolerance,
-    // since font rasterization differs slightly between browser builds
-    // and machines. Regenerate them with
-    // `yarn test:e2e --update-snapshots` after intentional UI changes.
+    // Screenshot baselines live in docs/screenshots (light/ and dark/)
+    // and are compared with a small tolerance, since font rasterization
+    // differs slightly between browser builds and machines. Regenerate
+    // them with `yarn test:e2e --update-snapshots` after intentional UI
+    // changes.
     toHaveScreenshot: {
       maxDiffPixelRatio: 0.02,
       threshold: 0.3,
     },
   },
+
+  snapshotDir: './docs/screenshots',
 
   // Run your local dev server before starting the tests
   webServer: process.env.CI
