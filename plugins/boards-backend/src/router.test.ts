@@ -470,6 +470,7 @@ describe('createRouter', () => {
     // a 404 here would mean ':boardId' matched 'facets' first
     expect(body<BoardFilterOptions>(response)).toEqual({
       total: 1,
+      favorites: 0,
       entityRefs: ['system:default/payments'],
       creators: ['user:default/alice'],
     });

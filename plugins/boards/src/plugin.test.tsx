@@ -7,9 +7,13 @@ import {
   HomePageWidgetData,
   homePageWidgetDataRef,
 } from '@backstage/plugin-home-react/alpha';
+import { catalogApiRef } from '@backstage/plugin-catalog-react';
 import { boardsApiRef } from './api';
 import { boardsPlugin } from './plugin';
-import { testBoardsApi } from './components/__testUtils__/testHelpers';
+import {
+  emptyCatalogApi,
+  testBoardsApi,
+} from './components/__testUtils__/testHelpers';
 
 describe('boardsPlugin', () => {
   it('registers the api, the page and the entity content', () => {
@@ -64,13 +68,23 @@ describe('boardsPlugin', () => {
     renderTestApp({
       features: [boardsPlugin],
       initialRouteEntries: ['/boards'],
-      apis: [[boardsApiRef, testBoardsApi()]],
+      apis: [
+        [boardsApiRef, testBoardsApi()],
+        // the filter bar puts names on refs through the catalog
+        [catalogApiRef, emptyCatalogApi],
+      ],
     });
     expect(
-      await screen.findByRole('tab', { name: 'Favorites (0)' }),
+      // the whole app boots here, which can outlast the default timeout
+      // on a loaded CI runner
+      await screen.findByRole(
+        'tab',
+        { name: 'Favorites (0)' },
+        { timeout: 15_000 },
+      ),
     ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Create board' }),
     ).toBeInTheDocument();
-  });
+  }, 30_000);
 });

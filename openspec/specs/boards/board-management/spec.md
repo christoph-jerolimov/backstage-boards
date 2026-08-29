@@ -52,7 +52,7 @@ On a board that already has columns, creation SHALL be offered from each column'
 ### Requirement: Board list view
 The system SHALL provide a list view showing the user's favorited boards and all boards the user can access (via direct permission, group permission, or public visibility). The list SHALL allow toggling between "Favorites" and "All" and show at least the board name, the catalog entities it references, and the user's access level. Each list SHALL be rendered as a table whose last column is an actions column holding a menu button; activating a row SHALL open the board. The actions menu SHALL also open, anchored at the pointer, when the user right-clicks the row.
 
-Both tabs SHALL request their boards one page at a time and SHALL render a pagination footer below the table showing the range of rows on screen, the total number of matching boards, previous/next controls disabled at the bounds, and a page-size choice. The "All" tab SHALL additionally offer the board filter bar; the "Favorites" tab SHALL NOT. The "All" tab's label SHALL count all boards the user can access, independent of the filters currently applied.
+Both tabs SHALL request their boards one page at a time and SHALL render a pagination footer below the table showing the range of rows on screen, the total number of matching boards, previous/next controls disabled at the bounds, and a page-size choice. Both tabs SHALL offer the board filter bar. The "All" tab's label SHALL count all boards the user can access and the "Favorites" tab's label SHALL count all boards the user has favorited, each independent of the filters currently applied.
 
 #### Scenario: List accessible boards
 - **WHEN** a user opens the boards list
@@ -77,6 +77,10 @@ Both tabs SHALL request their boards one page at a time and SHALL render a pagin
 #### Scenario: Board list stays fresh after a change
 - **WHEN** a user toggles a board's favorite state, or a board change arrives on the `boards` signal channel, while a paginated tab is open
 - **THEN** the currently shown page is refetched and reflects the change
+
+#### Scenario: Tab labels unaffected by filters
+- **WHEN** a user has filters active that match only some boards
+- **THEN** the "All" tab label still counts every board the user can access and the "Favorites" tab label still counts every board the user has favorited
 
 ### Requirement: Update and delete boards
 Users with `admin` access SHALL be able to rename a board and delete it. Deleting a board SHALL delete its columns, items, comments, change history, permissions, favorites, and watches. Users with `write` or `read` access SHALL NOT be able to rename or delete the board.
@@ -245,13 +249,19 @@ carry no counts, so existing callers pay nothing for the feature.
 
 ### Requirement: Filter the board list by search, entity, and creator
 
-The "All" tab of the board list SHALL offer a filter bar with a
-"Search" text field matching the board name case-insensitively, an
-entity dropdown, and a "Created by" dropdown. Each dropdown SHALL select
-one option at a time and SHALL offer an entry that selects none of them
-("All entities" / "Anyone"). The filters SHALL combine with AND: a board
-is listed only if it satisfies every active filter. An empty or
-whitespace-only search SHALL NOT filter anything.
+Both the "All" and the "Favorites" tab of the board list SHALL offer a
+filter bar with a "Search" text field matching the board name
+case-insensitively, an entity dropdown, and a "Created by" dropdown.
+Each dropdown SHALL select one option at a time and SHALL offer an entry
+that selects none of them ("All entities" / "Anyone"). The filters SHALL
+combine with AND: a board is listed only if it satisfies every active
+filter, and on the "Favorites" tab additionally only if the user has
+favorited it. An empty or whitespace-only search SHALL NOT filter
+anything.
+
+Each tab SHALL own its filter state independently: a filter applied on
+one tab SHALL NOT affect the other tab's listing, and switching tabs
+SHALL NOT clear either tab's filters.
 
 The dropdown options SHALL be labelled the way the item filter bar
 labels its assignees — by the display name resolved from the catalog,
@@ -260,8 +270,10 @@ does not resolve, with the ref itself reachable from the option — and
 SHALL be sorted by that label.
 
 The filter bar SHALL offer a "Clear filters" action whenever at least
-one filter is active, and SHALL report how many boards match. Changing
-any filter SHALL return the listing to its first page.
+one filter is active, and SHALL report how many boards match out of the
+tab's unfiltered total — all readable boards on the "All" tab, all
+favorited boards on the "Favorites" tab. Changing any filter SHALL
+return the listing to its first page.
 
 Filtering SHALL be applied by the listing API, not by the browser over
 an already-fetched page, so that filtering and pagination agree: the
@@ -281,6 +293,14 @@ SHALL be full.
   creator `user:default/anna`
 - **THEN** only boards that reference that entity **and** were created by
   that user are listed
+
+#### Scenario: Favorites tab filters within favorites
+
+- **WHEN** a user with several favorited boards types a search on the
+  "Favorites" tab
+- **THEN** the list shows only favorited boards whose name matches, the
+  match count reports how many of their favorites match, and boards the
+  user has not favorited stay absent however well they match
 
 #### Scenario: Options read as names
 
@@ -307,19 +327,36 @@ SHALL be full.
   to clear them, rather than showing the "no boards yet, create one"
   message used when the user has no boards at all
 
+#### Scenario: No favorite matches
+
+- **WHEN** a user with favorited boards has filters active on the
+  "Favorites" tab that match none of them
+- **THEN** the tab explains that no favorite boards match the filters,
+  rather than showing the "no favorites yet" message used when the user
+  has no favorites at all
+
 #### Scenario: Favorites tab is unfiltered
 
 - **WHEN** a user has filters active on the "All" tab and switches to
-  "Favorites"
-- **THEN** the favorites listing is unaffected by those filters
+  "Favorites" without setting any filter there
+- **THEN** the favorites listing is unaffected by the "All" tab's
+  filters
+
+#### Scenario: Tabs filter independently
+
+- **WHEN** a user filters the "Favorites" tab, switches to the "All"
+  tab, and switches back
+- **THEN** the "All" tab's listing is unaffected by the favorites
+  filters, and the "Favorites" tab still shows its filters as they were
 
 ### Requirement: Board filter options are scoped to the caller's boards
 
 The system SHALL provide a filter-options endpoint returning, for the
 calling principal, the distinct catalog entity refs referenced by boards
-the caller can read, the distinct creators of those boards, and the
-number of those boards. The dropdowns of the board filter bar SHALL be
-populated from this endpoint and from no other source.
+the caller can read, the distinct creators of those boards, the number
+of those boards, and the number of those boards the caller has
+favorited. The dropdowns of the board filter bar SHALL be populated from
+this endpoint and from no other source.
 
 The options SHALL be derived from the caller's readable, non-archived
 boards only. The endpoint SHALL NOT return catalog users, entities, or
@@ -363,6 +400,14 @@ selected filter can always be changed or widened.
 - **WHEN** a board the caller could read is archived
 - **THEN** its entity refs and its creator no longer appear in the filter
   options unless another readable board carries them
+
+#### Scenario: Favorites count is per-caller
+
+- **WHEN** a user has favorited two of the boards they can read and
+  another user has favorited none
+- **THEN** the first user's filter options report a favorites count of
+  two and the second user's report zero, counting only readable,
+  non-archived boards
 
 ### Requirement: Paginated board listing
 

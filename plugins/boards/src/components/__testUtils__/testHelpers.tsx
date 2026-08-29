@@ -27,7 +27,7 @@ type TestAppOptions = NonNullable<Parameters<typeof renderInTestApp>[1]>;
  * render their fallbacks. The real app always has this API; tests that
  * care about the answers pass their own.
  */
-const emptyCatalogApi = {
+export const emptyCatalogApi = {
   getEntitiesByRefs: async (request: { entityRefs: string[] }) => ({
     items: request.entityRefs.map(() => undefined),
   }),
@@ -201,9 +201,12 @@ export function testBoardsApi(
 ): jest.Mocked<BoardsApi> {
   return {
     listBoards: jest.fn().mockResolvedValue({ boards: [], total: 0 }),
-    listFilterOptions: jest
-      .fn()
-      .mockResolvedValue({ total: 0, entityRefs: [], creators: [] }),
+    listFilterOptions: jest.fn().mockResolvedValue({
+      total: 0,
+      favorites: 0,
+      entityRefs: [],
+      creators: [],
+    }),
     createBoard: jest.fn(),
     listMyItems: jest.fn().mockResolvedValue([]),
     getBoard: jest.fn(),

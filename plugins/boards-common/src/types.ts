@@ -145,10 +145,12 @@ export interface BoardListResult {
  * the boards the caller can read and from nothing else: `entityRefs` are
  * the entities those boards reference and `creators` the users who
  * created them. `total` is how many boards the caller can read at all,
+ * and `favorites` how many of those they have favorited, both
  * independent of any filter they currently have applied.
  */
 export interface BoardFilterOptions {
   total: number;
+  favorites: number;
   entityRefs: string[];
   creators: string[];
 }

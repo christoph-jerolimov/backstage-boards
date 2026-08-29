@@ -78,6 +78,7 @@ function renderPage(
       listBoards: listBoardsDouble(all),
       listFilterOptions: jest.fn().mockResolvedValue({
         total: all.length,
+        favorites: all.filter(board => board.favorite).length,
         entityRefs: [...new Set(all.flatMap(board => board.entityRefs))],
         creators: [...new Set(all.map(board => board.createdBy))],
         ...over.filterOptions,
@@ -458,6 +459,7 @@ describe('BoardListPage', () => {
         listBoards: listBoardsDouble(many),
         listFilterOptions: jest.fn().mockResolvedValue({
           total: many.length,
+          favorites: 0,
           entityRefs: ['system:default/payments'],
           creators: ['user:default/alice', 'user:default/bob'],
         }),
@@ -482,15 +484,104 @@ describe('BoardListPage', () => {
       expect(catalogApi.getEntities).not.toHaveBeenCalled();
       expect(boardsApi.listFilterOptions).toHaveBeenCalled();
     });
+  });
 
-    it('gives the favorites tab no filter bar', async () => {
-      renderPage({ boards: many });
+  describe('favorites tab filter bar', () => {
+    /** Two favorites and an unstarred board that matches the search. */
+    const mixed: BoardListEntry[] = [
+      testBoardListEntry({ id: 'board-1', name: 'Roadmap', favorite: true }),
+      testBoardListEntry({ id: 'board-2', name: 'Reviews', favorite: true }),
+      testBoardListEntry({ id: 'board-3', name: 'Roadwork', favorite: false }),
+    ];
+
+    it('filters within the favorites, never beyond them', async () => {
+      const { boardsApi } = renderPage({ boards: mixed });
+      await screen.findByRole('row', { name: /Reviews/ });
+      await userEvent.type(
+        await screen.findByRole('searchbox', { name: 'Search boards' }),
+        'road',
+      );
+      await waitFor(() =>
+        expect(boardsApi.listBoards).toHaveBeenCalledWith(
+          expect.objectContaining({ favoritesOnly: true, search: 'road' }),
+        ),
+      );
       expect(
-        await screen.findByRole('tab', { name: 'Favorites (0)' }),
+        await screen.findByRole('row', { name: /Roadmap/ }),
+      ).toBeInTheDocument();
+      await waitFor(() =>
+        expect(
+          screen.queryByRole('row', { name: /Reviews/ }),
+        ).not.toBeInTheDocument(),
+      );
+      // the unstarred board stays absent however well it matches
+      expect(
+        screen.queryByRole('row', { name: /Roadwork/ }),
+      ).not.toBeInTheDocument();
+      // the tab counts all favorites while the match count narrows
+      expect(await screen.findByText('1 of 2 boards')).toBeInTheDocument();
+      expect(
+        screen.getByRole('tab', { name: 'Favorites (2)' }),
+      ).toBeInTheDocument();
+    });
+
+    it('says no favorites matched, apart from having none at all', async () => {
+      renderPage({ boards: mixed });
+      await userEvent.type(
+        await screen.findByRole('searchbox', { name: 'Search boards' }),
+        'nothing here',
+      );
+      expect(
+        await screen.findByText('No favorite boards match your filters.'),
       ).toBeInTheDocument();
       expect(
-        screen.queryByRole('searchbox', { name: 'Search boards' }),
+        screen.queryByText(/No favorite boards yet/),
       ).not.toBeInTheDocument();
+    });
+
+    it("keeps each tab's filters to itself", async () => {
+      renderPage({ boards: mixed });
+      await userEvent.type(
+        await screen.findByRole('searchbox', { name: 'Search boards' }),
+        'road',
+      );
+      await screen.findByText('1 of 2 boards');
+
+      // the All tab is unaffected: empty search field, full listing
+      await userEvent.click(screen.getByRole('tab', { name: 'All (3)' }));
+      expect(
+        await screen.findByRole('row', { name: /Reviews/ }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole('searchbox', { name: 'Search boards' }),
+      ).toHaveValue('');
+
+      // and the favorites tab still holds its filter on return
+      await userEvent.click(screen.getByRole('tab', { name: 'Favorites (2)' }));
+      expect(
+        screen.getByRole('searchbox', { name: 'Search boards' }),
+      ).toHaveValue('road');
+      expect(
+        await screen.findByRole('row', { name: /Roadmap/ }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('row', { name: /Reviews/ }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('refreshes the favorites count when a star is toggled', async () => {
+      const { boardsApi } = renderPage({ boards: mixed });
+      await userEvent.click(
+        await screen.findByRole('button', {
+          name: 'Remove Roadmap from favorites',
+        }),
+      );
+      // the label reads the filter options, so they are refetched
+      await waitFor(() =>
+        expect(
+          boardsApi.listFilterOptions.mock.calls.length,
+        ).toBeGreaterThanOrEqual(2),
+      );
     });
   });
 });

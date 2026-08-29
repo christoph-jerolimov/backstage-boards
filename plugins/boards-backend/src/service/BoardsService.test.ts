@@ -611,6 +611,7 @@ describe('BoardsService', () => {
       const options = await service.listFilterOptions(alice);
       expect(options).toEqual({
         total: 2,
+        favorites: 0,
         entityRefs: ['component:default/service-a', 'system:default/payments'],
         creators: ['user:default/alice', 'user:default/bob'],
       });
@@ -644,6 +645,7 @@ describe('BoardsService', () => {
       const options = await service.listFilterOptions(alice);
       expect(options).toEqual({
         total: 1,
+        favorites: 0,
         entityRefs: ['component:default/new'],
         creators: ['user:default/alice'],
       });
@@ -653,9 +655,33 @@ describe('BoardsService', () => {
       await service.createBoard(bob, { name: 'Theirs' });
       expect(await service.listFilterOptions(carol)).toEqual({
         total: 0,
+        favorites: 0,
         entityRefs: [],
         creators: [],
       });
+    });
+
+    it('counts favorites per caller over readable boards', async () => {
+      const first = await service.createBoard(alice, {
+        name: 'First',
+        visibility: 'logged-in-read',
+      });
+      const second = await service.createBoard(alice, {
+        name: 'Second',
+        visibility: 'logged-in-read',
+      });
+      const gone = await service.createBoard(alice, {
+        name: 'Gone',
+        visibility: 'logged-in-read',
+      });
+      await service.setFavorite(alice, first.id, true);
+      await service.setFavorite(alice, second.id, true);
+      await service.setFavorite(alice, gone.id, true);
+      await service.deleteBoard(alice, gone.id);
+
+      // an archived favorite no longer counts, and favorites are per-user
+      expect((await service.listFilterOptions(alice)).favorites).toBe(2);
+      expect((await service.listFilterOptions(bob)).favorites).toBe(0);
     });
   });
 
