@@ -6,7 +6,7 @@ Lets users create, discover, configure, and delete shareable boards with per-boa
 ## Requirements
 
 ### Requirement: Create a board
-The system SHALL allow an authenticated user to create a board with a name. The creating user SHALL automatically receive the `admin` permission level on the board. A new board SHALL start with a default set of columns that the creator can immediately change.
+The system SHALL allow an authenticated user to create a board with a name. When the permission framework is in use, creating a board SHALL additionally require an ALLOW decision for the `boards.new.create` permission; a denied user's create request SHALL be rejected with a permission error and the create affordance SHALL NOT be offered in the UI. The creating user SHALL automatically receive the `admin` permission level on the board. A new board SHALL start with a default set of columns that the creator can immediately change.
 
 #### Scenario: User creates a board
 - **WHEN** an authenticated user creates a board named "Team Alpha"
@@ -15,6 +15,10 @@ The system SHALL allow an authenticated user to create a board with a name. The 
 #### Scenario: Board creation requires a name
 - **WHEN** a user attempts to create a board with an empty or whitespace-only name
 - **THEN** the request is rejected with a validation error and no board is created
+
+#### Scenario: Creation denied by permission policy
+- **WHEN** a user whose permission policy denies `boards.new.create` attempts to create a board
+- **THEN** the request is rejected with a permission error and no board is created
 
 ### Requirement: Configurable columns per board
 Each board SHALL have an ordered list of columns configurable from the UI by users with `admin` or `write` access. A column represents an item status; there SHALL be no built-in statuses (including no built-in "done" status) — all statuses come from the board's columns. Columns SHALL be creatable, renamable, reorderable, and deletable inline in the board view.
@@ -120,7 +124,7 @@ A column SHALL have an optional display color chosen from a fixed palette by use
 - **THEN** status indicators for that column render in a neutral color
 
 ### Requirement: Duplicate a board
-Users with read access SHALL be able to duplicate a board from its more menu, choosing a name and which parts of the source board to copy: its columns (including colors), its items, its entity references, and/or its share settings. The duplicating user SHALL become admin of the copy. Share settings SHALL only be copyable by admins of the source board; the copy otherwise starts private with only the duplicator's admin grant.
+Users with read access SHALL be able to duplicate a board from its more menu, choosing a name and which parts of the source board to copy: its columns (including colors), its items, its entity references, and/or its share settings. Because duplicating creates a new board, it SHALL be subject to the same `boards.new.create` permission decision as creating a board, and the duplicate affordance SHALL NOT be offered to denied users. The duplicating user SHALL become admin of the copy. Share settings SHALL only be copyable by admins of the source board; the copy otherwise starts private with only the duplicator's admin grant.
 
 #### Scenario: Duplicate with columns
 - **WHEN** a user duplicates a board choosing to copy columns
@@ -133,6 +137,10 @@ Users with read access SHALL be able to duplicate a board from its more menu, ch
 #### Scenario: Non-admin cannot copy share settings
 - **WHEN** a user without admin access on the source requests share-settings copying
 - **THEN** the request is rejected
+
+#### Scenario: Duplicate denied by permission policy
+- **WHEN** a user whose permission policy denies `boards.new.create` attempts to duplicate a board
+- **THEN** the request is rejected with a permission error and no board is created
 
 ### Requirement: Board archival, grace window, and purge
 Deleting a board SHALL archive it rather than remove it. Archived boards SHALL not appear in any listing (board list, favorites, entity assignments) and SHALL only be reachable via their direct link, read-only. The board page SHALL show an alert stating when the board will be permanently deleted, offering admins an "Unarchive" action that restores the board and a "Delete now" action that removes it immediately. A scheduled backend task SHALL permanently delete boards archived more than 30 days ago, including all their data.
