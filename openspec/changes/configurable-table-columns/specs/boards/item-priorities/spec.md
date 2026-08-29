@@ -4,7 +4,7 @@
 
 ### Requirement: Priority display
 
-The kanban card SHALL show its item's priority — the name, rendered with the priority's color when one is set and neutrally otherwise. The board table view SHALL show a priority column only when at least one listed item has a priority and the user has not hidden the column through the table's column menu; the my-items listing SHALL show a priority column only when at least one listed item has a priority; otherwise the column SHALL be absent. The item details drawer SHALL show the item's priority. The "Assigned items" home page widget SHALL show each item's priority when set.
+The kanban card SHALL show its item's priority — the name, rendered with the priority's color when one is set and neutrally otherwise. The board table view and the my-items listing SHALL show a priority column only when at least one listed item has a priority and the user has not hidden the column through the view's column menu; otherwise the column SHALL be absent. The item details drawer SHALL show the item's priority. The "Assigned items" home page widget SHALL show each item's priority when set.
 
 #### Scenario: Card shows the priority
 
@@ -20,8 +20,8 @@ The kanban card SHALL show its item's priority — the name, rendered with the p
 
 #### Scenario: Table column can be hidden by the user
 
-- **WHEN** a user hides the Priority column through the table's column menu on a board whose items use priorities
-- **THEN** the table shows no priority column for that user until they re-enable it
+- **WHEN** a user hides the Priority column through the column menu on a board table or on the my-items listing, while listed items use priorities
+- **THEN** that view shows no priority column for that user until they re-enable it
 
 #### Scenario: My-items column only when used
 
