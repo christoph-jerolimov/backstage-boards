@@ -6,9 +6,13 @@ import { actionsRegistryServiceRef } from '@backstage/backend-plugin-api/alpha';
 import { catalogServiceRef } from '@backstage/plugin-catalog-node';
 import { notificationService } from '@backstage/plugin-notifications-node';
 import { signalsServiceRef } from '@backstage/plugin-signals-node';
-import { RETENTION_DAYS } from '@internal/plugin-boards-common';
+import {
+  RETENTION_DAYS,
+  boardsPermissions,
+} from '@internal/plugin-boards-common';
 import { applyDatabaseMigrations } from './database/migrations';
 import { BoardsService } from './service/BoardsService';
+import { BoardsPermissionGuard } from './permissions';
 import { createRouter } from './router';
 import { registerActions } from './actions';
 import { scheduleReminders } from './reminders';
@@ -32,6 +36,8 @@ export const boardsPlugin = createBackendPlugin({
         httpAuth: coreServices.httpAuth,
         auth: coreServices.auth,
         userInfo: coreServices.userInfo,
+        permissions: coreServices.permissions,
+        permissionsRegistry: coreServices.permissionsRegistry,
         catalog: catalogServiceRef,
         notifications: notificationService,
         signals: signalsServiceRef,
@@ -46,6 +52,8 @@ export const boardsPlugin = createBackendPlugin({
         httpAuth,
         auth,
         userInfo,
+        permissions,
+        permissionsRegistry,
         catalog,
         notifications,
         signals,
@@ -83,15 +91,38 @@ export const boardsPlugin = createBackendPlugin({
           },
         });
 
+        // Announces `boards.use` and `boards.new.create` to the permission
+        // framework; enforcement happens in the router and the actions via
+        // the guard. Optional by design: with the framework disabled or the
+        // allow-all policy every decision is ALLOW and nothing changes.
+        permissionsRegistry.addPermissions(boardsPermissions);
+        const permissionGuard = new BoardsPermissionGuard({
+          permissions,
+          auth,
+        });
+
         httpRouter.use(
-          await createRouter({ service, httpAuth, auth, userInfo, logger }),
+          await createRouter({
+            service,
+            httpAuth,
+            auth,
+            userInfo,
+            logger,
+            permissionGuard,
+          }),
         );
         // Unauthenticated requests must reach the router so that boards with
         // `public-read`/`public-write` visibility work without a login; the
         // access resolver enforces visibility on every request.
         httpRouter.addAuthPolicy({ path: '/', allow: 'unauthenticated' });
 
-        registerActions({ actionsRegistry, service, auth, userInfo });
+        registerActions({
+          actionsRegistry,
+          service,
+          auth,
+          userInfo,
+          permissionGuard,
+        });
 
         await scheduler.scheduleTask({
           id: 'boards-purge-archived',

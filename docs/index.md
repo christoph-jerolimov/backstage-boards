@@ -27,6 +27,8 @@ notifications system.
   plugins to an existing Backstage instance.
 - **[Configuration](configuration.md)** — for admins: database, reminders,
   entity tab, and home page options.
+- **[Permission framework](permissions.md)** — for admins: optionally gate
+  the plugin and board creation through Backstage's permission framework.
 - **Features** — for users: a page per feature area, starting with
   [the boards list](features/boards.md).
 

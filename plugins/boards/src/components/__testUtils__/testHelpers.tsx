@@ -1,7 +1,13 @@
 import { ReactElement } from 'react';
+import { SWRConfig } from 'swr';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderInTestApp } from '@backstage/frontend-test-utils';
 import { catalogApiRef, entityRouteRef } from '@backstage/plugin-catalog-react';
+import { permissionApiRef } from '@backstage/plugin-permission-react';
+import {
+  AuthorizeResult,
+  EvaluatePermissionRequest,
+} from '@backstage/plugin-permission-common';
 import {
   BoardColumn,
   BoardItem,
@@ -34,19 +40,48 @@ export const emptyCatalogApi = {
   getEntities: async () => ({ items: [] }),
 };
 
+/**
+ * A permission api answering from the given map by permission name, with
+ * missing entries allowed — the framework's answer under the allow-all
+ * policy or with permissions disabled. Built with no argument it
+ * reproduces the plugin's default environment, and it is the default
+ * permission api of {@link renderWithProviders}.
+ */
+export function testPermissionApi(
+  decisions: Record<string, AuthorizeResult.ALLOW | AuthorizeResult.DENY> = {},
+) {
+  return {
+    authorize: async (request: EvaluatePermissionRequest) => ({
+      result: decisions[request.permission.name] ?? AuthorizeResult.ALLOW,
+    }),
+  };
+}
+
 export function renderWithProviders(
   ui: ReactElement,
   options?: Pick<TestAppOptions, 'apis' | 'mountedRoutes'>,
 ) {
-  const apis = options?.apis ?? [];
-  const withCatalog = apis.some(([ref]) => ref === catalogApiRef)
-    ? apis
-    : [...apis, [catalogApiRef, emptyCatalogApi] as (typeof apis)[number]];
+  let apis = options?.apis ?? [];
+  if (!apis.some(([ref]) => ref === catalogApiRef)) {
+    apis = [...apis, [catalogApiRef, emptyCatalogApi] as (typeof apis)[number]];
+  }
+  // permission gates resolve to ALLOW unless a test decides otherwise
+  if (!apis.some(([ref]) => ref === permissionApiRef)) {
+    apis = [
+      ...apis,
+      [permissionApiRef, testPermissionApi()] as (typeof apis)[number],
+    ];
+  }
+  const withCatalog = apis;
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   return renderInTestApp(
-    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
+    // a fresh SWR cache per render: `usePermission` caches its decisions in
+    // SWR's global cache, which would otherwise leak between tests
+    <SWRConfig value={{ provider: () => new Map() }}>
+      <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+    </SWRConfig>,
     {
       apis: withCatalog,
       mountedRoutes: {

@@ -11,3 +11,4 @@ export * from './refs';
 export * from './filter';
 export * from './mentions';
 export * from './dates';
+export * from './permissions';

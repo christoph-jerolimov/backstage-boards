@@ -5174,6 +5174,7 @@ __metadata:
     "@backstage/errors": "npm:^1.3.1"
     "@backstage/plugin-catalog-node": "npm:^2.2.4"
     "@backstage/plugin-notifications-node": "npm:^0.2.29"
+    "@backstage/plugin-permission-common": "npm:^0.9.10"
     "@backstage/plugin-signals-node": "npm:^0.2.4"
     "@internal/plugin-boards-common": "workspace:^"
     "@types/express": "npm:^4.17.25"
@@ -5193,6 +5194,7 @@ __metadata:
   dependencies:
     "@backstage/catalog-model": "npm:^1.10.0"
     "@backstage/cli": "npm:^0.36.5"
+    "@backstage/plugin-permission-common": "npm:^0.9.10"
   languageName: unknown
   linkType: soft
 
@@ -5207,6 +5209,8 @@ __metadata:
     "@backstage/frontend-test-utils": "npm:^0.6.0"
     "@backstage/plugin-catalog-react": "npm:^3.2.1"
     "@backstage/plugin-home-react": "npm:^0.1.41"
+    "@backstage/plugin-permission-common": "npm:^0.9.10"
+    "@backstage/plugin-permission-react": "npm:^0.5.4"
     "@backstage/plugin-signals-react": "npm:^0.0.25"
     "@backstage/ui": "npm:^0.17.1"
     "@internal/plugin-boards-common": "workspace:^"
@@ -5222,6 +5226,7 @@ __metadata:
     react-aria-components: "npm:^1.17.0"
     react-dom: "npm:^18.0.2"
     react-router-dom: "npm:^6.30.2"
+    swr: "npm:^2.5.1"
   peerDependencies:
     react: ^16.13.1 || ^17.0.0 || ^18.0.0
     react-dom: ^16.13.1 || ^17.0.0 || ^18.0.0
@@ -12634,6 +12639,7 @@ __metadata:
     "@backstage/plugin-kubernetes": "npm:^0.12.22"
     "@backstage/plugin-notifications": "npm:^0.5.20"
     "@backstage/plugin-org": "npm:^0.7.7"
+    "@backstage/plugin-permission-react": "npm:^0.5.4"
     "@backstage/plugin-scaffolder": "npm:^1.38.2"
     "@backstage/plugin-search": "npm:^1.7.7"
     "@backstage/plugin-signals": "npm:^0.0.34"
@@ -12642,6 +12648,7 @@ __metadata:
     "@backstage/plugin-user-settings": "npm:^0.9.6"
     "@backstage/ui": "npm:^0.17.1"
     "@internal/plugin-boards": "workspace:^"
+    "@internal/plugin-boards-common": "workspace:^"
     "@material-ui/core": "npm:^4.12.2"
     "@material-ui/icons": "npm:^4.9.1"
     "@playwright/test": "npm:^1.32.3"
@@ -29080,7 +29087,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"swr@npm:^2.0.0":
+"swr@npm:^2.0.0, swr@npm:^2.5.1":
   version: 2.5.1
   resolution: "swr@npm:2.5.1"
   dependencies:

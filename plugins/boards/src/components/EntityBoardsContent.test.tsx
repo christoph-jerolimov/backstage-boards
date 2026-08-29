@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { identityApiRef } from '@backstage/frontend-plugin-api';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
@@ -77,9 +77,12 @@ function renderTab(assigned: ReturnType<typeof board>[]) {
 describe('EntityBoardsContent', () => {
   it('asks only for the boards of the current entity', async () => {
     const { boardsApi } = renderTab([board('board-1', 'Roadmap')]);
-    expect(boardsApi.listBoards).toHaveBeenCalledWith({
-      entityRef: 'component:default/www',
-    });
+    // the permission gate resolves asynchronously before the query mounts
+    await waitFor(() =>
+      expect(boardsApi.listBoards).toHaveBeenCalledWith({
+        entityRef: 'component:default/www',
+      }),
+    );
   });
 
   it('names the access caveat when no board is readable', async () => {
