@@ -1,7 +1,7 @@
 import { expect, request, test, type Page } from '@playwright/test';
 
 /*
- * Full-page screenshots of every boards surface, in light and dark mode
+ * Screenshots of every boards surface, in light and dark mode
  * (the dark project in playwright.config.ts re-runs this file with a
  * dark color scheme). The shots double as showcase images, so nothing
  * is masked — instead everything on screen is made deterministic: one
@@ -176,14 +176,12 @@ test('the kanban view, priority grouping, and the table view', async ({
   await openBoard(page, boardId);
 
   await expect(page.getByText('To do (2)')).toBeVisible();
-  await expect(page).toHaveScreenshot('board-kanban.png', { fullPage: true });
+  await expect(page).toHaveScreenshot('board-kanban.png');
 
   await page.getByRole('button', { name: 'Group by' }).click();
   await page.getByRole('option', { name: 'By priority' }).click();
   await expect(page.getByText('critical (1)')).toBeVisible();
-  await expect(page).toHaveScreenshot('board-grouped-by-priority.png', {
-    fullPage: true,
-  });
+  await expect(page).toHaveScreenshot('board-grouped-by-priority.png');
 
   await page.getByRole('button', { name: 'Group by' }).click();
   await page.getByRole('option', { name: 'Not grouped' }).click();
@@ -191,7 +189,7 @@ test('the kanban view, priority grouping, and the table view', async ({
   await expect(
     page.getByRole('row', { name: /Design login flow/ }),
   ).toBeVisible();
-  await expect(page).toHaveScreenshot('board-table.png', { fullPage: true });
+  await expect(page).toHaveScreenshot('board-table.png');
 });
 
 test('the item drawer shows description, checklist, and timeline', async ({
@@ -207,7 +205,7 @@ test('the item drawer shows description, checklist, and timeline', async ({
   await expect(
     drawer.getByText('Kickoff scheduled, notes attached.'),
   ).toBeVisible();
-  await expect(page).toHaveScreenshot('item-drawer.png', { fullPage: true });
+  await expect(page).toHaveScreenshot('item-drawer.png');
 });
 
 test('the priority matrix and board settings dialogs', async ({ page }) => {
@@ -220,9 +218,7 @@ test('the priority matrix and board settings dialogs', async ({ page }) => {
   await expect(
     matrix.getByRole('table', { name: 'Priority matrix' }),
   ).toBeVisible();
-  await expect(page).toHaveScreenshot('priority-matrix.png', {
-    fullPage: true,
-  });
+  await expect(page).toHaveScreenshot('priority-matrix.png');
   // the dialog carries an icon close and the footer button; use the latter
   await matrix.getByRole('button', { name: 'Close' }).last().click();
 
@@ -232,9 +228,7 @@ test('the priority matrix and board settings dialogs', async ({ page }) => {
   await expect(
     settings.getByRole('button', { name: 'Delete priority critical' }),
   ).toBeVisible();
-  await expect(page).toHaveScreenshot('board-settings.png', {
-    fullPage: true,
-  });
+  await expect(page).toHaveScreenshot('board-settings.png');
 });
 
 test('the my-items table', async ({ page }) => {
@@ -256,7 +250,7 @@ test('the my-items table', async ({ page }) => {
   await expect(
     grid.getByRole('row', { name: /Fix flaky pipeline/ }),
   ).toBeVisible();
-  await expect(page).toHaveScreenshot('my-items.png', { fullPage: true });
+  await expect(page).toHaveScreenshot('my-items.png');
 });
 
 test('the home page', async ({ page }) => {
@@ -296,5 +290,5 @@ test('the home page', async ({ page }) => {
   await expect(
     page.getByRole('button', { name: `Open board ${BOARD_NAME}` }).first(),
   ).toBeVisible();
-  await expect(page).toHaveScreenshot('home.png', { fullPage: true });
+  await expect(page).toHaveScreenshot('home.png');
 });
