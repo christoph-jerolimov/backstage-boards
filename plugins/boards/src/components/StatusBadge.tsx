@@ -69,7 +69,10 @@ export function StatusChip(props: {
     <span
       style={{
         display: 'inline-flex',
-        alignItems: 'center',
+        // baseline, so a chip in a baseline-aligned row lines its label
+        // up with neighboring text; the dot has no baseline of its own
+        // and centers itself instead
+        alignItems: 'baseline',
         gap: size.gap,
         padding: size.padding,
         borderRadius: 10,
@@ -79,7 +82,9 @@ export function StatusChip(props: {
         whiteSpace: 'nowrap',
       }}
     >
-      <ColorDot color={props.color} size={size.dot} />
+      <span style={{ display: 'inline-flex', alignSelf: 'center' }}>
+        <ColorDot color={props.color} size={size.dot} />
+      </span>
       {props.children}
     </span>
   );

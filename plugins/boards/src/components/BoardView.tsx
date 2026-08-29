@@ -152,7 +152,7 @@ function ItemCard(props: {
         {/* the compact indicators share one row; guarded so an item
             without any of them doesn't render an empty gap */}
         {(priority || item.dueDate || item.checklist.length > 0) && (
-          <Flex align="center" gap="2" style={{ flexWrap: 'wrap' }}>
+          <Flex align="baseline" gap="2" style={{ flexWrap: 'wrap' }}>
             {priority && <PriorityChip priority={priority} size="small" />}
             <DueDateBadge dueDate={item.dueDate} />
             <ChecklistBadge checklist={item.checklist} />
