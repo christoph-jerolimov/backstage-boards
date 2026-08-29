@@ -1,0 +1,33 @@
+## Why
+
+The item detail drawer has grown organically and is getting cluttered: status and priority appear twice (a nice read-only badge row plus two labelled selects), the only bulk action is a bare "Delete item" button sitting near the top while every other surface offers the full item menu, the fields run together without visual structure, and the activity timeline is oldest-first with the comment composer buried at the very bottom of a potentially long scroll.
+
+## What Changes
+
+- **Merge the duplicate status and priority displays into interactive badges.** The status badge and priority chip become the controls: clicking (or right-clicking) one opens the picker, they are keyboard-focusable and operable, and they carry a visible affordance (dropdown indicator) so the select capability is discoverable. The separate "Status" and "Priority" selects are removed. Read-only viewers and externally managed items get the plain, non-interactive badge.
+- **Give the drawer visible structure.** Fields are grouped under headlined sections (details fields, description, checklist, tags, activity) instead of one flat stack.
+- **Replace the standalone "Delete item" button with the full item menu.** The drawer header offers the same item menu as cards and rows (move to column, due date shortcuts, priority, assignees, delete), minus the redundant "Open details" entry. Deleting from the menu closes the drawer.
+- **Rework the activity block.** Comments and changes are still available combined, but newest first by default, with tabs to switch between "Combined", "Comments", and "Changes" and a control to flip the ordering between "Newest first" and "Oldest first". The new-comment composer moves above this block so writing a comment never requires scrolling past the history.
+- Status changes made from the drawer go through the optimistic move mutation, closing an existing gap against the "Optimistic item moves" requirement (implementation alignment, no new spec text).
+
+## Capabilities
+
+### New Capabilities
+
+None.
+
+### Modified Capabilities
+
+- `boards/comments-and-history`: The "Unified timeline in item detail view" requirement changes — the detail view's activity block gains Combined/Comments/Changes tabs (Combined remains the default), a newest-first default ordering with a user-facing toggle, and the comment composer placed above the timeline.
+- `boards/item-management`: New requirements for the drawer — the full item menu is offered in the drawer (replacing the standalone delete button), the drawer content is grouped into headlined sections, and the drawer's status display and status editor merge into one accessible interactive badge control.
+- `boards/item-priorities`: The "Edit priority from drawer and item menu" requirement changes — the drawer's priority display and priority editor merge into one accessible interactive badge control; read-only users see only the plain badge.
+
+## Impact
+
+- `plugins/boards/src/components/ItemDrawer.tsx` — restructure: header with item menu, sectioned layout, badge-select controls, activity tabs/ordering, composer placement, optimistic status move.
+- `plugins/boards/src/components/ItemDrawerFields.tsx` — section/heading helper.
+- `plugins/boards/src/components/StatusBadge.tsx` — interactive variants of the status/priority chips (or a wrapper component).
+- `plugins/boards/src/components/ItemMenu.tsx` — option to omit the "Open details" entry when rendered inside the drawer.
+- `plugins/boards/src/components/ItemTimeline.tsx` — filtering/ordering support and stable keys for change entries.
+- Tests: `ItemDrawer.test.tsx` (large rework), `ItemMenu.test.tsx` (new prop), e2e `priorities.test.ts` (locator for the new priority control), e2e screenshot `item-drawer.png` (must be regenerated).
+- No backend/API changes: `getTimeline` stays oldest-first; the frontend orders and filters client-side.
