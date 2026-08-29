@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge, Button, Flex, Text } from '@backstage/ui';
 import { MyBoardItem } from '@internal/plugin-boards-common';
@@ -6,6 +6,7 @@ import { useBoardsSignal, useMyItemsQuery } from '../queries';
 import { useBoardsBasePath } from '../routes';
 import { AsyncList, ErrorText } from './common';
 import { DueDateBadge, formatDueDate } from './DueDate';
+import { ItemDrawerHost } from './ItemDrawerHost';
 import { PriorityChip } from './StatusBadge';
 import {
   filterDueEntries,
@@ -115,8 +116,9 @@ export function AssignedItemsContent(props: AssignedItemsContentProps) {
   }, [entries, scope, groupBy]);
 
   const openBoard = (boardId: string) => navigate(`${basePath}/${boardId}`);
-  const openItem = (entry: MyBoardItem) =>
-    navigate(`${basePath}/${entry.boardId}?item=${entry.item.id}`);
+  // the open drawer, held as its own copy so it survives the row
+  // disappearing (e.g. after the user unassigns themselves)
+  const [openEntry, setOpenEntry] = useState<MyBoardItem | undefined>();
 
   return (
     <div style={{ maxHeight: '100%', overflowY: 'auto' }}>
@@ -151,7 +153,7 @@ export function AssignedItemsContent(props: AssignedItemsContentProps) {
                     entry={entry}
                     // redundant when the group already names the status
                     showStatus={groupBy !== 'status'}
-                    onOpenItem={openItem}
+                    onOpenItem={setOpenEntry}
                   />
                 ))}
               </Flex>
@@ -159,6 +161,14 @@ export function AssignedItemsContent(props: AssignedItemsContentProps) {
           </Flex>
         )}
       </AsyncList>
+      {openEntry && (
+        <ItemDrawerHost
+          boardId={openEntry.boardId}
+          itemId={openEntry.item.id}
+          fallbackItem={openEntry.item}
+          onClose={() => setOpenEntry(undefined)}
+        />
+      )}
     </div>
   );
 }

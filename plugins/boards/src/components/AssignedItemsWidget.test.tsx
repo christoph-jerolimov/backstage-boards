@@ -1,11 +1,13 @@
-import { screen } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { boardsApiRef } from '../api';
 import { rootRouteRef } from '../routes';
 import { AssignedItemsContent } from './AssignedItemsWidget';
 import {
   renderWithProviders,
+  testBoard,
   testBoardsApi,
+  testColumn,
   testMyItem,
   testPriority,
 } from './__testUtils__/testHelpers';
@@ -53,7 +55,16 @@ function renderWidget(
   const listMyItems = over.error
     ? jest.fn().mockRejectedValue(over.error)
     : jest.fn().mockResolvedValue(over.items ?? entries);
-  const boardsApi = testBoardsApi({ listMyItems });
+  // the drawer host resolves an opened item's board behind the card
+  const getBoard = jest.fn().mockImplementation(async (boardId: string) =>
+    testBoard({
+      id: boardId,
+      name: boardId === 'board-1' ? 'Roadmap' : 'Support',
+      columns: [testColumn({ boardId })],
+      access: 'write',
+    }),
+  );
+  const boardsApi = testBoardsApi({ listMyItems, getBoard });
   renderWithProviders(<AssignedItemsContent {...props} />, {
     apis: [[boardsApiRef, boardsApi]],
     mountedRoutes: { '/boards': rootRouteRef },
@@ -192,12 +203,31 @@ describe('AssignedItemsContent', () => {
     expect(headings).toEqual(['Aug 5', 'Aug 27', 'Dec 24', 'No due date']);
   });
 
-  it('opens an item on its board', async () => {
+  it('opens the item drawer on the homepage', async () => {
     renderWidget();
     await userEvent.click(
       await screen.findByRole('button', { name: 'Open item Fix the build' }),
     );
-    expect(mockNavigate).toHaveBeenCalledWith('/boards/board-1?item=item-2');
+    expect(
+      await screen.findByRole('dialog', { name: 'Item Fix the build' }),
+    ).toBeInTheDocument();
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('saves a drawer edit and refreshes the card', async () => {
+    const { boardsApi } = renderWidget();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Open item Fix the build' }),
+    );
+    await screen.findByRole('dialog', { name: 'Item Fix the build' });
+    await userEvent.click(screen.getByRole('button', { name: 'Clear' }));
+    expect(boardsApi.updateItem).toHaveBeenCalledWith('board-1', 'item-2', {
+      dueDate: null,
+    });
+    // the drawer's invalidation reaches the card's listing
+    await waitFor(() =>
+      expect(boardsApi.listMyItems.mock.calls.length).toBeGreaterThan(1),
+    );
   });
 
   it('opens the board of a group', async () => {

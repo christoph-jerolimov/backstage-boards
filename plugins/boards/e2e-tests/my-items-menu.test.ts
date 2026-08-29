@@ -104,6 +104,30 @@ test.describe('my-items row menu', () => {
   });
 });
 
+test.describe('my-items item drawer', () => {
+  test('opens the item drawer in place from the row menu', async ({ page }) => {
+    const name = `My items E2E drawer ${Date.now()}`;
+    await seedAssignedBoard(name, ['Drawer card']);
+    await openMyItems(page, name);
+
+    await page
+      .getByRole('button', { name: 'Actions for Drawer card' })
+      .click();
+    await page.getByRole('menuitem', { name: 'Open details' }).click();
+
+    const drawer = page.getByRole('dialog', { name: 'Item Drawer card' });
+    await expect(drawer).toBeVisible();
+    // in place: still on the boards page, not on the item's board
+    expect(new URL(page.url()).pathname).toBe('/boards');
+
+    await drawer.getByRole('button', { name: 'Close item details' }).click();
+    await expect(drawer).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: `Open board ${name}` }),
+    ).toBeVisible();
+  });
+});
+
 test.describe('my-items filter bar and grouping', () => {
   test('searches, regroups by tag, and keeps the row menu working', async ({
     page,

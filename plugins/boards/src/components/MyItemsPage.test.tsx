@@ -217,12 +217,15 @@ describe('MyItemsList', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/boards/board-2');
   });
 
-  it('opens an item on its board when its row is activated', async () => {
+  it('opens the item drawer in place when its row is activated', async () => {
     renderList();
     await userEvent.click(
       await screen.findByRole('row', { name: /Ship the docs/ }),
     );
-    expect(mockNavigate).toHaveBeenCalledWith('/boards/board-1?item=item-1');
+    expect(
+      await screen.findByRole('dialog', { name: 'Item Ship the docs' }),
+    ).toBeInTheDocument();
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it('offers the board item actions plus Open board from the row', async () => {
@@ -240,13 +243,45 @@ describe('MyItemsList', () => {
     ]);
   });
 
-  it('opens an item from the row menu', async () => {
+  it('opens the item drawer from the row menu', async () => {
     renderList();
     await openRowMenu('Ship the docs');
     await userEvent.click(
       screen.getByRole('menuitem', { name: 'Open details' }),
     );
-    expect(mockNavigate).toHaveBeenCalledWith('/boards/board-1?item=item-1');
+    expect(
+      await screen.findByRole('dialog', { name: 'Item Ship the docs' }),
+    ).toBeInTheDocument();
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('opens a read-only drawer on a board the user can only read', async () => {
+    renderList({ access: 'read' });
+    await openRowMenu('Ship the docs');
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: 'Open details' }),
+    );
+    await screen.findByRole('dialog', { name: 'Item Ship the docs' });
+    expect(
+      screen.queryByRole('textbox', { name: 'New comment' }),
+    ).not.toBeInTheDocument();
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
+  it('saves a drawer edit and refreshes the listing', async () => {
+    const { boardsApi } = renderList();
+    await userEvent.click(
+      await screen.findByRole('row', { name: /Ship the docs/ }),
+    );
+    await screen.findByRole('dialog', { name: 'Item Ship the docs' });
+    await userEvent.click(screen.getByRole('button', { name: 'Clear' }));
+    expect(boardsApi.updateItem).toHaveBeenCalledWith('board-1', 'item-1', {
+      dueDate: null,
+    });
+    // the drawer's invalidation reaches the my-items listing too
+    await waitFor(() =>
+      expect(boardsApi.listMyItems.mock.calls.length).toBeGreaterThan(1),
+    );
   });
 
   it('moves an item to another column of its board', async () => {

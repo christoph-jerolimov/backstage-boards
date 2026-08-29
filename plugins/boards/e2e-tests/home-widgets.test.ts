@@ -166,6 +166,26 @@ test.describe('boards home page widgets', () => {
     ).toHaveCount(0);
   });
 
+  test('activating an assigned item opens its drawer on the homepage', async ({
+    page,
+  }) => {
+    const { overdueTitle } = await seedHomeData(`${Date.now()}`);
+    await openHome(page);
+    await resetHomeLayout(page);
+
+    await widget(page, 'Assigned items')
+      .getByRole('button', { name: `Open item ${overdueTitle}` })
+      .click();
+    const drawer = page.getByRole('dialog', { name: `Item ${overdueTitle}` });
+    await expect(drawer).toBeVisible();
+    // the drawer renders above the widgets, in place — no navigation
+    expect(new URL(page.url()).pathname).toBe('/home');
+
+    await drawer.getByRole('button', { name: 'Close item details' }).click();
+    await expect(drawer).toHaveCount(0);
+    expect(new URL(page.url()).pathname).toBe('/home');
+  });
+
   test('a card’s scope setting changes its content and survives a reload', async ({
     page,
   }) => {
