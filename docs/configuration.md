@@ -1,52 +1,16 @@
 # Configuration
 
-This page is for admins. All options live in `app-config.yaml` (with
-production overrides in `app-config.production.yaml`).
+This page is for admins and covers the boards-specific options. All of them
+live in `app-config.yaml` (with production overrides in
+`app-config.production.yaml`).
 
-## Database
-
-The development default is an in-memory SQLite database, so boards are gone
-after a backend restart:
-
-```yaml
-backend:
-  database:
-    client: better-sqlite3
-    connection: ':memory:'
-```
-
-Point `backend.database` at PostgreSQL to keep them, as
-`app-config.production.yaml` does:
-
-```yaml
-backend:
-  database:
-    client: pg
-    connection:
-      host: ${POSTGRES_HOST}
-      port: ${POSTGRES_PORT}
-      user: ${POSTGRES_USER}
-      password: ${POSTGRES_PASSWORD}
-```
-
-## Sign-in and identities
-
-Assignees, watchers, and share grants are catalog entity refs, so the
-signed-in identity must resolve to a catalog user for "my" features (My
-items, the Assigned items card, reminders) to work. The development config
-uses the guest provider resolved to `user:default/guest`:
-
-```yaml
-auth:
-  providers:
-    guest:
-      userEntityRef: user:default/guest
-```
-
-![The guest sign-in page of the development setup](screenshots/light/sign-in-page.png)
-
-In production, use a real auth provider whose sign-in resolver maps to your
-catalog users.
+Standard Backstage concerns — the database, auth providers, and so on — are
+configured exactly as documented by
+[Backstage itself](https://backstage.io/docs/conf/) and are not repeated
+here. One boards-specific note on identity: assignees, watchers, and share
+grants are catalog entity refs, so the sign-in resolver must map the
+signed-in user to a catalog user entity for the "my" features (My items,
+the Assigned items card, reminders) to work.
 
 ## Scheduled reminders
 

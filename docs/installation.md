@@ -17,8 +17,10 @@ This starts the frontend on <http://localhost:3000> and the backend on
 <http://localhost:7007>. Boards are at <http://localhost:3000/boards>.
 
 The default development configuration signs you in as the guest user and
-stores boards in an in-memory SQLite database — see
-[Configuration](configuration.md) for persistence and production settings.
+stores boards in an in-memory SQLite database, so boards are gone after a
+backend restart; point `backend.database` at PostgreSQL (as
+`app-config.production.yaml` does) to keep them. The boards-specific options
+are covered in [Configuration](configuration.md).
 
 ## The plugins
 
