@@ -1,10 +1,22 @@
 # @internal/plugin-boards-backend
 
-Backend for the boards plugin. Stores boards, columns, items, versioned
-comments, a change audit log, permissions, favorites, and watches in the
-plugin's own database. Exposes a REST API under `/api/boards`, registers
-actions in the actions registry, and sends notifications to watchers via the
-Backstage notifications service.
+Backend for the boards plugin. Stores boards, columns, priority definitions,
+items (with tags, assignees, due dates, and checklists), versioned comments
+and descriptions, a change audit log, permissions, favorites, and watches in
+the plugin's own database. Exposes a REST API under `/api/boards` and
+registers actions in the actions registry, both enforcing the same
+permission rules.
+
+Beyond request handling it also:
+
+- sends notifications to watchers and mentioned users via the Backstage
+  notifications service, grouped per user
+- publishes ids-only signals on board changes so open board views refresh
+  live
+- runs optional scheduled reminders about due and overdue items (see
+  `config.d.ts`)
+- purges boards and items 30 days after their soft delete via scheduled
+  tasks
 
 Sharing model: per-user/per-group grants with `read`/`write`/`admin` levels
 plus board visibility modes (`private`, `logged-in-read`, `logged-in-write`,

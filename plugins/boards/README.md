@@ -3,13 +3,24 @@
 Frontend for the boards plugin, built exclusively on the Backstage new
 frontend system. Provides:
 
-- `/boards` — list of favorited and all accessible boards
-- `/boards/:boardId` — kanban board view and table view with
-  group-by-assignee, inline editing, drag & drop (with an accessible
-  "Move to column" menu fallback), and an item detail drawer with a unified
-  comments + change history timeline
+- `/boards` — paginated "Favorites"/"All" board list with per-status item
+  counts, search/entity/creator filters, and row context menus
+- `/boards/my-items` — everything assigned to you across boards, with its own
+  filter bar and grouping
+- `/boards/:boardId` — kanban and table views with drag & drop (plus an
+  accessible "Move to column" menu fallback), inline editing, grouping by
+  assignee or priority, a filter bar, sortable and configurable table
+  columns, row multi-select with bulk actions, and the assignee × status and
+  status × priority matrix dialogs
+- an item detail drawer with combined status/priority/due-date badge editors,
+  description, checklist, and a unified comments + change history timeline
+  with per-user drafts
 - a share dialog for user/group permissions and public visibility modes
 - a "Boards" tab on catalog entities listing the boards assigned to them
+- "Assigned items" and "Boards" cards for the Backstage home page
+
+The repository README's Features section lists every behaviour in detail;
+the specs behind them live in `openspec/specs/boards/`.
 
 UI is composed from Backstage UI components with react-aria used where no
 Backstage UI component exists (drag & drop, the drawer overlay).
