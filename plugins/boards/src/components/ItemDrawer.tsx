@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useApi } from '@backstage/frontend-plugin-api';
 import { RiCloseLine } from '@remixicon/react';
-import { Button, ButtonIcon, Flex, Text, TextAreaField } from '@backstage/ui';
+import {
+  Box,
+  Button,
+  ButtonIcon,
+  Flex,
+  Text,
+  TextAreaField,
+} from '@backstage/ui';
 import {
   BoardItem,
   BoardWithContext,
@@ -133,9 +140,13 @@ export function ItemDrawer(props: {
           background: 'rgba(0,0,0,0.35)',
         }}
       />
-      <div
+      {/* A Box, so nested BUI fields know their surface: they draw
+          themselves in the next neutral shade instead of vanishing
+          into the drawer's own background. */}
+      <Box
         role="dialog"
         aria-label={`Item ${item.title}`}
+        bg="neutral"
         style={{
           position: 'fixed',
           top: 0,
@@ -323,7 +334,7 @@ export function ItemDrawer(props: {
             />
           )}
         </Flex>
-      </div>
+      </Box>
     </>
   );
 }
