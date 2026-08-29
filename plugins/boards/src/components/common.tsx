@@ -74,7 +74,10 @@ function RefChip(props: {
   const { refString, withAvatar, plain, onRemove } = props;
   // AssigneeAvatars already tells catalog refs and text refs apart
   const content = withAvatar ? (
-    <AssigneeAvatars refs={[refString]} />
+    <AssigneeAvatars
+      refs={[refString]}
+      align={plain ? 'baseline' : undefined}
+    />
   ) : (
     <RefDisplay refString={refString} />
   );
@@ -85,7 +88,7 @@ function RefChip(props: {
     <span
       style={{
         display: 'inline-flex',
-        alignItems: 'center',
+        alignItems: plain ? 'baseline' : 'center',
         gap: 4,
         ...(plain
           ? {}
@@ -126,7 +129,11 @@ export function RefChips(props: {
     return null;
   }
   return (
-    <Flex gap="1" align="center" style={{ flexWrap: 'wrap' }}>
+    <Flex
+      gap="1"
+      align={props.plain ? 'baseline' : 'center'}
+      style={{ flexWrap: 'wrap' }}
+    >
       {props.refs.map(ref => (
         <RefChip
           key={ref}

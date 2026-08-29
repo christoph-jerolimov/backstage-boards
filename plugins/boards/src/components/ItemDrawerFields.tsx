@@ -27,7 +27,7 @@ export function AssigneesField(props: {
 }) {
   const { assignees, readonly, onChange } = props;
   return (
-    <Flex align="center" gap="2" style={{ flexWrap: 'wrap' }}>
+    <Flex align="baseline" gap="2" style={{ flexWrap: 'wrap' }}>
       {assignees.length > 0 ? (
         <RefChips
           refs={assignees}
