@@ -23,9 +23,11 @@ them. Service-to-service traffic (the catalog processor's entity-reference
 lookup) and scheduled background jobs are not gated; service principals are
 allowed by the framework itself, subject to their access restrictions.
 
-Anonymous visitors are evaluated too: with the allow-all policy,
-`public-read`/`public-write` boards remain reachable without a login, and a
-custom policy can decide otherwise.
+Anonymous visitors are not evaluated — the permission framework cannot
+authorize callers without a token — so `public-read`/`public-write` boards
+remain reachable without a login regardless of the policy. The permissions
+apply to signed-in users; anonymous access is governed by board visibility
+alone, as it always was.
 
 ## Writing a policy
 

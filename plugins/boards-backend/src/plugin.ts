@@ -96,7 +96,10 @@ export const boardsPlugin = createBackendPlugin({
         // the guard. Optional by design: with the framework disabled or the
         // allow-all policy every decision is ALLOW and nothing changes.
         permissionsRegistry.addPermissions(boardsPermissions);
-        const permissionGuard = new BoardsPermissionGuard(permissions);
+        const permissionGuard = new BoardsPermissionGuard({
+          permissions,
+          auth,
+        });
 
         httpRouter.use(
           await createRouter({

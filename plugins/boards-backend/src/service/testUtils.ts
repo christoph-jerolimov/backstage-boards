@@ -1,4 +1,8 @@
-import { LoggerService } from '@backstage/backend-plugin-api';
+import {
+  BackstageCredentials,
+  BackstagePrincipalTypes,
+  LoggerService,
+} from '@backstage/backend-plugin-api';
 import { AuthorizeResult } from '@backstage/plugin-permission-common';
 import {
   NotificationSendOptions,
@@ -48,16 +52,31 @@ export const anonymous: BoardsPrincipal = { type: 'anonymous' };
  * A permission guard whose decisions come from the given map by permission
  * name. Missing entries are ALLOW — the framework's answer under the
  * allow-all policy or with permissions disabled, so a guard built with no
- * argument reproduces the plugin's default behavior.
+ * argument reproduces the plugin's default behavior. Principals are
+ * recognised by their `type` field, the shape both the real credential
+ * services and the test harnesses hand out.
  */
 export function testPermissionGuard(
   decisions: Record<string, AuthorizeResult.ALLOW | AuthorizeResult.DENY> = {},
 ): BoardsPermissionGuard {
   return new BoardsPermissionGuard({
-    authorize: async requests =>
-      requests.map(({ permission }) => ({
-        result: decisions[permission.name] ?? AuthorizeResult.ALLOW,
-      })),
+    permissions: {
+      authorize: async requests =>
+        requests.map(({ permission }) => ({
+          result: decisions[permission.name] ?? AuthorizeResult.ALLOW,
+        })),
+    },
+    auth: {
+      isPrincipal: <TType extends keyof BackstagePrincipalTypes>(
+        credentials: BackstageCredentials,
+        type: TType,
+      ): credentials is BackstageCredentials<
+        BackstagePrincipalTypes[TType]
+      > => {
+        const principal = credentials.principal as { type?: string };
+        return principal?.type === type;
+      },
+    },
   });
 }
 

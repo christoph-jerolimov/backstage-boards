@@ -1,4 +1,5 @@
 import {
+  AuthService,
   BackstageCredentials,
   PermissionsService,
 } from '@backstage/backend-plugin-api';
@@ -20,16 +21,24 @@ export type BoardsPermissionsService = Pick<PermissionsService, 'authorize'>;
 
 /**
  * Enforces the plugin-level framework permissions for every door into the
- * plugin (HTTP router, actions registry). Deliberately credential-based
- * rather than principal-based: the permissions service itself already
- * short-circuits service principals (honoring their access restrictions)
- * and evaluates anonymous credentials without a token, and with the
- * framework disabled every decision is ALLOW — so the plugin works
- * unchanged without the permission framework. Access within a board stays
- * with the share feature; this guard never looks at individual boards.
+ * plugin (HTTP router, actions registry). Signed-in users are what the
+ * framework can actually decide about, so only their credentials go to
+ * `authorize`: service principals are short-circuited by the permissions
+ * service itself (honoring their access restrictions), and anonymous
+ * callers are exempt — the permission backend rejects tokenless authorize
+ * requests outright, so their access stays governed by the share feature's
+ * public visibilities, exactly as without the framework. With the
+ * framework disabled every decision is ALLOW, keeping the integration
+ * optional. Access within a board stays with the share feature; this
+ * guard never looks at individual boards.
  */
 export class BoardsPermissionGuard {
-  constructor(private readonly permissions: BoardsPermissionsService) {}
+  constructor(
+    private readonly options: {
+      permissions: BoardsPermissionsService;
+      auth: Pick<AuthService, 'isPrincipal'>;
+    },
+  ) {}
 
   /** Throws `NotAllowedError` unless `boards.use` is allowed. */
   async requireUse(credentials: BackstageCredentials): Promise<void> {
@@ -52,7 +61,10 @@ export class BoardsPermissionGuard {
     credentials: BackstageCredentials,
     permissions: BasicPermission[],
   ): Promise<void> {
-    const decisions = await this.permissions.authorize(
+    if (this.options.auth.isPrincipal(credentials, 'none')) {
+      return;
+    }
+    const decisions = await this.options.permissions.authorize(
       permissions.map(permission => ({ permission })),
       { credentials },
     );

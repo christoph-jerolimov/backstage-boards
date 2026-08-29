@@ -59,7 +59,7 @@ A small helper wrapping `PermissionsService`:
 
 - `requireUse(credentials)` — authorizes `boards.use`; throws `NotAllowedError` on DENY.
 - `requireCreate(credentials)` — authorizes `boards.new.create`; throws on DENY.
-- The guard passes every caller's credentials to `authorize()` and lets the permissions service decide: `ServerPermissionClient` (verified at `@backstage/plugin-permission-node@0.11.3`) short-circuits service principals itself — ALLOW, while still honoring their access restrictions, which an explicit bypass in the guard would have ignored — returns ALLOW for everything when `permission.enabled` is false, and evaluates anonymous (`none`) credentials token-lessly so a policy can decide about anonymous visitors too.
+- The guard authorizes signed-in callers and lets the permissions service decide the rest: `ServerPermissionClient` (verified at `@backstage/plugin-permission-node@0.11.3`) short-circuits service principals itself — ALLOW, while still honoring their access restrictions, which an explicit bypass in the guard would have ignored — and returns ALLOW for everything when `permission.enabled` is false. Anonymous (`none`) credentials are exempted by the guard: the client sends their authorize request token-less and the permission backend rejects tokenless requests with 401 (verified against the running app), so evaluating them is not possible — anonymous access stays governed by the share feature's public visibilities, exactly as without the framework.
 
 Enforcement points:
 
@@ -94,7 +94,7 @@ With `permission.enabled: false`, `ServerPermissionClient` (backend) and the fro
 - [Tab header still visible to denied users on marked entities] → Content is gated and issues no API calls; revisit when `EntityContentBlueprint` filters become permission-aware. The existing spec already allows an "empty tab" state for users without access to any referencing board, so the UX is consistent.
 - [Permission API might not be among the New Frontend System's default APIs] → Verify during implementation; if missing, register the permission API factory in `packages/app`. The fail-open rule keeps the UI working either way.
 - [One `authorize()` round-trip per request] → Single basic permission per request against the local permission backend; negligible. Batch the create check into the same `authorize` call on the two create routes.
-- [Anonymous authorization] → Policies receive no user for anonymous credentials; the allow-all default keeps public boards working. E2E-test the unauthenticated public-board path to guard the regression.
+- [Anonymous callers cannot be policy-controlled] → The permission backend rejects tokenless authorize requests, so the guard exempts anonymous credentials rather than breaking public boards; a policy therefore cannot hide public boards from anonymous visitors. Accepted: that is today's behavior, and an installation can disable unauthenticated access outright if it needs to.
 - [Denying `boards.use` does not hide catalog labels] → The `boards/is-referenced` entity label is written by the catalog processor regardless of viewer; it leaks only "some board references this entity", no board data. Accepted.
 
 ## Migration Plan

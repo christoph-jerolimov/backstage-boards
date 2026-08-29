@@ -829,17 +829,18 @@ describe('framework permissions', () => {
     expect((await service.getBoard(alice, board.id)).name).toBe('Existing');
   });
 
-  it('evaluates anonymous callers too', async () => {
+  it('leaves anonymous callers to the share feature', async () => {
+    // the permission backend cannot evaluate tokenless callers, so
+    // anonymous access stays governed by board visibility even when the
+    // policy denies signed-in users
     await service.createBoard(alice, {
       name: 'Public',
       visibility: 'public-read',
     });
-    const denied = await appDeciding({ 'boards.use': AuthorizeResult.DENY });
-    await request(denied).get('/boards').expect(403);
-
-    const allowed = await appDeciding({ 'boards.use': AuthorizeResult.ALLOW });
-    const listing = await request(allowed).get('/boards').expect(200);
+    const app = await appDeciding({ 'boards.use': AuthorizeResult.DENY });
+    const listing = await request(app).get('/boards').expect(200);
     expect(body<{ boards: BoardListEntry[] }>(listing).boards).toHaveLength(1);
+    await request(app).get('/boards').set('x-test-user', 'alice').expect(403);
   });
 
   it('gates creating and duplicating on boards.new.create', async () => {

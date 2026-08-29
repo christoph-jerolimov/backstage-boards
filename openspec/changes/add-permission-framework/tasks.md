@@ -24,4 +24,4 @@
 
 - [x] 4.1 Add a `docs/permissions.md` page (permission names, what each gates, example policy snippet, optionality note, sharing stays authoritative within boards) and register it in `mkdocs.yml`; verify the page renders in the docs nav.
 - [x] 4.2 Run repo-wide checks — `yarn tsc`, `yarn lint`, `yarn test`, `yarn prettier:check` — and fix any fallout; verify all pass.
-- [ ] 4.3 End-to-end sanity: with the dev app under allow-all, confirm page, tab, widgets, create, and duplicate all behave exactly as before; with a temporary test policy denying `boards.use`, confirm the sidebar item and page content are gone and API calls return 403.
+- [x] 4.3 End-to-end sanity: with the dev app under allow-all, confirm page, tab, widgets, create, and duplicate all behave exactly as before; with a temporary test policy denying `boards.use`, confirm the sidebar item and page content are gone and API calls return 403.

@@ -22,7 +22,7 @@ The plugin SHALL define two permissions in its common package so both frontend a
 
 ### Requirement: The use permission gates all user-invoked API calls
 
-The backend SHALL evaluate the `boards.use` permission for every user-invoked API call, using the calling credentials, before performing the operation. When the decision is DENY, the call SHALL be rejected with a permission error and no data SHALL be read or changed. Service-to-service endpoints and scheduled background work SHALL NOT be subject to this permission.
+The backend SHALL evaluate the `boards.use` permission for every API call invoked by a signed-in user, using the calling credentials, before performing the operation. When the decision is DENY, the call SHALL be rejected with a permission error and no data SHALL be read or changed. Service-to-service endpoints and scheduled background work SHALL NOT be subject to this permission. Unauthenticated callers SHALL NOT be evaluated against it either — the permission framework cannot authorize tokenless callers — and their access SHALL remain governed solely by the share feature's public visibilities, exactly as without the framework.
 
 #### Scenario: Denied user cannot call the API
 
@@ -39,10 +39,10 @@ The backend SHALL evaluate the `boards.use` permission for every user-invoked AP
 - **WHEN** another backend plugin calls the service-only entity-references endpoint, or a scheduled task (reminders, purge) runs
 - **THEN** the `boards.use` permission is not evaluated and the operation behaves as before
 
-#### Scenario: Anonymous callers are evaluated too
+#### Scenario: Anonymous callers stay with the share feature
 
-- **WHEN** an unauthenticated visitor calls a boards endpoint in a deployment that permits anonymous access
-- **THEN** the `boards.use` decision is evaluated for the anonymous credentials, and only on ALLOW does the existing public-board visibility logic apply
+- **WHEN** an unauthenticated visitor calls a boards endpoint while the installation's policy denies `boards.use`
+- **THEN** the visitor's access is decided by board visibility alone: public boards remain reachable and everything else stays hidden, exactly as before the permission framework was adopted
 
 ### Requirement: The use permission gates the Boards page
 
