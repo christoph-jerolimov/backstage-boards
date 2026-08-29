@@ -1,8 +1,12 @@
 # Configuration
 
-The boards-specific options in `app-config.yaml`. The only requirement
-boards places on the standard setup is that the sign-in resolver maps users
-to catalog user entities, or the "my" features have nothing to attach to.
+The boards-specific options in `app-config.yaml`. Boards places two
+requirements on the standard setup: the sign-in resolver must map users to
+catalog user entities, or the "my" features have nothing to attach to; and
+since all boards, items, comments, and history live in the plugin's own
+database, `backend.database` must point at a persistent database with
+backups — unlike catalog data, boards cannot be re-ingested from anywhere
+if lost.
 
 ## Scheduled reminders
 
