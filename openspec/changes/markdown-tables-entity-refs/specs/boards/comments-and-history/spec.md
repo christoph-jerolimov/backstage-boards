@@ -37,3 +37,7 @@ Headings SHALL follow the ATX form (`#` through `######` at the start of a line,
 #### Scenario: Non-principal entity mention renders as entity link
 - **WHEN** a comment containing `@component:webserver-example` is rendered
 - **THEN** the mention appears as a link to `component:default/webserver-example`'s catalog page
+
+#### Scenario: Sentence punctuation stays out of the ref
+- **WHEN** a comment ends with `owned by @group:default/guests.`
+- **THEN** the mention links `group:default/guests` and the trailing period renders as plain text

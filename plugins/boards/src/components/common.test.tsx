@@ -77,6 +77,45 @@ describe('MarkdownContent', () => {
     const link = await screen.findByRole('link');
     expect(link).toHaveAttribute('href', '/catalog/default/user/jane');
   });
+
+  it('links mentions of non-principal entity kinds, but never text:', async () => {
+    renderWithProviders(
+      <MarkdownContent text="see @component:webserver-example and @text:foo" />,
+    );
+    const link = await screen.findByRole('link');
+    expect(link).toHaveAttribute(
+      'href',
+      '/catalog/default/component/webserver-example',
+    );
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+    expect(screen.getByText(/@text:foo/)).toBeInTheDocument();
+  });
+
+  it('renders headings at decreasing sizes', () => {
+    renderWithProviders(
+      <MarkdownContent text={'# Big **plan**\n\n### Smaller'} />,
+    );
+    const h1 = screen.getByRole('heading', { level: 1 });
+    expect(h1).toHaveTextContent('Big plan');
+    expect(h1.querySelector('strong')).toHaveTextContent('plan');
+    expect(screen.getByRole('heading', { level: 3 })).toHaveTextContent(
+      'Smaller',
+    );
+  });
+
+  it('renders pipe tables with a header row and entity links in cells', async () => {
+    renderWithProviders(
+      <MarkdownContent
+        text={'| Name | Owner |\n| --- | --- |\n| api | user:default/jane |'}
+      />,
+    );
+    expect(
+      screen.getByRole('columnheader', { name: 'Name' }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('cell', { name: 'api' })).toBeInTheDocument();
+    const link = await screen.findByRole('link');
+    expect(link).toHaveAttribute('href', '/catalog/default/user/jane');
+  });
 });
 
 describe('InlineEdit', () => {

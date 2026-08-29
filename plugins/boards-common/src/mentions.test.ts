@@ -30,6 +30,23 @@ describe('extractMentions', () => {
   it('matches after punctuation openers and start of text', () => {
     expect(extractMentions('(@carol)')).toEqual(['user:default/carol']);
   });
+
+  it('returns only user/group principals, not other entity kinds', () => {
+    expect(extractMentions('@component:webserver-example @carol')).toEqual([
+      'user:default/carol',
+    ]);
+  });
+
+  it('ignores non-entity kinds like text:', () => {
+    expect(extractMentions('@text:not-a-ref')).toEqual([]);
+  });
+
+  it('leaves sentence punctuation out of the ref', () => {
+    expect(extractMentions('owned by @group:default/guests.')).toEqual([
+      'group:default/guests',
+    ]);
+    expect(extractMentions('thanks @carol.')).toEqual(['user:default/carol']);
+  });
 });
 
 describe('findMentions', () => {
@@ -41,5 +58,20 @@ describe('findMentions', () => {
       entityRef: 'user:default/carol',
       display: '@carol',
     });
+  });
+
+  it('reports full entity refs of any kind', () => {
+    const mentions = findMentions(
+      'see @component:webserver-example and @group:default/another-team',
+    );
+    expect(mentions.map(m => m.entityRef)).toEqual([
+      'component:default/webserver-example',
+      'group:default/another-team',
+    ]);
+    expect(mentions[0].display).toBe('@component:webserver-example');
+  });
+
+  it('skips non-entity kinds', () => {
+    expect(findMentions('read @text:foo')).toEqual([]);
   });
 });
