@@ -19,8 +19,12 @@ import { RefLabel } from './common';
 type MatchState = 'all' | 'some' | 'none';
 
 /** The `✓ `/`– ` label prefix for a fully/partially matching entry. */
-const mark = (state: MatchState) =>
-  state === 'all' ? '✓ ' : state === 'some' ? '– ' : '';
+const mark = (state: MatchState) => {
+  if (state === 'all') {
+    return '✓ ';
+  }
+  return state === 'some' ? '– ' : '';
+};
 
 /**
  * The toolbar the table view shows while items are selected: status,
