@@ -1,10 +1,8 @@
 # Configuration
 
-The boards-specific options in `app-config.yaml`. For everything standard —
-database, auth, and so on — see the
-[Backstage docs](https://backstage.io/docs/conf/); the only requirement from
-boards is that the sign-in resolver maps users to catalog user entities, or
-the "my" features have nothing to attach to.
+The boards-specific options in `app-config.yaml`. The only requirement
+boards places on the standard setup is that the sign-in resolver maps users
+to catalog user entities, or the "my" features have nothing to attach to.
 
 ## Scheduled reminders
 
