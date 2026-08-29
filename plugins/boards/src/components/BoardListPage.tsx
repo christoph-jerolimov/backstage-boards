@@ -30,6 +30,7 @@ import {
   BoardListFilter,
   errorMessage,
 } from '@internal/plugin-boards-common';
+import { useQueryClient } from '@tanstack/react-query';
 import { boardsApiRef } from '../api';
 import {
   boardsQueryClient,
@@ -48,9 +49,6 @@ import {
 } from './TablePagination';
 import { FavoriteButton, FavoriteStar } from './FavoriteButton';
 import { useAsyncAction } from './useAsyncAction';
-
-/** Stable so the favorites tab's paging effect does not reset every render. */
-const FAVORITES_FILTER: BoardListFilter = { favoritesOnly: true };
 
 /** The shared board actions menu: row button and right-click alike. */
 function BoardMenu(props: {
@@ -218,6 +216,7 @@ function BoardsPanel(props: {
 
 export function BoardListPage() {
   const boardsApi = useApi(boardsApiRef);
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [tab, setTab] = useState<string>('favorites');
   const [createOpen, setCreateOpen] = useState(false);
@@ -230,8 +229,13 @@ export function BoardListPage() {
     formatError: err => `Could not create board: ${errorMessage(err)}`,
   });
 
+  // each tab owns its filter, so narrowing one never moves the other
+  const favoritesFilter = useBoardFilter();
   const filter = useBoardFilter();
-  const favorites = useBoardsPage(FAVORITES_FILTER);
+  const favorites = useBoardsPage({
+    ...favoritesFilter.filter,
+    favoritesOnly: true,
+  });
   const all = useBoardsPage(filter.filter);
 
   useBoardsSignal(() => {
@@ -242,7 +246,9 @@ export function BoardListPage() {
 
   const toggleFavorite = async (board: BoardListEntry) => {
     await boardsApi.setFavorite(board.id, !board.favorite);
-    // the star moves a board between the two tabs, so both are stale
+    // the star moves a board between the two tabs and changes the
+    // favorites count behind the tab label, so all three are stale
+    queryClient.invalidateQueries({ queryKey: queryKeys.filterOptions });
     await Promise.all([favorites.refetch(), all.refetch()]);
   };
 
@@ -271,8 +277,11 @@ export function BoardListPage() {
       {error && <ErrorText>{error}</ErrorText>}
       <Tabs selectedKey={tab} onSelectionChange={key => setTab(String(key))}>
         <TabList>
-          <Tab id="favorites">Favorites ({favorites.data?.total ?? 0})</Tab>
-          {/* the caller's whole readable set, so filtering never moves it */}
+          {/* both labels count each tab's whole set, so filtering never
+              moves them */}
+          <Tab id="favorites">
+            Favorites ({favoritesFilter.options?.favorites ?? 0})
+          </Tab>
           <Tab id="all">All ({filter.options?.total ?? 0})</Tab>
           <Tab id="my-items">My items</Tab>
         </TabList>
@@ -282,11 +291,25 @@ export function BoardListPage() {
             page={favorites}
             onToggleFavorite={toggleFavorite}
             empty={
-              <Text color="secondary">
-                No favorite boards yet — star a board in the All tab.
-              </Text>
+              favoritesFilter.active ? (
+                // the bar right above holds the clear action; a second
+                // one here would be two controls doing one thing
+                <Text color="secondary">
+                  No favorite boards match your filters.
+                </Text>
+              ) : (
+                <Text color="secondary">
+                  No favorite boards yet — star a board in the All tab.
+                </Text>
+              )
             }
-          />
+          >
+            <BoardsFilterBar
+              filter={favoritesFilter}
+              matchCount={favorites.data?.total ?? 0}
+              total={favoritesFilter.options?.favorites ?? 0}
+            />
+          </BoardsPanel>
         </TabPanel>
         <TabPanel id="all">
           <BoardsPanel

@@ -12,6 +12,7 @@ import {
 } from '@internal/plugin-boards-common';
 import { BoardsApi } from '../../api';
 import { BoardActions } from '../BoardView';
+import { BulkActions } from '../useBoardActions';
 
 /**
  * Renders a component inside a test app (routing and app context, which
@@ -26,7 +27,7 @@ type TestAppOptions = NonNullable<Parameters<typeof renderInTestApp>[1]>;
  * render their fallbacks. The real app always has this API; tests that
  * care about the answers pass their own.
  */
-const emptyCatalogApi = {
+export const emptyCatalogApi = {
   getEntitiesByRefs: async (request: { entityRefs: string[] }) => ({
     items: request.entityRefs.map(() => undefined),
   }),
@@ -185,15 +186,27 @@ export function testActions(): jest.Mocked<BoardActions> {
   };
 }
 
+/** Bulk actions where every handler is a jest mock. */
+export function testBulkActions(): jest.Mocked<BulkActions> {
+  return {
+    moveItems: jest.fn().mockResolvedValue(undefined),
+    updateItems: jest.fn().mockResolvedValue(undefined),
+    archiveItems: jest.fn().mockResolvedValue(undefined),
+  };
+}
+
 /** A BoardsApi where every method is a jest mock with an empty result. */
 export function testBoardsApi(
   over: Partial<jest.Mocked<BoardsApi>> = {},
 ): jest.Mocked<BoardsApi> {
   return {
     listBoards: jest.fn().mockResolvedValue({ boards: [], total: 0 }),
-    listFilterOptions: jest
-      .fn()
-      .mockResolvedValue({ total: 0, entityRefs: [], creators: [] }),
+    listFilterOptions: jest.fn().mockResolvedValue({
+      total: 0,
+      favorites: 0,
+      entityRefs: [],
+      creators: [],
+    }),
     createBoard: jest.fn(),
     listMyItems: jest.fn().mockResolvedValue([]),
     getBoard: jest.fn(),

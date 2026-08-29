@@ -51,7 +51,7 @@ export function BoardPageContent(props: {
   const { data: items } = useItemsQuery(boardId);
 
   const { openItemId, openItem, closeItem } = useOpenItemParam();
-  const { actions, guarded, refreshAll, error } = useBoardActions(
+  const { actions, bulk, guarded, refreshAll, error } = useBoardActions(
     boardId,
     openItem,
   );
@@ -117,6 +117,7 @@ export function BoardPageContent(props: {
           items={filter.filteredItems}
           canWrite={canWrite}
           actions={actions}
+          bulk={bulk}
           groupBy={groupBy}
           openItem={actions.openItem}
         />

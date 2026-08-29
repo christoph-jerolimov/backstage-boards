@@ -686,7 +686,7 @@ export class BoardsService {
       row => row.id,
     );
     if (ids.length === 0) {
-      return { total: 0, entityRefs: [], creators: [] };
+      return { total: 0, favorites: 0, entityRefs: [], creators: [] };
     }
     const entityRows = await this.knex('board_entities')
       .whereIn('board_id', ids)
@@ -696,8 +696,17 @@ export class BoardsService {
       .whereIn('id', ids)
       .distinct('created_by')
       .orderBy('created_by');
+    // favorites are per-user; nobody else has any
+    const userRef = principal.type === 'user' ? principal.userRef : undefined;
+    const favoriteRows = userRef
+      ? await this.knex('favorites')
+          .whereIn('board_id', ids)
+          .where('user_ref', userRef)
+          .count({ count: '*' })
+      : undefined;
     return {
       total: ids.length,
+      favorites: Number(favoriteRows?.[0]?.count ?? 0),
       entityRefs: entityRows.map(row => row.entity_ref),
       creators: creatorRows.map(row => row.created_by),
     };

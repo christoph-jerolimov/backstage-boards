@@ -2,6 +2,7 @@ import { Fragment, useState } from 'react';
 import { VisuallyHidden } from 'react-aria';
 import {
   Cell,
+  Checkbox,
   Column,
   Flex,
   Row,
@@ -35,12 +36,21 @@ import {
   utilityColumnStyle,
 } from './RowMenu';
 import type { BoardActions } from './BoardView';
+import type { BulkActions } from './useBoardActions';
+import { BulkActionsBar } from './BulkActionsBar';
 import { formatDate, RefDisplay } from './common';
 import { AssigneeAvatars } from './AssigneeAvatars';
 import { DueDateBadge } from './DueDate';
 import { PriorityChip, StatusBadge } from './StatusBadge';
 
 const SORTABLE_COLUMNS = new Set<TableColumnId>(ITEM_SORT_COLUMNS);
+
+/** The shared item-id selection every group's table renders and edits. */
+interface SelectionHandle {
+  selected: ReadonlySet<string>;
+  toggleItem: (itemId: string) => void;
+  setMany: (itemIds: string[], on: boolean) => void;
+}
 
 function ItemsTable(props: {
   board: BoardWithContext;
@@ -51,6 +61,8 @@ function ItemsTable(props: {
   rowMenu: RowMenuHandle<BoardItem>;
   sort: ItemSortDescriptor | undefined;
   onSortChange: (descriptor: ItemSortDescriptor) => void;
+  /** Row selection; absent for readers, who get no checkbox column. */
+  selection?: SelectionHandle;
 }) {
   const {
     board,
@@ -60,12 +72,20 @@ function ItemsTable(props: {
     rowMenu,
     sort,
     onSortChange,
+    selection,
   } = props;
   const columnOf = (columnId: string) =>
     board.columns.find(column => column.id === columnId);
   const priorityOf = (item: BoardItem) =>
     board.priorities.find(priority => priority.id === item.priorityId);
   const sorted = sortItems(items, sort, board.columns);
+  // externally managed items are read-only, so select-all skips them
+  const selectable = sorted.filter(item => !item.externalManager);
+  const selectedHere = selectable.filter(item =>
+    selection?.selected.has(item.id),
+  );
+  const allSelected =
+    selectable.length > 0 && selectedHere.length === selectable.length;
   const cellContent = (id: TableColumnId, item: BoardItem) => {
     switch (id) {
       case 'title':
@@ -110,6 +130,30 @@ function ItemsTable(props: {
       }}
     >
       <TableHeader>
+        {selection ? (
+          // a utility column like the actions one: checkbox-narrow
+          <Column style={utilityColumnStyle}>
+            <Checkbox
+              // opt out of the table's slotted selection context — this
+              // checkbox drives the view's own id-based selection
+              slot={null}
+              aria-label="Select all items"
+              isSelected={allSelected}
+              isIndeterminate={selectedHere.length > 0 && !allSelected}
+              onChange={() =>
+                allSelected
+                  ? selection.setMany(
+                      sorted.map(item => item.id),
+                      false,
+                    )
+                  : selection.setMany(
+                      selectable.map(item => item.id),
+                      true,
+                    )
+              }
+            />
+          </Column>
+        ) : null}
         {visibleColumns.map(column => (
           <Column
             key={column.id}
@@ -133,6 +177,17 @@ function ItemsTable(props: {
               rowMenu.onContextMenu(item, event)
             }
           >
+            {selection ? (
+              <Cell>
+                <Checkbox
+                  slot={null}
+                  aria-label={`Select ${item.title}`}
+                  isSelected={selection.selected.has(item.id)}
+                  isDisabled={!!item.externalManager}
+                  onChange={() => selection.toggleItem(item.id)}
+                />
+              </Cell>
+            ) : null}
             {visibleColumns.map(column => (
               <Cell key={column.id}>{cellContent(column.id, item)}</Cell>
             ))}
@@ -153,12 +208,45 @@ export function TableView(props: {
   items: BoardItem[];
   canWrite: boolean;
   actions: BoardActions;
+  bulk: BulkActions;
   groupBy: GroupByMode;
   openItem: (itemId: string) => void;
 }) {
-  const { board, items, canWrite, actions, groupBy, openItem } = props;
+  const { board, items, canWrite, actions, bulk, groupBy, openItem } = props;
   const pool = assigneePool(items);
   const [sort, setSort] = useState<ItemSortDescriptor | undefined>(undefined);
+  // selection is a set of item ids: grouping only re-partitions the same
+  // items, so it survives a group-by change, and an item shown in several
+  // groups is one selection; ids of vanished items simply stop matching
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const selection: SelectionHandle | undefined = canWrite
+    ? {
+        selected,
+        toggleItem: itemId =>
+          setSelected(current => {
+            const next = new Set(current);
+            if (!next.delete(itemId)) {
+              next.add(itemId);
+            }
+            return next;
+          }),
+        setMany: (itemIds, on) =>
+          setSelected(current => {
+            const next = new Set(current);
+            for (const itemId of itemIds) {
+              if (on) {
+                next.add(itemId);
+              } else {
+                next.delete(itemId);
+              }
+            }
+            return next;
+          }),
+      }
+    : undefined;
+  const selectedItems = canWrite
+    ? items.filter(item => selected.has(item.id))
+    : [];
   const rowMenu = useRowMenu<BoardItem>({
     name: item => item.title,
     children: item => (
@@ -187,9 +275,20 @@ export function TableView(props: {
       />
     </Flex>
   );
+  const bulkBar =
+    selectedItems.length > 0 ? (
+      <BulkActionsBar
+        board={board}
+        selectedItems={selectedItems}
+        assigneePool={pool}
+        bulk={bulk}
+        onClear={() => setSelected(new Set())}
+      />
+    ) : null;
   if (groupBy === 'none') {
     return (
       <Flex direction="column" gap="2">
+        {bulkBar}
         {columnsMenu}
         <ItemsTable
           board={board}
@@ -199,6 +298,7 @@ export function TableView(props: {
           rowMenu={rowMenu}
           sort={sort}
           onSortChange={setSort}
+          selection={selection}
         />
         {rowMenu.contextMenu}
       </Flex>
@@ -206,6 +306,7 @@ export function TableView(props: {
   }
   return (
     <Flex direction="column" gap="2">
+      {bulkBar}
       {columnsMenu}
       {groupItems(items, groupBy, board.priorities).map(group => (
         <Fragment key={group.key}>
@@ -225,6 +326,7 @@ export function TableView(props: {
             rowMenu={rowMenu}
             sort={sort}
             onSortChange={setSort}
+            selection={selection}
           />
         </Fragment>
       ))}
