@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useApi } from '@backstage/frontend-plugin-api';
 import { useQueryClient } from '@tanstack/react-query';
+import { errorMessage, ItemUpdate } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
 import { invalidateBoard, useMoveItem, useRenameItem } from '../queries';
 import type { BoardActions } from './BoardView';
@@ -26,9 +27,24 @@ export function useOpenItemParam() {
   );
 }
 
+/**
+ * The fan-out mutations behind the table's bulk-actions bar. Each call
+ * runs its per-item requests in parallel, refreshes the board once, and
+ * keeps the items that succeeded even when others fail.
+ */
+export interface BulkActions {
+  moveItems: (itemIds: string[], columnId: string) => Promise<void>;
+  updateItems: (
+    entries: { itemId: string; update: ItemUpdate }[],
+  ) => Promise<void>;
+  archiveItems: (itemIds: string[]) => Promise<void>;
+}
+
 export interface BoardActionsHandle {
   /** The item and column actions handed to the board and table views. */
   actions: BoardActions;
+  /** The bulk mutations handed to the table view. */
+  bulk: BulkActions;
   /** Runs a board-level mutation, refreshing after it and surfacing failures. */
   guarded: (action: () => Promise<unknown>) => Promise<void>;
   refreshAll: () => Promise<void>;
@@ -66,6 +82,45 @@ export function useBoardActions(
 
   const moveItemMutation = useMoveItem(boardId, setError);
   const renameItemMutation = useRenameItem(boardId, setError);
+
+  // all calls settle before the one refresh, so the items that went
+  // through render their new state even when a sibling call failed
+  const fanOut = async (tasks: Array<() => Promise<unknown>>) => {
+    setError(undefined);
+    const results = await Promise.allSettled(tasks.map(task => task()));
+    await invalidateBoard(queryClient, boardId);
+    const failure = results.find(
+      (result): result is PromiseRejectedResult => result.status === 'rejected',
+    );
+    if (failure) {
+      setError(errorMessage(failure.reason));
+    }
+  };
+
+  const bulk: BulkActions = useMemo(
+    () => ({
+      moveItems: (itemIds, columnId) =>
+        fanOut(
+          itemIds.map(
+            itemId => () => boardsApi.moveItem(boardId, itemId, { columnId }),
+          ),
+        ),
+      updateItems: entries =>
+        fanOut(
+          entries.map(
+            ({ itemId, update }) =>
+              () =>
+                boardsApi.updateItem(boardId, itemId, update),
+          ),
+        ),
+      archiveItems: itemIds =>
+        fanOut(
+          itemIds.map(itemId => () => boardsApi.deleteItem(boardId, itemId)),
+        ),
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [boardsApi, boardId],
+  );
 
   const actions: BoardActions = useMemo(
     () => ({
@@ -110,5 +165,5 @@ export function useBoardActions(
     [boardsApi, boardId, openItem],
   );
 
-  return { actions, guarded, refreshAll, error };
+  return { actions, bulk, guarded, refreshAll, error };
 }

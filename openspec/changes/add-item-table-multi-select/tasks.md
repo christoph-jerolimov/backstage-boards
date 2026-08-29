@@ -2,7 +2,7 @@
 
 ## 1. Bulk mutations
 
-- [ ] 1.1 Add the `BulkActions` handle to `useBoardActions.ts`
+- [x] 1.1 Add the `BulkActions` handle to `useBoardActions.ts`
       (`moveItems(itemIds, columnId)`, `updateItems(entries:
       {itemId, update}[])`, `archiveItems(itemIds)`), each fanning out
       over `boardsApi.moveItem` / `updateItem` / `deleteItem` with
@@ -15,7 +15,7 @@
 
 ## 2. Row selection
 
-- [ ] 2.1 Add id-based selection state to `TableView.tsx`
+- [x] 2.1 Add id-based selection state to `TableView.tsx`
       (`ReadonlySet<string>` next to `sort`), derive `selectedItems`
       by intersecting with `items`, and pass a selection handle to
       `ItemsTable`. Render a leading checkbox column (only when
@@ -25,7 +25,7 @@
       `TableView.test.tsx`: readers see no checkboxes, a writer can
       check a row, the external item's checkbox is disabled, and
       toggling a checkbox does not call `openItem`.
-- [ ] 2.2 Add the per-table select-all header checkbox: checked when
+- [x] 2.2 Add the per-table select-all header checkbox: checked when
       every selectable row of that table is selected, indeterminate
       when some are (use `react-aria-components`' `Checkbox` if BUI's
       does not forward `isIndeterminate`), toggling between selecting
@@ -33,7 +33,7 @@
       `TableView.test.tsx`: select-all selects the group's rows but
       not external items, and unchecking one row makes the header
       indeterminate.
-- [ ] 2.3 Keep the selection across grouping: selection lives in
+- [x] 2.3 Keep the selection across grouping: selection lives in
       `TableView` only, so grouped mode reuses the same set for every
       group's `ItemsTable`. Verify with `TableView.test.tsx`: select
       two items with `groupBy="none"`, re-render with
@@ -43,7 +43,7 @@
 
 ## 3. Bulk-actions bar
 
-- [ ] 3.1 Create `BulkActionsBar.tsx`: a `Flex` toolbar rendered by
+- [x] 3.1 Create `BulkActionsBar.tsx`: a `Flex` toolbar rendered by
       `TableView` above the tables only when `canWrite` and at least
       one item is selected, showing `{n} selected`, a Clear button,
       and the Archive button (calls `bulk.archiveItems` with the
@@ -52,13 +52,13 @@
       appears after selecting, Clear empties the selection, and
       Archive calls `deleteItem` for each selected id and hides the
       bar.
-- [ ] 3.2 Add the Status dropdown listing all board columns with `✓ `
+- [x] 3.2 Add the Status dropdown listing all board columns with `✓ `
       when all selected items are in that column and `– ` when some
       are; choosing a column calls `bulk.moveItems` for the selected
       items not already in it. Verify with `TableView.test.tsx`:
       mixed selection shows dashes, uniform selection shows one
       checkmark, and choosing a column moves every selected item.
-- [ ] 3.3 Add the Priority dropdown, rendered only when
+- [x] 3.3 Add the Priority dropdown, rendered only when
       `board.priorities.length > 0`, listing priorities in order plus
       `No priority`, with the same ✓/– markers (`No priority` marks
       against `!item.priorityId`); choosing sets or clears
@@ -66,7 +66,7 @@
       the target. Verify with `TableView.test.tsx`: no dropdown on a
       board without priorities, markers for mixed/uniform/no-priority
       states, and bulk set/clear patches the right items.
-- [ ] 3.4 Add the Assignee dropdown — `Me` first (cached
+- [x] 3.4 Add the Assignee dropdown — `Me` first (cached
       `queryKeys.identity`), then `assigneePool` minus me sorted by
       `useProfiles` display name, then `No assignee` — with ✓ when
       every selected item includes the ref and – when some do;
@@ -75,7 +75,7 @@
       `bulk.updateItems`. Verify with `TableView.test.tsx`: marker
       states, add-to-all, toggle-off-all, and clear-all each patch
       the expected per-item assignee arrays.
-- [ ] 3.5 Add the Due date dropdown with `Today`, `Tomorrow`,
+- [x] 3.5 Add the Due date dropdown with `Today`, `Tomorrow`,
       `This week (Fri)`, and `Remove due date` (reusing `todayISO` /
       `tomorrowISO` / `fridayISO` from `DueDate.tsx`), applying the
       value to every selected item via `bulk.updateItems`. Verify
