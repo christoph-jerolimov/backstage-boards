@@ -12,6 +12,7 @@ import {
 } from '@internal/plugin-boards-common';
 import { BoardsApi } from '../../api';
 import { BoardActions } from '../BoardView';
+import { BulkActions } from '../useBoardActions';
 
 /**
  * Renders a component inside a test app (routing and app context, which
@@ -182,6 +183,15 @@ export function testActions(): jest.Mocked<BoardActions> {
     setAssignees: jest.fn().mockResolvedValue(undefined),
     setItemPriority: jest.fn().mockResolvedValue(undefined),
     deleteItem: jest.fn().mockResolvedValue(undefined),
+  };
+}
+
+/** Bulk actions where every handler is a jest mock. */
+export function testBulkActions(): jest.Mocked<BulkActions> {
+  return {
+    moveItems: jest.fn().mockResolvedValue(undefined),
+    updateItems: jest.fn().mockResolvedValue(undefined),
+    archiveItems: jest.fn().mockResolvedValue(undefined),
   };
 }
 
