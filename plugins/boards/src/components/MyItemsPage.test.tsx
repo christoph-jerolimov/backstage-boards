@@ -1,6 +1,7 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { identityApiRef } from '@backstage/frontend-plugin-api';
+import { identityApiRef, storageApiRef } from '@backstage/frontend-plugin-api';
+import { mockApis } from '@backstage/frontend-test-utils';
 import { BoardPermissionLevel, todayISO } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
 import { rootRouteRef } from '../routes';
@@ -77,6 +78,7 @@ function renderList(
     access?: BoardPermissionLevel;
     priorities?: ReturnType<typeof testPriorities>;
     api?: Record<string, unknown>;
+    storage?: ReturnType<typeof mockApis.storage>;
   } = {},
 ) {
   const listMyItems = over.error
@@ -101,14 +103,16 @@ function renderList(
     getBoard,
     ...over.api,
   });
+  const storage = over.storage ?? mockApis.storage();
   renderWithProviders(<MyItemsList />, {
     apis: [
       [boardsApiRef, boardsApi],
       [identityApiRef, identityApi],
+      [storageApiRef, storage],
     ],
     mountedRoutes: { '/boards': rootRouteRef },
   });
-  return { boardsApi };
+  return { boardsApi, storage };
 }
 
 /** Switches the listing to another grouping, by its menu label. */
@@ -188,6 +192,47 @@ describe('MyItemsList', () => {
     expect(
       screen.getAllByRole('columnheader').map(cell => cell.textContent),
     ).not.toContain('Priority');
+  });
+
+  it('shows the default columns, Item first', async () => {
+    renderList();
+    await screen.findByText('Ship the docs');
+    // grouped by board renders one table per board; check the first
+    expect(
+      within(screen.getAllByRole('grid')[0])
+        .getAllByRole('columnheader')
+        .map(cell => cell.textContent),
+    ).toEqual(['Item', 'Status', 'Due', 'Assignees', 'Tags', 'Actions']);
+  });
+
+  it('shows and hides columns from the configure menu, stored for the listing', async () => {
+    const { storage } = renderList();
+    await screen.findByText('Ship the docs');
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Configure columns' }),
+    );
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Updated' }));
+    expect(
+      screen.getAllByRole('columnheader').map(cell => cell.textContent),
+    ).toContain('Updated');
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Configure columns' }),
+    );
+    await userEvent.click(screen.getByRole('menuitem', { name: '✓ Tags' }));
+    expect(
+      screen.getAllByRole('columnheader').map(cell => cell.textContent),
+    ).not.toContain('Tags');
+    expect(
+      storage.forBucket('boards-table-columns').snapshot<string[]>('my-items')
+        .value,
+    ).toEqual([
+      'title',
+      'status',
+      'priority',
+      'dueDate',
+      'assignees',
+      'updatedAt',
+    ]);
   });
 
   it('offers the priorities of the item’s own board in the row menu', async () => {

@@ -45,7 +45,20 @@ import { GroupLabel } from './GroupLabel';
 import { ItemDrawerHost } from './ItemDrawerHost';
 import { ItemActions, ItemMenu } from './ItemMenu';
 import { ActionsCellContent, useRowMenu, utilityColumnStyle } from './RowMenu';
-import { AsyncList, ErrorText, selectedOption } from './common';
+import {
+  AsyncList,
+  ErrorText,
+  formatDate,
+  RefDisplay,
+  selectedOption,
+} from './common';
+import { AssigneeAvatars } from './AssigneeAvatars';
+import {
+  ColumnsMenu,
+  TABLE_COLUMNS,
+  TableColumnId,
+  useVisibleColumns,
+} from './tableColumns';
 import { ItemFilterBar, useItemFilter } from './ItemFilterBar';
 import { PriorityChip, StatusBadge } from './StatusBadge';
 import { useAsyncAction } from './useAsyncAction';
@@ -72,8 +85,8 @@ function MyItemsTable(props: {
   pool: string[];
   basePath: string;
   showBoardColumn: boolean;
-  /** Render the priority column; on when any listed item has one. */
-  showPriority: boolean;
+  /** The user's visible columns, already resolved in display order. */
+  visibleColumns: ReadonlyArray<(typeof TABLE_COLUMNS)[number]>;
   onError: (message?: string) => void;
   /** Opens the entry's detail drawer in place. */
   onOpenItem: (entry: MyBoardItem) => void;
@@ -85,7 +98,7 @@ function MyItemsTable(props: {
     pool,
     basePath,
     showBoardColumn,
-    showPriority,
+    visibleColumns,
     onError,
     onOpenItem,
   } = props;
@@ -100,6 +113,37 @@ function MyItemsTable(props: {
     boards
       .get(entry.boardId)
       ?.columns.find(column => column.id === entry.item.columnId);
+  const cellContent = (id: TableColumnId, entry: MyBoardItem) => {
+    switch (id) {
+      case 'title':
+        return entry.item.title;
+      case 'status':
+        return columnOf(entry) ? (
+          <StatusBadge column={columnOf(entry)} />
+        ) : (
+          // until the board resolves, the listing's own title
+          <Badge size="small">{entry.columnTitle}</Badge>
+        );
+      case 'priority':
+        return <PriorityChip priority={entry.priority} />;
+      case 'dueDate':
+        return <DueDateBadge dueDate={entry.item.dueDate} />;
+      case 'assignees':
+        return <AssigneeAvatars refs={entry.item.assignees} />;
+      case 'tags':
+        return entry.item.tags.join(', ');
+      case 'createdBy':
+        return <RefDisplay refString={entry.item.createdBy} />;
+      case 'createdAt':
+        return formatDate(entry.item.createdAt);
+      case 'updatedBy':
+        return <RefDisplay refString={entry.item.updatedBy} />;
+      case 'updatedAt':
+        return formatDate(entry.item.updatedAt);
+      default:
+        return null;
+    }
+  };
   const canWrite = (entry: MyBoardItem) => {
     const board = boards.get(entry.boardId);
     return !!board && levelIncludes(board.access, 'write') && !board.archivedAt;
@@ -172,11 +216,11 @@ function MyItemsTable(props: {
       >
         <TableHeader>
           {showBoardColumn ? <Column>Board</Column> : null}
-          <Column isRowHeader>Item</Column>
-          <Column>Status</Column>
-          {showPriority ? <Column>Priority</Column> : null}
-          <Column>Due</Column>
-          <Column>Tags</Column>
+          {visibleColumns.map(column => (
+            <Column key={column.id} isRowHeader={column.id === 'title'}>
+              {column.id === 'title' ? 'Item' : column.label}
+            </Column>
+          ))}
           <Column style={utilityColumnStyle}>
             <VisuallyHidden>Actions</VisuallyHidden>
           </Column>
@@ -202,24 +246,9 @@ function MyItemsTable(props: {
                   </Button>
                 </Cell>
               ) : null}
-              <Cell>{entry.item.title}</Cell>
-              <Cell>
-                {columnOf(entry) ? (
-                  <StatusBadge column={columnOf(entry)} />
-                ) : (
-                  // until the board resolves, the listing's own title
-                  <Badge size="small">{entry.columnTitle}</Badge>
-                )}
-              </Cell>
-              {showPriority ? (
-                <Cell>
-                  <PriorityChip priority={entry.priority} />
-                </Cell>
-              ) : null}
-              <Cell>
-                <DueDateBadge dueDate={entry.item.dueDate} />
-              </Cell>
-              <Cell>{entry.item.tags.join(', ')}</Cell>
+              {visibleColumns.map(column => (
+                <Cell key={column.id}>{cellContent(column.id, entry)}</Cell>
+              ))}
               <Cell>
                 <ActionsCellContent>
                   {rowMenu.rowActions(entry)}
@@ -329,6 +358,10 @@ export function MyItemsList() {
   );
   // one decision for the whole listing, so every group shows the same columns
   const showPriority = filtered.some(entry => entry.priority);
+  const [visible, toggleColumn] = useVisibleColumns('my-items');
+  const visibleColumns = TABLE_COLUMNS.filter(column =>
+    visible.has(column.id),
+  ).filter(column => column.id !== 'priority' || showPriority);
 
   return (
     <Flex direction="column" gap="4">
@@ -343,6 +376,11 @@ export function MyItemsList() {
           {/* every listed item is already the viewer's, so a single
               assignee would match every row */}
           <ItemFilterBar filter={filter} minAssigneeOptions={2} />
+          <ColumnsMenu
+            visible={visible}
+            onToggle={toggleColumn}
+            showPriority={showPriority}
+          />
           {/* the select grows into whatever the flex row leaves it */}
           <div style={{ width: 160, flexShrink: 0 }}>
             <Select
@@ -393,7 +431,7 @@ export function MyItemsList() {
                 pool={pool}
                 basePath={basePath}
                 showBoardColumn={groupBy !== 'board'}
-                showPriority={showPriority}
+                visibleColumns={visibleColumns}
                 onError={setActionError}
                 onOpenItem={setOpenEntry}
               />

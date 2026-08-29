@@ -3,6 +3,7 @@ import { VisuallyHidden } from 'react-aria';
 import {
   Cell,
   Column,
+  Flex,
   Row,
   TableBody,
   TableHeader,
@@ -14,11 +15,18 @@ import {
   assigneePool,
   GroupByMode,
   groupItems,
+  ITEM_SORT_COLUMNS,
   ItemSortDescriptor,
   sortItems,
   toItemSortDescriptor,
 } from './grouping';
 import { GroupLabel } from './GroupLabel';
+import {
+  ColumnsMenu,
+  TABLE_COLUMNS,
+  TableColumnId,
+  useVisibleColumns,
+} from './tableColumns';
 import { ItemMenu } from './ItemMenu';
 import {
   ActionsCellContent,
@@ -32,23 +40,63 @@ import { AssigneeAvatars } from './AssigneeAvatars';
 import { DueDateBadge } from './DueDate';
 import { PriorityChip, StatusBadge } from './StatusBadge';
 
+const SORTABLE_COLUMNS = new Set<TableColumnId>(ITEM_SORT_COLUMNS);
+
 function ItemsTable(props: {
   board: BoardWithContext;
   items: BoardItem[];
-  /** Render the priority column; on when any listed item has one. */
-  showPriority: boolean;
+  /** The user's visible columns, already resolved in display order. */
+  visibleColumns: ReadonlyArray<(typeof TABLE_COLUMNS)[number]>;
   openItem: (itemId: string) => void;
   rowMenu: RowMenuHandle<BoardItem>;
   sort: ItemSortDescriptor | undefined;
   onSortChange: (descriptor: ItemSortDescriptor) => void;
 }) {
-  const { board, items, showPriority, openItem, rowMenu, sort, onSortChange } =
-    props;
+  const {
+    board,
+    items,
+    visibleColumns,
+    openItem,
+    rowMenu,
+    sort,
+    onSortChange,
+  } = props;
   const columnOf = (columnId: string) =>
     board.columns.find(column => column.id === columnId);
   const priorityOf = (item: BoardItem) =>
     board.priorities.find(priority => priority.id === item.priorityId);
   const sorted = sortItems(items, sort, board.columns);
+  const cellContent = (id: TableColumnId, item: BoardItem) => {
+    switch (id) {
+      case 'title':
+        return (
+          <>
+            {item.title}
+            {item.externalManager ? ` (via ${item.externalManager})` : ''}
+          </>
+        );
+      case 'status':
+        return <StatusBadge column={columnOf(item.columnId)} />;
+      case 'priority':
+        return <PriorityChip priority={priorityOf(item)} />;
+      case 'dueDate':
+        return <DueDateBadge dueDate={item.dueDate} />;
+      case 'assignees':
+        return <AssigneeAvatars refs={item.assignees} />;
+      case 'tags':
+        return item.tags.join(', ');
+      case 'createdBy':
+        return <RefDisplay refString={item.createdBy} />;
+      case 'createdAt':
+        return formatDate(item.createdAt);
+      case 'updatedBy':
+        return <RefDisplay refString={item.updatedBy} />;
+      case 'updatedAt':
+        return formatDate(item.updatedAt);
+      default:
+        return null;
+    }
+  };
   return (
     <TableRoot
       aria-label="Board items"
@@ -62,24 +110,16 @@ function ItemsTable(props: {
       }}
     >
       <TableHeader>
-        <Column id="title" isRowHeader allowsSorting>
-          Title
-        </Column>
-        <Column id="status" allowsSorting>
-          Status
-        </Column>
-        {showPriority ? <Column>Priority</Column> : null}
-        <Column id="dueDate" allowsSorting>
-          Due
-        </Column>
-        <Column>Assignees</Column>
-        <Column>Tags</Column>
-        <Column id="createdBy" allowsSorting>
-          Created by
-        </Column>
-        <Column id="updatedAt" allowsSorting>
-          Updated
-        </Column>
+        {visibleColumns.map(column => (
+          <Column
+            key={column.id}
+            id={column.id}
+            isRowHeader={column.id === 'title'}
+            allowsSorting={SORTABLE_COLUMNS.has(column.id)}
+          >
+            {column.label}
+          </Column>
+        ))}
         <Column style={utilityColumnStyle}>
           <VisuallyHidden>Actions</VisuallyHidden>
         </Column>
@@ -93,29 +133,9 @@ function ItemsTable(props: {
               rowMenu.onContextMenu(item, event)
             }
           >
-            <Cell>
-              {item.title}
-              {item.externalManager ? ` (via ${item.externalManager})` : ''}
-            </Cell>
-            <Cell>
-              <StatusBadge column={columnOf(item.columnId)} />
-            </Cell>
-            {showPriority ? (
-              <Cell>
-                <PriorityChip priority={priorityOf(item)} />
-              </Cell>
-            ) : null}
-            <Cell>
-              <DueDateBadge dueDate={item.dueDate} />
-            </Cell>
-            <Cell>
-              <AssigneeAvatars refs={item.assignees} />
-            </Cell>
-            <Cell>{item.tags.join(', ')}</Cell>
-            <Cell>
-              <RefDisplay refString={item.createdBy} />
-            </Cell>
-            <Cell>{formatDate(item.updatedAt)}</Cell>
+            {visibleColumns.map(column => (
+              <Cell key={column.id}>{cellContent(column.id, item)}</Cell>
+            ))}
             <Cell>
               <ActionsCellContent>
                 {rowMenu.rowActions(item)}
@@ -154,24 +174,39 @@ export function TableView(props: {
   });
   // one decision for the whole view, so every group shows the same columns
   const showPriority = items.some(item => item.priorityId);
+  const [visible, toggleColumn] = useVisibleColumns(board.id);
+  const visibleColumns = TABLE_COLUMNS.filter(column =>
+    visible.has(column.id),
+  ).filter(column => column.id !== 'priority' || showPriority);
+  const columnsMenu = (
+    <Flex justify="end">
+      <ColumnsMenu
+        visible={visible}
+        onToggle={toggleColumn}
+        showPriority={showPriority}
+      />
+    </Flex>
+  );
   if (groupBy === 'none') {
     return (
-      <>
+      <Flex direction="column" gap="2">
+        {columnsMenu}
         <ItemsTable
           board={board}
           items={items}
-          showPriority={showPriority}
+          visibleColumns={visibleColumns}
           openItem={openItem}
           rowMenu={rowMenu}
           sort={sort}
           onSortChange={setSort}
         />
         {rowMenu.contextMenu}
-      </>
+      </Flex>
     );
   }
   return (
-    <>
+    <Flex direction="column" gap="2">
+      {columnsMenu}
       {groupItems(items, groupBy, board.priorities).map(group => (
         <Fragment key={group.key}>
           <Text variant="body-medium" weight="bold" as="h3">
@@ -185,7 +220,7 @@ export function TableView(props: {
           <ItemsTable
             board={board}
             items={group.items}
-            showPriority={showPriority}
+            visibleColumns={visibleColumns}
             openItem={openItem}
             rowMenu={rowMenu}
             sort={sort}
@@ -194,6 +229,6 @@ export function TableView(props: {
         </Fragment>
       ))}
       {rowMenu.contextMenu}
-    </>
+    </Flex>
   );
 }

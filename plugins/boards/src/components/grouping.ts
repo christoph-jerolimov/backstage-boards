@@ -12,6 +12,8 @@ export const ITEM_SORT_COLUMNS = [
   'status',
   'dueDate',
   'createdBy',
+  'createdAt',
+  'updatedBy',
   'updatedAt',
 ] as const;
 
@@ -64,6 +66,10 @@ export function sortItems(
         return item.dueDate ?? '9999-99-99';
       case 'createdBy':
         return item.createdBy.toLocaleLowerCase('en-US');
+      case 'createdAt':
+        return item.createdAt;
+      case 'updatedBy':
+        return item.updatedBy.toLocaleLowerCase('en-US');
       case 'updatedAt':
         return item.updatedAt;
       default:
