@@ -44,3 +44,7 @@ names.
   deletion require `admin`.
 - The board header always shows your own access level, so you know why an
   action is or is not offered.
+- Above these per-board rules, an installation can optionally gate the
+  whole plugin and board creation through Backstage's
+  [permission framework](../permissions.md); sharing stays authoritative
+  within a board either way.
