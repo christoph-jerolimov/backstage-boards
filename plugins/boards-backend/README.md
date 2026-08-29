@@ -91,12 +91,12 @@ the repository. The frontend counterpart is `@internal/plugin-boards`.
 - **Signals** — ids-only signals on board changes so open board views
   refresh live; data access stays behind the permission-checked API.
 
-### Actions
+### Actions registry
 
 - **Registry actions** — board, permission, item, comment, and tag
   operations with typed schemas, enforcing the same permissions and
-  producing the same history and notifications as the REST API.
-- **`list-items`** — a read-only query action honoring the item filters.
+  producing the same history and notifications as the REST API; the full
+  list is in [Actions](#actions) below.
 - **External managers** — integrations can create and update items carrying
   the external-management marker.
 
@@ -104,6 +104,32 @@ the repository. The frontend counterpart is `@internal/plugin-boards`.
 
 - **Entity-references endpoint and proactive refreshes** — see
   [Catalog entity references](#catalog-entity-references).
+
+## Actions
+
+All actions registered in the Backstage actions registry, callable from
+other backend plugins, scaffolder templates, and automation such as MCP
+clients. The registry namespaces the names with the plugin id (e.g.
+`boards:create-board`); full input and output schemas are documented on the
+Actions page of the TechDocs (`docs/features/actions.md` in the
+repository).
+
+| Action                    | Description                                                                                                 |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `create-board`            | Creates a new board with optional columns, visibility, entity assignment, and admin grants.                 |
+| `update-board`            | Updates a board's name, referenced catalog entities, or visibility.                                         |
+| `delete-board`            | Archives a board; it becomes read-only for admins and is permanently deleted after 30 days.                 |
+| `add-board-permission`    | Grants a user or group a permission level (read, write, admin) on a board.                                  |
+| `update-board-permission` | Changes the level of an existing board permission entry.                                                    |
+| `remove-board-permission` | Removes a permission entry from a board.                                                                    |
+| `list-items`              | Lists the items of a board, optionally filtered by text and tags (all must match).                          |
+| `add-item`                | Adds an item to a board column. Service callers may mark items as externally managed (read-only for users). |
+| `update-item`             | Updates an item's title, description, creator, assignees, due date, or priority.                            |
+| `move-item`               | Moves an item to another column and/or position.                                                            |
+| `delete-item`             | Deletes an item from a board.                                                                               |
+| `add-comment`             | Adds a comment to a board item.                                                                             |
+| `update-comment`          | Edits an existing comment; the previous version is kept in the comment history.                             |
+| `set-item-tags`           | Replaces the tags of an item.                                                                               |
 
 ## Scheduled reminders
 

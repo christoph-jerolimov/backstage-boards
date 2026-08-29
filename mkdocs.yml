@@ -20,3 +20,4 @@ nav:
       - Catalog integration: features/catalog-entities.md
       - Watching and notifications: features/watching-and-notifications.md
       - Home page cards: features/home-page.md
+      - Actions: features/actions.md
