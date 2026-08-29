@@ -136,8 +136,14 @@ export function BoardsFilterBar(props: {
   filter: BoardFilterHandle;
   /** Boards matching the filter, for the count beside "Clear filters". */
   matchCount: number;
+  /**
+   * The unfiltered total the match count reads against — the tab's whole
+   * set, e.g. the favorites count on the favorites tab. Defaults to all
+   * boards the user can read.
+   */
+  total?: number;
 }) {
-  const { filter, matchCount } = props;
+  const { filter, matchCount, total } = props;
   return (
     <Flex align="center" gap="2" style={{ flexWrap: 'wrap' }}>
       <div style={{ width: 240, flexShrink: 0 }}>
@@ -166,7 +172,7 @@ export function BoardsFilterBar(props: {
       {filter.active && (
         <>
           <Text variant="body-small" color="secondary" style={{ flexGrow: 1 }}>
-            {matchCount} of {filter.options?.total ?? 0} boards
+            {matchCount} of {total ?? filter.options?.total ?? 0} boards
           </Text>
           <Button variant="tertiary" size="small" onPress={filter.clear}>
             Clear filters
