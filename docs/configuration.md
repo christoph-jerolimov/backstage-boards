@@ -1,16 +1,10 @@
 # Configuration
 
-This page is for admins and covers the boards-specific options. All of them
-live in `app-config.yaml` (with production overrides in
-`app-config.production.yaml`).
-
-Standard Backstage concerns — the database, auth providers, and so on — are
-configured exactly as documented by
-[Backstage itself](https://backstage.io/docs/conf/) and are not repeated
-here. One boards-specific note on identity: assignees, watchers, and share
-grants are catalog entity refs, so the sign-in resolver must map the
-signed-in user to a catalog user entity for the "my" features (My items,
-the Assigned items card, reminders) to work.
+The boards-specific options in `app-config.yaml`. For everything standard —
+database, auth, and so on — see the
+[Backstage docs](https://backstage.io/docs/conf/); the only requirement from
+boards is that the sign-in resolver maps users to catalog user entities, or
+the "my" features have nothing to attach to.
 
 ## Scheduled reminders
 
@@ -84,21 +78,3 @@ every other widget stays available through the page's Edit mode. The layout
 is plain new-frontend-system configuration on `page:home` — see the
 `defaultConfig` block in `app-config.yaml` and
 [Home page cards](features/home-page.md) for the cards' own settings.
-
-## TechDocs
-
-This documentation itself is served by TechDocs. The relevant pieces:
-
-```yaml
-techdocs:
-  builder: 'local'
-  generator:
-    runIn: 'docker' # use 'local' if mkdocs & mkdocs-techdocs-core are installed
-  publisher:
-    type: 'local'
-```
-
-The root `catalog-info.yaml` carries the
-`backstage.io/techdocs-ref: dir:.` annotation and is registered as a catalog
-location, so the docs build from `mkdocs.yml` and the `docs/` folder of this
-repository.
