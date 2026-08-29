@@ -10,24 +10,165 @@ board-specific lives in `plugins/`.
 
 ## Features
 
-- **Boards and items** — kanban and table views with per-board configurable
-  columns, group-by-assignee, inline editing, drag & drop (with an accessible
-  "Move to column" menu fallback), and an item detail drawer.
-- **Comments and history** — editable, versioned comments with catalog-entity
-  auto-linking, plus an audit log of every other item change, merged into one
-  timeline.
-- **Sharing** — per-user and per-group `read`/`write`/`admin` grants and
-  board-wide visibility modes (`private`, `logged-in-read`, `logged-in-write`,
-  `public-read`, `public-write`), all enforced server-side.
-- **Catalog integration** — a "Boards" tab on entities a board references, with
-  the reference derived by a catalog processor rather than declared in
-  `catalog-info.yaml`.
-- **Watching and notifications** — watch a board or a single item and get
-  Backstage notifications on changes, plus optional scheduled reminders about
-  due and overdue items.
-- **Actions** — board and item operations are registered in the Backstage
-  actions registry, so other plugins, automation, and MCP clients can drive
-  boards programmatically.
+### Boards
+
+- **Board list** — paginated "Favorites" and "All" tabs, with per-status item
+  counts on every row.
+- **Board filters** — filter the list by free-text search, referenced entity,
+  and creator, with the filter options scoped to your own boards.
+- **Favorites** — per-user, toggled from the row menu.
+- **Configurable columns** — add, rename, reorder, and remove columns per
+  board, and insert a column at any position.
+- **Column colors** — an optional color per column, shown as a dot in the
+  kanban header and as the status badge color everywhere else.
+- **Duplicate a board** — optionally copying items and entity references; the
+  copy belongs to the duplicator.
+- **Board archival** — deleting archives the board for 30 days, read-only and
+  reachable only by direct link, with "Unarchive" and "Delete now" actions.
+- **Entity assignment** — a board can reference any number of catalog
+  entities.
+- **Row and context menus** — board rows carry an actions menu that also opens
+  at the pointer on right-click.
+
+### Items
+
+- **Kanban and table views** — two switchable views over the same items.
+- **Drag & drop** — with a drop indicator and an accessible "Move to column"
+  menu as keyboard fallback.
+- **Optimistic updates** — moves and edits apply instantly and roll back on
+  failure.
+- **Item fields** — title, description, tags, creator, and multiple
+  assignees, as catalog refs or free-text `text:` identities.
+- **Filter bar** — free-text search plus tag (all must match) and assignee
+  (any must match) filters, applied to both views and the API alike.
+- **Grouping** — group the board by assignee or by priority.
+- **Table sorting.**
+- **Configurable table columns** — choose which columns the table shows.
+- **Utility columns** — the table's leading selection and trailing actions
+  columns stay put regardless of configuration.
+- **Row selection and bulk actions** — multi-select table rows and change
+  assignee or priority for all of them at once.
+- **Item archival** — deleted items are archived, listed with who archived
+  them and when, restorable for 30 days before purge.
+- **Externally managed items** — items owned by an integration are read-only
+  and marked as such.
+- **Item detail drawer** — structured into fields, description, checklist,
+  and activity sections, and openable in place from any view.
+- **Combined badges** — status, priority, and due date in the drawer are
+  badges that double as their own keyboard-operable editors.
+- **Assignee avatars** — stacked on cards, with display name and full entity
+  ref in the tooltip.
+- **Assignee × status matrix** — a per-board dialog counting items per
+  assignee and column, with clickable headers and sum rows.
+- **"Add another"** — the create dialog can stay open to add several items in
+  a row.
+- **Card and row context menus** — the item menu also opens at the pointer on
+  right-click.
+
+### Due dates
+
+- **Urgency colors** — due-date badges color by how close (or past) the date
+  is.
+- **Quick due-date menu** — Today, Tomorrow, and This week directly on the
+  card.
+- **Arbitrary dates** — a full date picker in the details drawer, plus a
+  remove entry.
+- **Group by due date** — overdue first, then by date, undated last.
+
+### Priorities
+
+- **Per-board definitions** — admins manage up to ten ordered priorities with
+  name and color in the board settings.
+- **Everywhere they matter** — priorities appear on cards, in the table, as a
+  filter, as a grouping, and in the home page widget.
+- **Status × priority matrix** — a dialog counting items per column and
+  priority, with toggleable headers and sums.
+- **Graceful absence** — a board without priorities shows no priority UI at
+  all.
+
+### Checklists
+
+- **Per-item checklist** — plain-text entries ticked off in the details
+  drawer.
+- **Progress badge** — cards show a done count like `1/3`, styled when
+  complete.
+- **Tracked and copied** — checklist changes appear in item history and
+  survive board duplication.
+
+### My items
+
+- **Cross-board page** — everything assigned to you, across all boards you
+  can access.
+- **Own filter bar and grouping** — including grouping by due date and by
+  tags.
+- **Menu parity** — the same item actions as on the board itself.
+
+### Comments and history
+
+- **Comments** — editable, with full version history.
+- **Auto-linking** — catalog entity refs in comment text become links.
+- **Mentions** — `@`-mention users in comments; mentions render as entity
+  links.
+- **Change history** — every non-comment change is recorded with who, when,
+  and what.
+- **Unified timeline** — comments and changes merged in the item detail view.
+- **Description history** — the item description is versioned too.
+- **Drafts survive reload** — unsent comment and description edits are stored
+  per user until saved or cancelled.
+- **Recent changes** — a board-wide view of the latest activity.
+
+### Sharing
+
+- **Three levels** — `read`, `write`, and `admin`, granted per user or per
+  group; the highest grant wins.
+- **Public modes** — `private`, `logged-in-read`, `logged-in-write`,
+  `public-read`, and `public-write`.
+- **Server-side enforcement** — every API call is permission-checked, not
+  just the UI.
+- **Catalog-backed pickers** — share with users and groups picked from the
+  catalog.
+
+### Catalog integration
+
+- **Entity "Boards" tab** — shown only on entities at least one board
+  references.
+- **Processor-derived marks** — the reference is computed by a catalog
+  processor, not declared in `catalog-info.yaml`, and follows assignment
+  changes.
+- **Display names** — assignees and creators show their catalog display name,
+  with the raw ref in a tooltip.
+- **Honest empty state** — the tab notes that boards you cannot access may
+  exist.
+
+### Watching, notifications, and live updates
+
+- **Watching** — watch a whole board or a single item; watchers are listed.
+- **Change notifications** — watched changes arrive as Backstage
+  notifications, grouped per user.
+- **Mention notifications** — being mentioned in a comment notifies you.
+- **Scheduled reminders** — optional, configurable reminders about due and
+  overdue items.
+- **Live updates** — open boards refresh via Backstage signals; the signals
+  carry ids only, data stays permission-checked.
+
+### Home page
+
+- **Assigned items card** — your due work at a glance, with scope and
+  grouping settings.
+- **Boards card** — your favorite (or all) boards, with an item-count
+  setting.
+- **Well-behaved cards** — defined loading, empty, and failure states, and
+  they refresh on board signals.
+
+### Actions
+
+- **Registry actions** — board, permission, item, comment, and tag operations
+  in the Backstage actions registry with typed schemas.
+- **Same rules as the API** — actions enforce the same permissions and
+  produce the same history and notifications as the UI.
+- **`list-items`** — a read-only query action honoring the item filters.
+- **External managers** — integrations can create and update items carrying
+  the external-management marker.
 
 ## Repository layout
 
@@ -93,7 +234,8 @@ the entity "Boards" tab appears nowhere. Both are already registered in
 
 The project is developed spec-first with OpenSpec.
 `openspec/specs/boards/` holds the current behaviour of each capability —
-board management, item management, sharing, comments and history, the catalog
-entity tab, watching and notifications, and actions — and
+board management, item management, item priorities, item checklists, sharing,
+comments and history, the catalog entity tab, watching and notifications,
+home page widgets, and actions — and
 `openspec/changes/archive/` records how it got there. When you change
 behaviour, update the spec in the same change.
