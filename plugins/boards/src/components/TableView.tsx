@@ -1,8 +1,10 @@
 import { Fragment, useState } from 'react';
+import { VisuallyHidden } from 'react-aria';
 import {
   Cell,
   Checkbox,
   Column,
+  Flex,
   Row,
   TableBody,
   TableHeader,
@@ -14,13 +16,25 @@ import {
   assigneePool,
   GroupByMode,
   groupItems,
+  ITEM_SORT_COLUMNS,
   ItemSortDescriptor,
   sortItems,
   toItemSortDescriptor,
 } from './grouping';
 import { GroupLabel } from './GroupLabel';
+import {
+  ColumnsMenu,
+  TABLE_COLUMNS,
+  TableColumnId,
+  useVisibleColumns,
+} from './tableColumns';
 import { ItemMenu } from './ItemMenu';
-import { RowMenuHandle, useRowMenu } from './RowMenu';
+import {
+  ActionsCellContent,
+  RowMenuHandle,
+  useRowMenu,
+  utilityColumnStyle,
+} from './RowMenu';
 import type { BoardActions } from './BoardView';
 import type { BulkActions } from './useBoardActions';
 import { BulkActionsBar } from './BulkActionsBar';
@@ -28,6 +42,8 @@ import { formatDate, RefDisplay } from './common';
 import { AssigneeAvatars } from './AssigneeAvatars';
 import { DueDateBadge } from './DueDate';
 import { PriorityChip, StatusBadge } from './StatusBadge';
+
+const SORTABLE_COLUMNS = new Set<TableColumnId>(ITEM_SORT_COLUMNS);
 
 /** The shared item-id selection every group's table renders and edits. */
 interface SelectionHandle {
@@ -39,8 +55,8 @@ interface SelectionHandle {
 function ItemsTable(props: {
   board: BoardWithContext;
   items: BoardItem[];
-  /** Render the priority column; on when any listed item has one. */
-  showPriority: boolean;
+  /** The user's visible columns, already resolved in display order. */
+  visibleColumns: ReadonlyArray<(typeof TABLE_COLUMNS)[number]>;
   openItem: (itemId: string) => void;
   rowMenu: RowMenuHandle<BoardItem>;
   sort: ItemSortDescriptor | undefined;
@@ -51,7 +67,7 @@ function ItemsTable(props: {
   const {
     board,
     items,
-    showPriority,
+    visibleColumns,
     openItem,
     rowMenu,
     sort,
@@ -70,6 +86,37 @@ function ItemsTable(props: {
   );
   const allSelected =
     selectable.length > 0 && selectedHere.length === selectable.length;
+  const cellContent = (id: TableColumnId, item: BoardItem) => {
+    switch (id) {
+      case 'title':
+        return (
+          <>
+            {item.title}
+            {item.externalManager ? ` (via ${item.externalManager})` : ''}
+          </>
+        );
+      case 'status':
+        return <StatusBadge column={columnOf(item.columnId)} />;
+      case 'priority':
+        return <PriorityChip priority={priorityOf(item)} />;
+      case 'dueDate':
+        return <DueDateBadge dueDate={item.dueDate} />;
+      case 'assignees':
+        return <AssigneeAvatars refs={item.assignees} />;
+      case 'tags':
+        return item.tags.join(', ');
+      case 'createdBy':
+        return <RefDisplay refString={item.createdBy} />;
+      case 'createdAt':
+        return formatDate(item.createdAt);
+      case 'updatedBy':
+        return <RefDisplay refString={item.updatedBy} />;
+      case 'updatedAt':
+        return formatDate(item.updatedAt);
+      default:
+        return null;
+    }
+  };
   return (
     <TableRoot
       aria-label="Board items"
@@ -84,7 +131,8 @@ function ItemsTable(props: {
     >
       <TableHeader>
         {selection ? (
-          <Column>
+          // a utility column like the actions one: checkbox-narrow
+          <Column style={utilityColumnStyle}>
             <Checkbox
               // opt out of the table's slotted selection context — this
               // checkbox drives the view's own id-based selection
@@ -106,25 +154,19 @@ function ItemsTable(props: {
             />
           </Column>
         ) : null}
-        <Column id="title" isRowHeader allowsSorting>
-          Title
+        {visibleColumns.map(column => (
+          <Column
+            key={column.id}
+            id={column.id}
+            isRowHeader={column.id === 'title'}
+            allowsSorting={SORTABLE_COLUMNS.has(column.id)}
+          >
+            {column.label}
+          </Column>
+        ))}
+        <Column style={utilityColumnStyle}>
+          <VisuallyHidden>Actions</VisuallyHidden>
         </Column>
-        <Column id="status" allowsSorting>
-          Status
-        </Column>
-        {showPriority ? <Column>Priority</Column> : null}
-        <Column id="dueDate" allowsSorting>
-          Due
-        </Column>
-        <Column>Assignees</Column>
-        <Column>Tags</Column>
-        <Column id="createdBy" allowsSorting>
-          Created by
-        </Column>
-        <Column id="updatedAt" allowsSorting>
-          Updated
-        </Column>
-        <Column>Actions</Column>
       </TableHeader>
       <TableBody>
         {sorted.map(item => (
@@ -146,30 +188,14 @@ function ItemsTable(props: {
                 />
               </Cell>
             ) : null}
+            {visibleColumns.map(column => (
+              <Cell key={column.id}>{cellContent(column.id, item)}</Cell>
+            ))}
             <Cell>
-              {item.title}
-              {item.externalManager ? ` (via ${item.externalManager})` : ''}
+              <ActionsCellContent>
+                {rowMenu.rowActions(item)}
+              </ActionsCellContent>
             </Cell>
-            <Cell>
-              <StatusBadge column={columnOf(item.columnId)} />
-            </Cell>
-            {showPriority ? (
-              <Cell>
-                <PriorityChip priority={priorityOf(item)} />
-              </Cell>
-            ) : null}
-            <Cell>
-              <DueDateBadge dueDate={item.dueDate} />
-            </Cell>
-            <Cell>
-              <AssigneeAvatars refs={item.assignees} />
-            </Cell>
-            <Cell>{item.tags.join(', ')}</Cell>
-            <Cell>
-              <RefDisplay refString={item.createdBy} />
-            </Cell>
-            <Cell>{formatDate(item.updatedAt)}</Cell>
-            <Cell>{rowMenu.rowActions(item)}</Cell>
           </Row>
         ))}
       </TableBody>
@@ -236,6 +262,19 @@ export function TableView(props: {
   });
   // one decision for the whole view, so every group shows the same columns
   const showPriority = items.some(item => item.priorityId);
+  const [visible, toggleColumn] = useVisibleColumns(board.id);
+  const visibleColumns = TABLE_COLUMNS.filter(column =>
+    visible.has(column.id),
+  ).filter(column => column.id !== 'priority' || showPriority);
+  const columnsMenu = (
+    <Flex justify="end">
+      <ColumnsMenu
+        visible={visible}
+        onToggle={toggleColumn}
+        showPriority={showPriority}
+      />
+    </Flex>
+  );
   const bulkBar =
     selectedItems.length > 0 ? (
       <BulkActionsBar
@@ -248,12 +287,13 @@ export function TableView(props: {
     ) : null;
   if (groupBy === 'none') {
     return (
-      <>
+      <Flex direction="column" gap="2">
         {bulkBar}
+        {columnsMenu}
         <ItemsTable
           board={board}
           items={items}
-          showPriority={showPriority}
+          visibleColumns={visibleColumns}
           openItem={openItem}
           rowMenu={rowMenu}
           sort={sort}
@@ -261,12 +301,13 @@ export function TableView(props: {
           selection={selection}
         />
         {rowMenu.contextMenu}
-      </>
+      </Flex>
     );
   }
   return (
-    <>
+    <Flex direction="column" gap="2">
       {bulkBar}
+      {columnsMenu}
       {groupItems(items, groupBy, board.priorities).map(group => (
         <Fragment key={group.key}>
           <Text variant="body-medium" weight="bold" as="h3">
@@ -280,7 +321,7 @@ export function TableView(props: {
           <ItemsTable
             board={board}
             items={group.items}
-            showPriority={showPriority}
+            visibleColumns={visibleColumns}
             openItem={openItem}
             rowMenu={rowMenu}
             sort={sort}
@@ -290,6 +331,6 @@ export function TableView(props: {
         </Fragment>
       ))}
       {rowMenu.contextMenu}
-    </>
+    </Flex>
   );
 }

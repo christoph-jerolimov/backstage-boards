@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { identityApiRef } from '@backstage/frontend-plugin-api';
+import { identityApiRef, storageApiRef } from '@backstage/frontend-plugin-api';
+import { mockApis } from '@backstage/frontend-test-utils';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
 import { tomorrowISO } from '@internal/plugin-boards-common';
 import { TableView } from './TableView';
@@ -59,11 +60,13 @@ function renderTable(
     items?: typeof items;
     canWrite?: boolean;
     groupBy?: 'none' | 'assignee' | 'dueDate' | 'tags';
+    storage?: ReturnType<typeof mockApis.storage>;
   } = {},
 ) {
   const actions = testActions();
   const bulk = testBulkActions();
   const openItem = jest.fn();
+  const storage = over.storage ?? mockApis.storage();
   renderWithProviders(
     <TableView
       board={over.board ?? board}
@@ -78,10 +81,11 @@ function renderTable(
       apis: [
         [identityApiRef, identityApi],
         [catalogApiRef, catalogApi],
+        [storageApiRef, storage],
       ],
     },
   );
-  return { actions, bulk, openItem };
+  return { actions, bulk, openItem, storage };
 }
 
 /** Titles of the data rows, in render order. */
@@ -108,25 +112,92 @@ async function chooseFromMenu(menuLabel: string, entry: RegExp) {
 }
 
 describe('TableView', () => {
-  it('renders one row per item with all columns', () => {
+  it('renders one row per item with the default columns', () => {
     renderTable();
     expect(
       screen.getAllByRole('columnheader').map(cell => cell.textContent),
-    ).toEqual([
-      '',
-      'Title',
-      'Status',
-      'Due',
-      'Assignees',
-      'Tags',
-      'Created by',
-      'Updated',
-      'Actions',
-    ]);
+      // the leading '' is the selection column, whose header is the
+      // select-all checkbox
+    ).toEqual(['', 'Title', 'Status', 'Due', 'Assignees', 'Tags', 'Actions']);
     expect(titles()).toEqual(['Beta task', 'Alpha task']);
     expect(screen.getByText('docs')).toBeInTheDocument();
-    expect(screen.getByText('Importer')).toBeInTheDocument();
     expect(screen.getByText('Done')).toBeInTheDocument();
+    // the audit columns are hidden by default
+    expect(screen.queryByText('Importer')).not.toBeInTheDocument();
+  });
+
+  it('shows and hides columns from the configure menu, stored per board', async () => {
+    const { storage } = renderTable();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Configure columns' }),
+    );
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Created by' }));
+    expect(
+      screen.getByRole('columnheader', { name: 'Created by' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Importer')).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Configure columns' }),
+    );
+    await userEvent.click(screen.getByRole('menuitem', { name: '✓ Tags' }));
+    expect(
+      screen.queryByRole('columnheader', { name: 'Tags' }),
+    ).not.toBeInTheDocument();
+    expect(
+      storage.forBucket('boards-table-columns').snapshot<string[]>('board-1')
+        .value,
+    ).toEqual([
+      'title',
+      'status',
+      'priority',
+      'dueDate',
+      'assignees',
+      'createdBy',
+    ]);
+  });
+
+  it('renders a stored column choice, including the new audit columns', () => {
+    const storage = mockApis.storage();
+    storage
+      .forBucket('boards-table-columns')
+      .set('board-1', ['title', 'createdAt', 'updatedBy']);
+    renderTable({ storage });
+    expect(
+      screen.getAllByRole('columnheader').map(cell => cell.textContent),
+    ).toEqual(['', 'Title', 'Created', 'Updated by', 'Actions']);
+    // both fixture items were created 2026-08-01 and updated by alice
+    expect(screen.getAllByText(/8\/1\/2026/)).toHaveLength(2);
+    expect(screen.getAllByText('alice')).toHaveLength(2);
+  });
+
+  it('sorts by the Created column', async () => {
+    const storage = mockApis.storage();
+    storage
+      .forBucket('boards-table-columns')
+      .set('board-1', ['title', 'createdAt']);
+    renderTable({
+      storage,
+      items: [
+        testItem({
+          id: 'item-1',
+          title: 'Older',
+          createdAt: '2026-08-01T10:00:00.000Z',
+        }),
+        testItem({
+          id: 'item-2',
+          title: 'Newer',
+          createdAt: '2026-08-05T10:00:00.000Z',
+        }),
+      ],
+    });
+    await userEvent.click(
+      screen.getByRole('columnheader', { name: 'Created' }),
+    );
+    expect(titles()).toEqual(['Older', 'Newer']);
+    await userEvent.click(
+      screen.getByRole('columnheader', { name: 'Created' }),
+    );
+    expect(titles()).toEqual(['Newer', 'Older']);
   });
 
   it('adds the priority column only when a listed item has one', () => {

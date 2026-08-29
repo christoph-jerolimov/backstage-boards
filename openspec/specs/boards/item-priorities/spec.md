@@ -95,7 +95,7 @@ Deleting a priority that no item uses SHALL simply remove it. Deleting a priorit
 
 ### Requirement: Priority display
 
-The kanban card SHALL show its item's priority — the name, rendered with the priority's color when one is set and neutrally otherwise. The board table view and the my-items listing SHALL show a priority column only when at least one listed item has a priority; otherwise the column SHALL be absent. The item details drawer SHALL show the item's priority. The "Assigned items" home page widget SHALL show each item's priority when set.
+The kanban card SHALL show its item's priority — the name, rendered with the priority's color when one is set and neutrally otherwise. The board table view and the my-items listing SHALL show a priority column only when at least one listed item has a priority and the user has not hidden the column through the view's column menu; otherwise the column SHALL be absent. The item details drawer SHALL show the item's priority. The "Assigned items" home page widget SHALL show each item's priority when set.
 
 #### Scenario: Card shows the priority
 
@@ -108,6 +108,11 @@ The kanban card SHALL show its item's priority — the name, rendered with the p
 - **THEN** no priority column is shown
 - **WHEN** at least one item has a priority
 - **THEN** the priority column appears and shows each item's priority, empty for items without one
+
+#### Scenario: Table column can be hidden by the user
+
+- **WHEN** a user hides the Priority column through the column menu on a board table or on the my-items listing, while listed items use priorities
+- **THEN** that view shows no priority column for that user until they re-enable it
 
 #### Scenario: My-items column only when used
 
@@ -154,12 +159,26 @@ The board view and the table view SHALL offer grouping by priority, alongside th
 
 ### Requirement: Edit priority from drawer and item menu
 
-The item details drawer SHALL let users with write access pick one of the board's priorities or clear the priority. The item context menu (on cards, table rows, and the my-items rows) SHALL offer a priority submenu with the board's priorities ordered by order number ascending plus a clear entry, subject to the same write-access and externally-managed restrictions as other item actions; in the my-items listing the offered priorities SHALL be those of the item's own board.
+The item details drawer SHALL present the item's priority as a single combined display-and-editor control: the priority badge itself. For users with write access on a non-externally-managed item, the badge SHALL open a picker listing the board's priorities ordered by order number ascending plus a clear entry, on click and on right-click; it SHALL be keyboard-focusable and operable via the keyboard and SHALL carry a visible affordance (such as a dropdown indicator) making its select capability discoverable. When the board defines priorities and the item has none, the control SHALL show a neutral "No priority" placeholder. The drawer SHALL NOT additionally show a separate priority select.
+
+The item context menu (on cards, table rows, and the my-items rows) SHALL offer a priority submenu with the board's priorities ordered by order number ascending plus a clear entry, subject to the same write-access and externally-managed restrictions as other item actions; in the my-items listing the offered priorities SHALL be those of the item's own board.
+
+Read-only users and users viewing an externally managed item SHALL see only the plain, non-interactive priority badge (or nothing when the item has no priority); no priority-changing control SHALL be offered.
 
 #### Scenario: Change priority in the drawer
 
-- **WHEN** a user with write access selects "high" in the drawer's priority field
-- **THEN** the item's priority becomes "high" without leaving the view
+- **WHEN** a user with write access activates the drawer's priority badge and selects "high"
+- **THEN** the item's priority becomes "high" without leaving the view, and the badge shows "high"
+
+#### Scenario: Clear priority in the drawer
+
+- **WHEN** a user with write access opens the drawer's priority control on an item with a priority and picks the clear entry
+- **THEN** the item has no priority and the control shows the "No priority" placeholder
+
+#### Scenario: Keyboard operation of the priority control
+
+- **WHEN** a user with write access focuses the drawer's priority badge via the keyboard and opens it with the keyboard
+- **THEN** the priority picker opens and a priority can be chosen without a pointer
 
 #### Scenario: Change priority from the item menu
 
@@ -169,7 +188,7 @@ The item details drawer SHALL let users with write access pick one of the board'
 #### Scenario: Read-only users see no priority editor
 
 - **WHEN** a user with only read access opens the drawer or item menu
-- **THEN** no priority-changing control is offered
+- **THEN** no priority-changing control is offered; in the drawer the priority appears only as a plain badge when set
 
 ### Requirement: Duplication copies priorities
 

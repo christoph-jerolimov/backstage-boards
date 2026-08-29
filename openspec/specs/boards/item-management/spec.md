@@ -187,11 +187,15 @@ Moving an item (drag & drop, move menu, or status change) SHALL update the visib
 - **THEN** the item returns to its previous column and an error message is shown
 
 ### Requirement: Table sorting
-The table view SHALL allow sorting by the Title, Status, Created by, and Updated columns via their headers, toggling between ascending and descending. Sorting SHALL combine with active filters, and with group-by-assignee enabled it SHALL order the items within each group.
+The table view SHALL allow sorting by the Title, Status, Due, Created by, Created, Updated by, and Updated columns via their headers, toggling between ascending and descending. Sorting SHALL combine with active filters, and with group-by-assignee enabled it SHALL order the items within each group.
 
 #### Scenario: Sort by title
 - **WHEN** a user activates the Title header
 - **THEN** rows order alphabetically by title, and activating it again reverses the order
+
+#### Scenario: Sort by creation time
+- **WHEN** the Created column is visible and the user activates its header
+- **THEN** rows order by creation time, and activating it again reverses the order
 
 #### Scenario: Sorting within groups
 - **WHEN** group-by-assignee is active and a sort is applied
@@ -249,14 +253,22 @@ set).
 
 ### Requirement: Arbitrary due date in details view
 
-The item details drawer SHALL let users with write access pick any
-calendar date as the due date, or clear it.
+The item details drawer SHALL present the item's due date as a single combined display-and-editor control: the due-date badge itself (or a "No due date" placeholder). For users with write access on a non-externally-managed item, the badge SHALL open a menu on click and on right-click offering today, tomorrow, this week (the upcoming Friday), a "pick a date" entry, and — when a due date is set — a remove entry; it SHALL be keyboard-focusable and operable via the keyboard and SHALL carry a visible affordance making its select capability discoverable. The "pick a date" entry SHALL replace the badge with a focused date input so the user can pick any calendar date; leaving the input SHALL restore the badge. Read-only users and externally managed items SHALL see only the plain due-date display without a picker.
+
+#### Scenario: Quick option from the badge
+
+- **WHEN** a user with write access opens the drawer's due-date control and picks "Tomorrow"
+- **THEN** the item's due date becomes tomorrow's date and the badge shows it
 
 #### Scenario: Pick a date in the drawer
 
-- **WHEN** a user selects a date three weeks out in the drawer's due-date
-  field
-- **THEN** the item's due date is updated to that date
+- **WHEN** a user with write access chooses "Pick a date…" and selects a date three weeks out in the focused date input
+- **THEN** the item's due date is updated to that date and the badge shows it
+
+#### Scenario: Remove the due date
+
+- **WHEN** a user with write access opens the due-date control of an item with a due date and picks the remove entry
+- **THEN** the item has no due date and the control shows the "No due date" placeholder
 
 ### Requirement: My items across boards
 
@@ -287,9 +299,11 @@ without opening the board.
 ### Requirement: My items sub-page
 
 The frontend SHALL offer a "My items" sub-page under the boards page that
-lists the user's items with their status, due date (with the standard
-urgency colors), and tags, and opens the item's detail drawer in place
-when an item is clicked — without navigating to the item's board. The
+lists the user's items with — by default — their status, priority, due
+date (with the standard urgency colors), assignees, and tags, subject to
+the user's my-items column configuration, and opens the item's detail
+drawer in place when an item is clicked — without navigating to the
+item's board. The
 drawer SHALL offer the same detail view as on the board, editable when
 the user has write access to that item's board and read-only otherwise;
 closing it SHALL leave the user on the listing. The listing SHALL be
@@ -585,6 +599,95 @@ SHALL NOT change any item.
 - **THEN** the assignee matrix entry is offered, and opening it changes
   no item
 
+<<<<<<< HEAD
+### Requirement: Item menu in details drawer
+The item details drawer SHALL offer the same item actions menu as the item's card and table row — move to another column, the quick due-date entries, the priority submenu (when the board defines priorities), the assignee submenu, and delete — subject to the same write-access and externally-managed restrictions as elsewhere. The "Open details" entry SHALL be omitted, since the details are already open. The drawer SHALL NOT show a standalone delete button; deletion is offered through the menu. Deleting the item from the drawer's menu SHALL close the drawer. For users who cannot modify the item (read-only access or an externally managed item) the drawer SHALL NOT offer an empty menu.
+
+#### Scenario: Drawer menu offers the full action set
+- **WHEN** a user with write access opens the item menu in the details drawer
+- **THEN** it offers moving the item to another column, the due-date shortcuts, the priority submenu (on a board with priorities), the assignee submenu, and deleting the item — and no "Open details" entry
+
+#### Scenario: Delete via the drawer menu
+- **WHEN** a user with write access deletes the item from the drawer's menu
+- **THEN** the item is deleted and the drawer closes
+
+#### Scenario: No standalone delete button
+- **WHEN** a user with write access views the details drawer
+- **THEN** no standalone "Delete item" button is shown outside the menu
+
+#### Scenario: Read-only users get no empty menu
+- **WHEN** a user with only read access, or any user on an externally managed item, views the details drawer
+- **THEN** no item actions menu with zero usable entries is offered
+
+### Requirement: Structured details drawer
+The item details drawer SHALL group its content into visually separated sections so each block is identifiable at a glance, in this order: the item's fields (status, priority, due date badges, then assignees and tags), the description, the checklist, and the activity block. Assignees and tags SHALL render as a borderless label/value table — the labels on the left, the chips and their add controls on the right of the same row. The description's heading row SHALL carry the description's edit and history controls on its right. The activity block is identified by its tabs; the drawer SHALL NOT show a separate "Activity" heading and SHALL NOT show a created-by/updated-by metadata block. The watch control SHALL sit in the drawer header, beside the item menu and close buttons.
+
+#### Scenario: Sections and field table
+- **WHEN** a user opens the item details drawer
+- **THEN** the field area, description, and checklist each appear under a visible heading or label, the assignees and tags form a borderless label/value table with their add controls in the value column, and the activity tabs follow without an extra heading or metadata lines
+
+#### Scenario: Description controls beside the heading
+- **WHEN** a user with write access views an item with an edited description
+- **THEN** the "Description" heading row offers the edit control and the history toggle on its right side
+
+#### Scenario: Watch control in the header
+- **WHEN** a user opens the item details drawer
+- **THEN** the watch control appears in the drawer header next to the item menu and close buttons
+
+### Requirement: Combined status display and editor in details drawer
+The item details drawer SHALL show the item's status as a single control: the status badge itself. For users with write access on a non-externally-managed item, the badge SHALL open a status picker listing the board's columns on click and on right-click, SHALL be keyboard-focusable and operable via the keyboard, and SHALL carry a visible affordance (such as a dropdown indicator) making its select capability discoverable. Choosing a column SHALL move the item to that column. The drawer SHALL NOT additionally show a separate status select. For read-only users and externally managed items the plain, non-interactive badge SHALL be shown without a picker or affordance.
+
+#### Scenario: Change status via the badge
+- **WHEN** a user with write access activates the drawer's status badge and picks another column
+- **THEN** the item moves to that column and the badge shows the new status
+
+#### Scenario: Keyboard operation
+- **WHEN** a user with write access focuses the status badge via the keyboard and opens it with the keyboard
+- **THEN** the status picker opens and a column can be chosen without a pointer
+
+#### Scenario: Right-click opens the picker
+- **WHEN** a user with write access right-clicks the drawer's status badge
+- **THEN** the status picker opens instead of the browser context menu
+
+#### Scenario: Read-only status badge
+- **WHEN** a read-only user or any user on an externally managed item views the drawer
+- **THEN** the status badge is plain and non-interactive, with no dropdown affordance and no separate status select
+
+### Requirement: Configurable item table columns
+The board table view and the my-items listing SHALL each offer these data columns: the title column ("Title" on a board, "Item" on the my-items listing), Status, Priority, Due, Assignees, Tags, Created by, Created, Updated by, and Updated. By default only the title column, Status, Priority, Due, Assignees, and Tags SHALL be visible. Each view SHALL offer a small dropdown menu from which the user can show and hide each column, marked with the current visibility; the title column SHALL always be shown and SHALL NOT be offered for hiding. The trailing actions column is a control rather than a data column and SHALL NOT be offered; on the my-items listing the conditional board column stays governed by the grouping and SHALL NOT be offered either. The Priority entry remains subject to the priority feature's own rules (no priority column when no listed item has one).
+
+The set of visible columns SHALL be stored per user through the user settings storage, so it survives closing the page and reloading the browser and does not affect other users. Board tables SHALL keep an independent choice per board; the my-items listing SHALL keep one choice of its own, shared by the sub-page and the boards page's "My items" tab.
+
+#### Scenario: Default columns
+
+- **WHEN** a user opens a board's table view for the first time
+- **THEN** the table shows Title, Status, Priority (when used), Due, Assignees, and Tags — and no Created by, Created, Updated by, or Updated columns
+
+#### Scenario: Show an audit column
+
+- **WHEN** the user opens the column menu and enables "Created"
+- **THEN** the table gains a Created column showing each item's creation time
+
+#### Scenario: Hide a default column
+
+- **WHEN** the user disables "Tags" in the column menu
+- **THEN** the Tags column disappears from the table while the other columns stay
+
+#### Scenario: Choice persists per user and board
+
+- **WHEN** the user enables "Updated by" on board A and reloads the browser
+- **THEN** board A's table still shows the Updated by column, while board B's table keeps its own column set and other users' views are unaffected
+
+#### Scenario: My-items columns configurable with its own stored choice
+
+- **WHEN** the user hides "Tags" on the my-items listing and reloads the browser
+- **THEN** the my-items tables show no Tags column — on the sub-page and on the boards page's "My items" tab alike — while every board's own table view keeps its stored column set
+
+#### Scenario: Title cannot be hidden
+
+- **WHEN** the user opens the column menu on either view
+- **THEN** no entry offers hiding the title column and the tables always render it
+=======
 ### Requirement: Table row selection
 The board's table view SHALL let users with write access select item
 rows via a leading checkbox per row, tracked by item id. Each rendered
@@ -690,3 +793,4 @@ item.
   assignees
 - **THEN** all assignees are removed from every selected item, and
   reopening the dropdown shows a checkmark on "No assignee"
+>>>>>>> origin/main

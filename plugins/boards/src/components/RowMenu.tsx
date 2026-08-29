@@ -99,6 +99,23 @@ export function useRowMenu<T>(options: {
   };
 }
 
+/**
+ * Fixes a utility column (favorite star, actions menu) to its icon
+ * button's width. BUI tables use `table-layout: fixed`, so an explicit
+ * small width is what shrinks the column — mirroring the library's own
+ * 40px selection column, plus room for the cell padding.
+ */
+export const utilityColumnStyle = { width: 56 } as const;
+
+/** Right-aligns an actions cell's control against the table edge. */
+export function ActionsCellContent(props: { children: ReactNode }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+      {props.children}
+    </div>
+  );
+}
+
 /** The three-dot button for a table row's trailing actions cell. */
 export function RowActionsMenu(props: { label: string; children: ReactNode }) {
   return (

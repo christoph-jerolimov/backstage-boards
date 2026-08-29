@@ -103,9 +103,9 @@ test('the drawer changes the priority', async ({ page }) => {
   // the card itself is the button; its title text is an inline editor
   await page.getByRole('button', { name: 'High card', exact: true }).click();
   const drawer = page.getByRole('dialog', { name: 'Item High card' });
-  // the select's accessible name carries the current value too
-  await drawer.getByRole('button', { name: /Priority/ }).click();
-  await page.getByRole('option', { name: 'medium' }).click();
+  // the priority badge is the control; its name carries the current value
+  await drawer.getByRole('button', { name: 'Change priority: high' }).click();
+  await page.getByRole('menuitem', { name: 'medium' }).click();
   await expect(
     drawer.getByText('medium', { exact: true }).first(),
   ).toBeVisible();

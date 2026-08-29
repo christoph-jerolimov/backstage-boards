@@ -48,6 +48,8 @@ export function ItemMenu(props: {
   assigneePool: string[];
   /** Extra entries for one surface only, rendered after "Open details". */
   extraItems?: ReactNode;
+  /** The drawer already shows the details, so it drops the entry. */
+  showOpenDetails?: boolean;
 }) {
   const {
     item,
@@ -57,6 +59,7 @@ export function ItemMenu(props: {
     actions,
     assigneePool,
     extraItems,
+    showOpenDetails = true,
   } = props;
   const identityApi = useApi(identityApiRef);
   const { data: identity } = useQuery({
@@ -82,9 +85,11 @@ export function ItemMenu(props: {
     item.assignees.includes(ref) ? `✓ ${label}` : label;
   return (
     <Menu placement="right top">
-      <MenuItem onAction={() => actions.openItem(item.id)}>
-        Open details
-      </MenuItem>
+      {showOpenDetails && (
+        <MenuItem onAction={() => actions.openItem(item.id)}>
+          Open details
+        </MenuItem>
+      )}
       {extraItems}
       {!readonly && (
         <SubmenuTrigger>

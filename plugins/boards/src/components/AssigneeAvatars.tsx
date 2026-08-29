@@ -94,7 +94,14 @@ function AvatarLink(props: {
  * name; several as an overlapping stack with name tooltips), `text:`
  * refs as plain badges.
  */
-export function AssigneeAvatars(props: { refs: string[] }) {
+export function AssigneeAvatars(props: {
+  refs: string[];
+  /**
+   * `baseline` lines the name up with surrounding text (the avatar stays
+   * vertically centered); the default centers everything, as cards do.
+   */
+  align?: 'center' | 'baseline';
+}) {
   const entityRefs = props.refs.filter(ref => !isTextRef(ref));
   const textRefs = props.refs.filter(ref => isTextRef(ref));
   const profiles = useProfiles(entityRefs);
@@ -105,13 +112,14 @@ export function AssigneeAvatars(props: { refs: string[] }) {
   ensureStackStyles();
   const stacked = entityRefs.length > 1;
   return (
-    <Flex gap="1" align="center" style={{ flexWrap: 'wrap' }}>
+    <Flex gap="1" align={props.align ?? 'center'} style={{ flexWrap: 'wrap' }}>
       {entityRefs.length > 0 && (
         // clicking an avatar must navigate, not open the card's drawer
         // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
         <span
           className={STACK_CLASS}
           data-stacked={stacked || undefined}
+          style={{ alignSelf: 'center' }}
           onClick={event => event.stopPropagation()}
         >
           {entityRefs.map(ref => (

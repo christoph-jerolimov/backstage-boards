@@ -1,6 +1,9 @@
-import { screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { storageApiRef } from '@backstage/frontend-plugin-api';
+import { mockApis } from '@backstage/frontend-test-utils';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
+import { todayISO } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
 import { ItemDrawer } from './ItemDrawer';
 import {
@@ -28,22 +31,24 @@ const board = testBoard({
 
 const timeline = [
   {
+    kind: 'change',
+    at: '2026-08-01T10:00:00.000Z',
+    change: {
+      id: 'change-1',
+      actorRef: 'text:Importer',
+      type: 'created',
+      at: '2026-08-01T10:00:00.000Z',
+    },
+  },
+  {
     kind: 'comment',
+    at: '2026-08-05T10:00:00.000Z',
     comment: {
       id: 'comment-1',
       authorRef: 'user:default/jane',
       text: 'Looks good',
       createdAt: '2026-08-05T10:00:00.000Z',
       versionCount: 1,
-    },
-  },
-  {
-    kind: 'change',
-    change: {
-      id: 'change-1',
-      actorRef: 'text:Importer',
-      type: 'created',
-      at: '2026-08-01T10:00:00.000Z',
     },
   },
 ];
@@ -53,11 +58,14 @@ function renderDrawer(
     item?: ReturnType<typeof testItem>;
     canWrite?: boolean;
     priorities?: ReturnType<typeof testPriorities>;
+    storage?: ReturnType<typeof mockApis.storage>;
   } = {},
 ) {
   const boardsApi = testBoardsApi({
     getTimeline: jest.fn().mockResolvedValue(timeline),
+    addComment: jest.fn().mockResolvedValue(undefined),
   });
+  const storage = over.storage ?? mockApis.storage();
   const onClose = jest.fn();
   const onChanged = jest.fn().mockResolvedValue(undefined);
   renderWithProviders(
@@ -73,10 +81,16 @@ function renderDrawer(
       apis: [
         [boardsApiRef, boardsApi],
         [catalogApiRef, catalogApi],
+        [storageApiRef, storage],
       ],
     },
   );
-  return { boardsApi, onClose, onChanged };
+  return { boardsApi, onClose, onChanged, storage };
+}
+
+/** The bucket the drawer keeps unsent input in. */
+function draftsBucket(storage: ReturnType<typeof mockApis.storage>) {
+  return storage.forBucket('boards-item-drafts');
 }
 
 describe('ItemDrawer', () => {
@@ -85,14 +99,15 @@ describe('ItemDrawer', () => {
     expect(
       screen.getByRole('dialog', { name: 'Item Ship the docs' }),
     ).toBeInTheDocument();
-    // the status badge and the status select both name the column
-    expect(screen.getAllByText('Todo').length).toBeGreaterThan(0);
+    // the status badge is the one place naming the column
+    expect(screen.getByText('Todo')).toBeInTheDocument();
     expect(screen.getByText('No due date')).toBeInTheDocument();
     expect(screen.getByText('Unassigned')).toBeInTheDocument();
     expect(screen.getByText('No description yet.')).toBeInTheDocument();
-    expect(await screen.findAllByRole('link', { name: 'alice' })).toHaveLength(
-      2,
-    );
+    // no created-by/updated-by metadata block anymore
+    expect(await screen.findByText('Looks good')).toBeInTheDocument();
+    expect(screen.queryByText(/Created by/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Updated by/)).not.toBeInTheDocument();
   });
 
   it('closes on the close button, the backdrop and Escape', async () => {
@@ -118,50 +133,112 @@ describe('ItemDrawer', () => {
     });
   });
 
-  it('moves the item to another status', async () => {
+  it('moves the item to another status via the badge', async () => {
     const { boardsApi } = renderDrawer();
-    await userEvent.click(screen.getByRole('button', { name: /Status/ }));
-    await userEvent.click(await screen.findByRole('option', { name: 'Done' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Change status: Todo' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Done' }),
+    );
     expect(boardsApi.moveItem).toHaveBeenCalledWith('board-1', 'item-1', {
       columnId: 'column-2',
     });
   });
 
-  it('offers no priority field on a board without priorities', () => {
+  it('offers no priority control on a board without priorities', () => {
     renderDrawer();
     expect(
-      screen.queryByRole('button', { name: /Priority/ }),
+      screen.queryByRole('button', { name: /Change priority/ }),
     ).not.toBeInTheDocument();
   });
 
-  it('sets the priority from the drawer', async () => {
+  it('sets the priority from the drawer badge', async () => {
     const { boardsApi } = renderDrawer({ priorities: testPriorities() });
-    await userEvent.click(screen.getByRole('button', { name: /Priority/ }));
-    await userEvent.click(await screen.findByRole('option', { name: 'high' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Change priority: No priority' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'high' }),
+    );
     expect(boardsApi.updateItem).toHaveBeenCalledWith('board-1', 'item-1', {
       priorityId: 'priority-2',
     });
   });
 
-  it('clears the priority via the None option', async () => {
+  it('clears the priority via the No priority entry', async () => {
     const { boardsApi } = renderDrawer({
       item: testItem({ priorityId: 'priority-2' }),
       priorities: testPriorities(),
     });
-    await userEvent.click(screen.getByRole('button', { name: /Priority/ }));
-    await userEvent.click(await screen.findByRole('option', { name: 'None' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Change priority: high' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'No priority' }),
+    );
     expect(boardsApi.updateItem).toHaveBeenCalledWith('board-1', 'item-1', {
       priorityId: null,
     });
   });
 
-  it('sets and clears the due date', async () => {
+  it('shows plain badges without pickers to readers', () => {
+    renderDrawer({
+      canWrite: false,
+      item: testItem({ priorityId: 'priority-1' }),
+      priorities: testPriorities(),
+    });
+    expect(screen.getByText('Todo')).toBeInTheDocument();
+    expect(screen.getByText('critical')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Change status/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Change priority/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('sets a quick due date from the badge', async () => {
+    const { boardsApi } = renderDrawer();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Change due date' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Today' }),
+    );
+    expect(boardsApi.updateItem).toHaveBeenCalledWith('board-1', 'item-1', {
+      dueDate: todayISO(),
+    });
+  });
+
+  it('removes the due date from the badge menu', async () => {
     const { boardsApi } = renderDrawer({
       item: testItem({ dueDate: '2026-09-04' }),
     });
-    await userEvent.click(screen.getByRole('button', { name: 'Clear' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Change due date' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Remove due date' }),
+    );
     expect(boardsApi.updateItem).toHaveBeenCalledWith('board-1', 'item-1', {
       dueDate: null,
+    });
+  });
+
+  it('picks an arbitrary due date behind Pick a date', async () => {
+    const { boardsApi } = renderDrawer();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Change due date' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Pick a date…' }),
+    );
+    fireEvent.change(await screen.findByLabelText('Due date'), {
+      target: { value: '2026-09-18' },
+    });
+    expect(boardsApi.updateItem).toHaveBeenCalledWith('board-1', 'item-1', {
+      dueDate: '2026-09-18',
     });
   });
 
@@ -226,9 +303,6 @@ describe('ItemDrawer', () => {
     expect(boardsApi.updateItem).toHaveBeenCalledWith('board-1', 'item-1', {
       checklist: [{ text: 'write docs', checked: true }],
     });
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Add checklist entry' }),
-    );
     await userEvent.type(
       screen.getByRole('textbox', { name: 'Add checklist entry' }),
       'announce{Enter}',
@@ -252,28 +326,212 @@ describe('ItemDrawer', () => {
       screen.getByRole('checkbox', { name: /"write docs" as not done/ }),
     ).toBeDisabled();
     expect(
-      screen.queryByRole('button', { name: 'Add checklist entry' }),
+      screen.queryByRole('textbox', { name: 'Add checklist entry' }),
     ).not.toBeInTheDocument();
   });
 
-  it('deletes the item and closes', async () => {
+  it('offers the item menu without Open details and no standalone delete button', async () => {
+    renderDrawer({ priorities: testPriorities() });
+    expect(
+      screen.queryByRole('button', { name: 'Delete item' }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Actions for Ship the docs' }),
+    );
+    expect(
+      (await screen.findAllByRole('menuitem')).map(entry => entry.textContent),
+    ).toEqual([
+      'Move to column',
+      'Due date',
+      'Priority',
+      'Assignee',
+      'Delete item',
+    ]);
+  });
+
+  it('deletes the item from the menu and closes', async () => {
     const { boardsApi, onClose } = renderDrawer();
-    await userEvent.click(screen.getByRole('button', { name: 'Delete item' }));
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Actions for Ship the docs' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Delete item' }),
+    );
     expect(boardsApi.deleteItem).toHaveBeenCalledWith('board-1', 'item-1');
     await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 
-  it('shows the activity timeline with comments and changes', async () => {
+  it('moves the item from the menu', async () => {
+    const { boardsApi } = renderDrawer();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Actions for Ship the docs' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Move to column' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Done' }),
+    );
+    expect(boardsApi.moveItem).toHaveBeenCalledWith('board-1', 'item-1', {
+      columnId: 'column-2',
+    });
+  });
+
+  it('hides the item menu from readers', () => {
+    renderDrawer({ canWrite: false });
+    expect(
+      screen.queryByRole('button', { name: 'Actions for Ship the docs' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('groups the drawer into sections with a field table, no Activity heading', () => {
     renderDrawer();
-    expect(await screen.findByText('Looks good')).toBeInTheDocument();
+    for (const title of ['Details', 'Description', 'Checklist']) {
+      expect(screen.getByRole('heading', { name: title })).toBeInTheDocument();
+    }
+    // assignees and tags are labelled table rows, not headlined sections
+    expect(screen.getByText('Assignees')).toBeInTheDocument();
+    expect(screen.getByText('Tags')).toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Tags' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'Activity' }),
+    ).not.toBeInTheDocument();
+    const tags = screen.getByText('Tags');
+    const description = screen.getByRole('heading', { name: 'Description' });
+    expect(
+      tags.compareDocumentPosition(description) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('offers the description controls beside its heading', () => {
+    renderDrawer();
+    const headingRow = screen.getByRole('heading', { name: 'Description' })
+      .parentElement as HTMLElement;
+    // empty description offers "Add"; the button sits in the heading row
+    expect(
+      within(headingRow).getByRole('button', { name: 'Add' }),
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the watch control in the header', () => {
+    renderDrawer();
+    const watch = screen.getByRole('button', { name: 'Watch this item' });
+    const details = screen.getByRole('heading', { name: 'Details' });
+    // the watch button renders in the header, above every section
+    expect(
+      watch.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('shows the activity timeline with comments and changes, newest first', async () => {
+    renderDrawer();
+    const comment = await screen.findByText('Looks good');
     expect(screen.getByText('Importer')).toBeInTheDocument();
-    expect(screen.getByText(/created this item/)).toBeInTheDocument();
+    const change = screen.getByText(/created this item/);
+    // the older change entry renders below the newer comment
+    expect(
+      comment.compareDocumentPosition(change) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('places the composer in the tab panel, beside where the comment lands', async () => {
+    renderDrawer();
+    await screen.findByText('Looks good');
+    const panel = screen.getByRole('tabpanel');
+    // newest first: the composer comes before the newest entry
+    const composer = within(panel).getByRole('textbox', {
+      name: 'New comment',
+    });
+    expect(
+      composer.compareDocumentPosition(screen.getByText('Looks good')) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    // oldest first: the composer moves after the timeline
+    await userEvent.click(screen.getByRole('button', { name: 'Newest first' }));
+    const flipped = screen.getByRole('textbox', { name: 'New comment' });
+    expect(
+      screen.getByText('Looks good').compareDocumentPosition(flipped) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it('hides the composer on the Changes tab', async () => {
+    renderDrawer();
+    await screen.findByText('Looks good');
+    await userEvent.click(screen.getByRole('tab', { name: 'Changes' }));
+    expect(
+      screen.queryByRole('textbox', { name: 'New comment' }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('tab', { name: 'Comments' }));
+    expect(
+      screen.getByRole('textbox', { name: 'New comment' }),
+    ).toBeInTheDocument();
+  });
+
+  it('persists the comment draft until the comment is added', async () => {
+    const storage = mockApis.storage();
+    const { boardsApi } = renderDrawer({ storage });
+    await screen.findByText('Looks good');
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'New comment' }),
+      'half a thought',
+    );
+    await waitFor(() =>
+      expect(
+        draftsBucket(storage).snapshot<string>('comment-board-1-item-1').value,
+      ).toBe('half a thought'),
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Comment' }));
+    expect(boardsApi.addComment).toHaveBeenCalledWith(
+      'board-1',
+      'item-1',
+      'half a thought',
+    );
+    await waitFor(() =>
+      expect(
+        draftsBucket(storage).snapshot('comment-board-1-item-1').presence,
+      ).toBe('absent'),
+    );
+  });
+
+  it('restores a stored comment draft', async () => {
+    const storage = mockApis.storage();
+    draftsBucket(storage).set('comment-board-1-item-1', 'unsent words');
+    renderDrawer({ storage });
+    await screen.findByText('Looks good');
+    expect(screen.getByRole('textbox', { name: 'New comment' })).toHaveValue(
+      'unsent words',
+    );
+  });
+
+  it('persists the description draft and clears it on save', async () => {
+    const storage = mockApis.storage();
+    draftsBucket(storage).set('description-board-1-item-1', 'draft notes');
+    const { boardsApi } = renderDrawer({ storage });
+    await userEvent.click(screen.getByRole('button', { name: 'Add' }));
+    const editor = screen.getByRole('textbox', { name: 'Edit description' });
+    // the editor opens with the stored draft instead of the saved text
+    expect(editor).toHaveValue('draft notes');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(boardsApi.updateItem).toHaveBeenCalledWith('board-1', 'item-1', {
+      description: 'draft notes',
+    });
+    await waitFor(() =>
+      expect(
+        draftsBucket(storage).snapshot('description-board-1-item-1').presence,
+      ).toBe('absent'),
+    );
   });
 
   it('adds a comment', async () => {
     const { boardsApi } = renderDrawer();
     await userEvent.type(
-      screen.getByRole('textbox', { name: 'New comment' }),
+      await screen.findByRole('textbox', { name: 'New comment' }),
       'Nice work',
     );
     await userEvent.click(screen.getByRole('button', { name: 'Comment' }));
@@ -286,7 +544,9 @@ describe('ItemDrawer', () => {
 
   it('does not add an empty comment', async () => {
     const { boardsApi } = renderDrawer();
-    await userEvent.click(screen.getByRole('button', { name: 'Comment' }));
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Comment' }),
+    );
     expect(boardsApi.addComment).not.toHaveBeenCalled();
   });
 
@@ -310,7 +570,10 @@ describe('ItemDrawer', () => {
       screen.getByText('This item is managed by “jira” and read-only.'),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Delete item' }),
+      screen.queryByRole('button', { name: /Actions for/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /Change status/ }),
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('combobox', { name: 'Add assignee' }),

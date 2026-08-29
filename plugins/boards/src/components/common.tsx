@@ -68,12 +68,16 @@ export function EntityRefList(props: { entityRefs: string[] }) {
 function RefChip(props: {
   refString: string;
   withAvatar?: boolean;
+  plain?: boolean;
   onRemove?: (ref: string) => void;
 }) {
-  const { refString, withAvatar, onRemove } = props;
+  const { refString, withAvatar, plain, onRemove } = props;
   // AssigneeAvatars already tells catalog refs and text refs apart
   const content = withAvatar ? (
-    <AssigneeAvatars refs={[refString]} />
+    <AssigneeAvatars
+      refs={[refString]}
+      align={plain ? 'baseline' : undefined}
+    />
   ) : (
     <RefDisplay refString={refString} />
   );
@@ -84,11 +88,15 @@ function RefChip(props: {
     <span
       style={{
         display: 'inline-flex',
-        alignItems: 'center',
+        alignItems: plain ? 'baseline' : 'center',
         gap: 4,
-        border: '1px solid var(--bui-border-1)',
-        borderRadius: 12,
-        padding: onRemove ? '2px 4px 2px 8px' : '2px 8px',
+        ...(plain
+          ? {}
+          : {
+              border: '1px solid var(--bui-border-1)',
+              borderRadius: 12,
+              padding: onRemove ? '2px 4px 2px 8px' : '2px 8px',
+            }),
       }}
     >
       {content}
@@ -108,23 +116,30 @@ function RefChip(props: {
 
 /**
  * A row of refs as chips. With `withAvatars` the catalog refs show their
- * profile picture, and `onRemove` puts a remove button in each chip.
+ * profile picture, `onRemove` puts a remove button in each chip, and
+ * `plain` drops the chip border for surfaces that don't want it.
  */
 export function RefChips(props: {
   refs: string[];
   withAvatars?: boolean;
+  plain?: boolean;
   onRemove?: (ref: string) => void;
 }) {
   if (props.refs.length === 0) {
     return null;
   }
   return (
-    <Flex gap="1" align="center" style={{ flexWrap: 'wrap' }}>
+    <Flex
+      gap="1"
+      align={props.plain ? 'baseline' : 'center'}
+      style={{ flexWrap: 'wrap' }}
+    >
       {props.refs.map(ref => (
         <RefChip
           key={ref}
           refString={ref}
           withAvatar={props.withAvatars}
+          plain={props.plain}
           onRemove={props.onRemove}
         />
       ))}

@@ -113,54 +113,58 @@ function ItemCard(props: {
       onClick={() => actions.openItem(item.id)}
       onContextMenu={event => rowMenu.onContextMenu(item, event)}
     >
-      <Flex align="center" gap="2" justify="between">
-        {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions,jsx-a11y/click-events-have-key-events */}
-        <div
-          style={{ flexGrow: 1, minWidth: 0 }}
-          onClick={e => {
-            // clicks on the inline-editable text must not open the
-            // drawer, but the empty area beside it should
-            e.stopPropagation();
-            if (e.target === e.currentTarget) {
-              actions.openItem(item.id);
-            }
-          }}
-        >
-          <InlineEdit
-            value={item.title}
-            canEdit={!readonly}
-            ariaLabel={`title of ${item.title}`}
-            onCommit={title => actions.renameItem(item.id, title)}
-            display={
-              <Text variant="body-medium" weight="bold">
-                {item.title}
-              </Text>
-            }
-          />
-        </div>
-        {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions,jsx-a11y/click-events-have-key-events */}
-        <div onClick={event => event.stopPropagation()}>
-          {rowMenu.rowActions(item)}
-        </div>
+      <Flex direction="column" gap="1">
+        <Flex align="center" gap="2" justify="between">
+          {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions,jsx-a11y/click-events-have-key-events */}
+          <div
+            style={{ flexGrow: 1, minWidth: 0 }}
+            onClick={e => {
+              // clicks on the inline-editable text must not open the
+              // drawer, but the empty area beside it should
+              e.stopPropagation();
+              if (e.target === e.currentTarget) {
+                actions.openItem(item.id);
+              }
+            }}
+          >
+            <InlineEdit
+              value={item.title}
+              canEdit={!readonly}
+              ariaLabel={`title of ${item.title}`}
+              onCommit={title => actions.renameItem(item.id, title)}
+              display={
+                <Text variant="body-medium" weight="bold">
+                  {item.title}
+                </Text>
+              }
+            />
+          </div>
+          {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions,jsx-a11y/click-events-have-key-events */}
+          <div onClick={event => event.stopPropagation()}>
+            {rowMenu.rowActions(item)}
+          </div>
+        </Flex>
+        {item.externalManager && (
+          <Text variant="body-x-small" color="secondary">
+            Managed by {item.externalManager} (read-only)
+          </Text>
+        )}
+        {/* the compact indicators share one row; guarded so an item
+            without any of them doesn't render an empty gap */}
+        {(priority || item.dueDate || item.checklist.length > 0) && (
+          <Flex align="baseline" gap="2" style={{ flexWrap: 'wrap' }}>
+            {priority && <PriorityChip priority={priority} size="small" />}
+            <DueDateBadge dueDate={item.dueDate} />
+            <ChecklistBadge checklist={item.checklist} />
+          </Flex>
+        )}
+        <AssigneeAvatars refs={item.assignees} />
+        {item.tags.length > 0 && (
+          <Text variant="body-x-small" color="secondary">
+            {item.tags.join(', ')}
+          </Text>
+        )}
       </Flex>
-      {item.externalManager && (
-        <Text variant="body-x-small" color="secondary">
-          Managed by {item.externalManager} (read-only)
-        </Text>
-      )}
-      {priority && (
-        <div style={{ marginTop: 4 }}>
-          <PriorityChip priority={priority} size="small" />
-        </div>
-      )}
-      <DueDateBadge dueDate={item.dueDate} />
-      <ChecklistBadge checklist={item.checklist} />
-      <AssigneeAvatars refs={item.assignees} />
-      {item.tags.length > 0 && (
-        <Text variant="body-x-small" color="secondary">
-          {item.tags.join(', ')}
-        </Text>
-      )}
     </div>
   );
 }

@@ -11,9 +11,10 @@ import {
 import { normalizeTags } from '@internal/plugin-boards-common';
 
 /**
- * Tag list with per-tag removal and an Add button that turns into a
- * search autocomplete. Enter adds the typed text directly; Escape
- * closes the autocomplete and focuses the Add button again.
+ * Tag list with per-tag removal and an inline Add button that turns
+ * into a search autocomplete, all on one wrapping row. Enter adds the
+ * typed text directly; Escape closes the autocomplete and focuses the
+ * Add button again.
  */
 export function TagsEditor(props: {
   tags: string[];
@@ -53,7 +54,7 @@ export function TagsEditor(props: {
     .sort();
 
   return (
-    <Flex direction="column" gap="2">
+    <Flex align="center" gap="2" style={{ flexWrap: 'wrap' }}>
       {tags.length > 0 ? (
         <TagGroup
           aria-label="Tags"

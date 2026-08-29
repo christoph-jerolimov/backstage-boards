@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useApi } from '@backstage/frontend-plugin-api';
 import { RiCloseLine } from '@remixicon/react';
 import {
+  Box,
   Button,
   ButtonIcon,
   Flex,
-  Select,
   Text,
   TextAreaField,
 } from '@backstage/ui';
@@ -16,20 +16,23 @@ import {
 } from '@internal/plugin-boards-common';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { boardsApiRef } from '../api';
-import { queryKeys } from '../queries';
+import { queryKeys, useItemsQuery, useMoveItem } from '../queries';
 import { WatchButton } from './WatchButton';
 import { EditableMarkdown } from './EditableMarkdown';
-import {
-  AssigneesField,
-  DrawerField,
-  DueDateField,
-  ItemMetadata,
-} from './ItemDrawerFields';
-import { Timeline } from './ItemTimeline';
+import { AssigneesField, DrawerSection } from './ItemDrawerFields';
+import { useDraft } from './drafts';
+import { ActivityBlock } from './ItemTimeline';
 import { ChecklistEditor } from './ChecklistEditor';
 import { TagsEditor } from './TagsEditor';
-import { InlineEdit } from './common';
-import { PriorityChip, StatusBadge } from './StatusBadge';
+import { ErrorText, InlineEdit } from './common';
+import {
+  DueDateSelect,
+  PrioritySelect,
+  StatusBadgeSelect,
+} from './ItemBadgeSelects';
+import { ItemActions, ItemMenu } from './ItemMenu';
+import { RowActionsMenu } from './RowMenu';
+import { assigneePool } from './grouping';
 
 export function ItemDrawer(props: {
   board: BoardWithContext;
@@ -43,7 +46,13 @@ export function ItemDrawer(props: {
   const { board, item, canWrite, onClose, onChanged } = props;
   const boardsApi = useApi(boardsApiRef);
   const readonly = !canWrite || !!item.externalManager;
-  const [newComment, setNewComment] = useState('');
+  // unsent input survives closing the drawer and reloading the browser
+  const [newComment, setNewComment, clearNewComment] = useDraft(
+    `comment-${board.id}-${item.id}`,
+  );
+  const [descriptionDraft, setDescriptionDraft, clearDescriptionDraft] =
+    useDraft(`description-${board.id}-${item.id}`);
+  const [actionError, setActionError] = useState<string>();
 
   const queryClient = useQueryClient();
   const timelineKey = queryKeys.timeline(board.id, item.id);
@@ -63,6 +72,39 @@ export function ItemDrawer(props: {
     await changed();
   };
 
+  const moveItemMutation = useMoveItem(board.id, setActionError);
+  /** Optimistic status change: the badge flips before the server answers. */
+  const moveTo = async (columnId: string) => {
+    try {
+      await moveItemMutation.mutateAsync({ itemId: item.id, columnId });
+    } catch {
+      return; // rolled back; the mutation surfaced the error already
+    }
+    await changed();
+  };
+
+  // The board's items, for offering its assignees in the menu; shares the
+  // board page's cache, so the drawer costs no extra request there.
+  const { data: boardItems } = useItemsQuery(board.id);
+  const pool = useMemo(
+    () => assigneePool(boardItems ?? [item]),
+    [boardItems, item],
+  );
+
+  const itemActions: ItemActions = {
+    // the details are already open; the menu drops its entry for this
+    openItem: () => {},
+    moveItem: (_itemId, target) => moveTo(target.columnId),
+    setItemDueDate: (_itemId, dueDate) => patchItem({ dueDate }),
+    setAssignees: (_itemId, assignees) => patchItem({ assignees }),
+    setItemPriority: (_itemId, priorityId) => patchItem({ priorityId }),
+    deleteItem: async () => {
+      await boardsApi.deleteItem(board.id, item.id);
+      onClose();
+      await onChanged();
+    },
+  };
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape' && !event.defaultPrevented) {
@@ -78,7 +120,7 @@ export function ItemDrawer(props: {
     const text = newComment.trim();
     if (!text) return;
     await boardsApi.addComment(board.id, item.id, text);
-    setNewComment('');
+    clearNewComment();
     await changed();
   };
 
@@ -98,9 +140,13 @@ export function ItemDrawer(props: {
           background: 'rgba(0,0,0,0.35)',
         }}
       />
-      <div
+      {/* A Box, so nested BUI fields know their surface: they draw
+          themselves in the next neutral shade instead of vanishing
+          into the drawer's own background. */}
+      <Box
         role="dialog"
         aria-label={`Item ${item.title}`}
+        bg="neutral"
         style={{
           position: 'fixed',
           top: 0,
@@ -128,12 +174,39 @@ export function ItemDrawer(props: {
                 </Text>
               }
             />
-            <ButtonIcon
-              aria-label="Close item details"
-              variant="tertiary"
-              icon={<RiCloseLine size={16} />}
-              onPress={onClose}
-            />
+            <Flex align="center" gap="1">
+              <WatchButton
+                watching={!!item.watching}
+                targetLabel="this item"
+                onToggle={async watching => {
+                  await boardsApi.setWatchItem(board.id, item.id, watching);
+                  await onChanged();
+                }}
+                loadWatchers={() =>
+                  boardsApi.listItemWatchers(board.id, item.id)
+                }
+                watchersKey={queryKeys.itemWatchers(board.id, item.id)}
+              />
+              {!readonly && (
+                <RowActionsMenu label={`Actions for ${item.title}`}>
+                  <ItemMenu
+                    item={item}
+                    columns={board.columns}
+                    priorities={board.priorities}
+                    readonly={readonly}
+                    actions={itemActions}
+                    assigneePool={pool}
+                    showOpenDetails={false}
+                  />
+                </RowActionsMenu>
+              )}
+              <ButtonIcon
+                aria-label="Close item details"
+                variant="tertiary"
+                icon={<RiCloseLine size={16} />}
+                onPress={onClose}
+              />
+            </Flex>
           </Flex>
 
           {item.externalManager && (
@@ -142,160 +215,126 @@ export function ItemDrawer(props: {
             </Text>
           )}
 
-          <Flex align="center" gap="2" justify="between">
-            <WatchButton
-              watching={!!item.watching}
-              targetLabel="this item"
-              onToggle={async watching => {
-                await boardsApi.setWatchItem(board.id, item.id, watching);
-                await onChanged();
-              }}
-              loadWatchers={() => boardsApi.listItemWatchers(board.id, item.id)}
-              watchersKey={queryKeys.itemWatchers(board.id, item.id)}
-            />
-            {!readonly && (
-              <Button
-                variant="secondary"
-                size="small"
-                destructive
-                onPress={async () => {
-                  await boardsApi.deleteItem(board.id, item.id);
-                  onClose();
-                  await onChanged();
-                }}
-              >
-                Delete item
-              </Button>
-            )}
-          </Flex>
+          {actionError && <ErrorText>{actionError}</ErrorText>}
 
-          <Flex align="center" gap="2">
-            <StatusBadge
-              column={board.columns.find(column => column.id === item.columnId)}
-            />
-            <PriorityChip
-              priority={board.priorities.find(
-                priority => priority.id === item.priorityId,
+          <DrawerSection title="Details">
+            <Flex align="center" gap="2">
+              <StatusBadgeSelect
+                columns={board.columns}
+                columnId={item.columnId}
+                readonly={readonly}
+                onSelect={moveTo}
+              />
+              {board.priorities.length > 0 && (
+                <PrioritySelect
+                  priorities={board.priorities}
+                  priorityId={item.priorityId}
+                  readonly={readonly}
+                  onSelect={priorityId => patchItem({ priorityId })}
+                />
               )}
-            />
-          </Flex>
-          <Select
-            label="Status"
-            isDisabled={readonly}
-            options={board.columns.map(column => ({
-              value: column.id,
-              label: column.title,
-            }))}
-            selectedKey={item.columnId}
-            onSelectionChange={async key => {
-              if (key && String(key) !== item.columnId) {
-                await boardsApi.moveItem(board.id, item.id, {
-                  columnId: String(key),
-                });
-                await changed();
-              }
-            }}
-          />
+              <DueDateSelect
+                dueDate={item.dueDate}
+                readonly={readonly}
+                onChange={dueDate => patchItem({ dueDate })}
+              />
+            </Flex>
 
-          {board.priorities.length > 0 && (
-            <Select
-              label="Priority"
-              isDisabled={readonly}
-              options={[
-                { value: 'none', label: 'None' },
-                ...[...board.priorities]
-                  .sort((a, b) => a.order - b.order)
-                  .map(priority => ({
-                    value: priority.id,
-                    label: priority.name,
-                  })),
-              ]}
-              selectedKey={item.priorityId ?? 'none'}
-              onSelectionChange={async key => {
-                const next = key && String(key) !== 'none' ? String(key) : null;
-                if ((next ?? 'none') !== (item.priorityId ?? 'none')) {
-                  await patchItem({ priorityId: next });
-                }
+            {/* borderless label/value table for the list-shaped fields */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'max-content 1fr',
+                columnGap: 16,
+                rowGap: 8,
+                alignItems: 'baseline',
               }}
-            />
-          )}
+            >
+              <Text variant="body-small" color="secondary">
+                Assignees
+              </Text>
+              <AssigneesField
+                assignees={item.assignees}
+                readonly={readonly}
+                onChange={assignees => patchItem({ assignees })}
+              />
+              <Text variant="body-small" color="secondary">
+                Tags
+              </Text>
+              <TagsEditor
+                tags={item.tags}
+                canEdit={!readonly}
+                suggestions={props.tagSuggestions ?? []}
+                onChange={tags => patchItem({ tags })}
+              />
+            </div>
+          </DrawerSection>
 
-          <DueDateField
-            dueDate={item.dueDate}
-            readonly={readonly}
-            onChange={dueDate => patchItem({ dueDate })}
+          <EditableMarkdown
+            title={
+              <Text variant="body-medium" weight="bold" as="h3">
+                Description
+              </Text>
+            }
+            text={item.description ?? ''}
+            canEdit={!readonly}
+            versionCount={item.descriptionVersionCount}
+            allowEmpty
+            emptyText="No description yet."
+            editAriaLabel="Edit description"
+            draft={descriptionDraft || undefined}
+            onDraftChange={text =>
+              text === null
+                ? clearDescriptionDraft()
+                : setDescriptionDraft(text)
+            }
+            loadVersions={() =>
+              boardsApi.listDescriptionVersions(board.id, item.id)
+            }
+            versionsKey={queryKeys.descriptionVersions(board.id, item.id)}
+            onSave={description => patchItem({ description })}
           />
 
-          <AssigneesField
-            assignees={item.assignees}
-            readonly={readonly}
-            onChange={assignees => patchItem({ assignees })}
-          />
-
-          <DrawerField label="Description">
-            <EditableMarkdown
-              text={item.description ?? ''}
-              canEdit={!readonly}
-              versionCount={item.descriptionVersionCount}
-              allowEmpty
-              emptyText="No description yet."
-              editAriaLabel="Edit description"
-              loadVersions={() =>
-                boardsApi.listDescriptionVersions(board.id, item.id)
-              }
-              versionsKey={queryKeys.descriptionVersions(board.id, item.id)}
-              onSave={description => patchItem({ description })}
-            />
-          </DrawerField>
-
-          <DrawerField label="Checklist">
+          <DrawerSection title="Checklist">
             <ChecklistEditor
               checklist={item.checklist}
               canEdit={!readonly}
               onChange={checklist => patchItem({ checklist })}
             />
-          </DrawerField>
+          </DrawerSection>
 
-          <DrawerField label="Tags">
-            <TagsEditor
-              tags={item.tags}
-              canEdit={!readonly}
-              suggestions={props.tagSuggestions ?? []}
-              onChange={tags => patchItem({ tags })}
-            />
-          </DrawerField>
-
-          <ItemMetadata item={item} />
-
-          <Text variant="body-medium" weight="bold" as="h3">
-            Activity
-          </Text>
           {timeline && (
-            <Timeline
+            <ActivityBlock
               boardId={board.id}
               itemId={item.id}
               entries={timeline}
               canWrite={canWrite}
               onChanged={changed}
+              composer={
+                canWrite ? (
+                  <Flex direction="column" gap="2">
+                    <TextAreaField
+                      aria-label="New comment"
+                      placeholder="Write a comment… (markdown subset, entity refs like system:default/example auto-link)"
+                      value={newComment}
+                      onChange={setNewComment}
+                    />
+                    <div>
+                      <Button
+                        variant="primary"
+                        size="small"
+                        onPress={addComment}
+                      >
+                        Comment
+                      </Button>
+                    </div>
+                  </Flex>
+                ) : undefined
+              }
             />
           )}
-          {canWrite && (
-            <Flex direction="column" gap="2">
-              <TextAreaField
-                aria-label="New comment"
-                placeholder="Write a comment… (markdown subset, entity refs like system:default/example auto-link)"
-                value={newComment}
-                onChange={setNewComment}
-              />
-              <div>
-                <Button variant="primary" size="small" onPress={addComment}>
-                  Comment
-                </Button>
-              </div>
-            </Flex>
-          )}
         </Flex>
-      </div>
+      </Box>
     </>
   );
 }

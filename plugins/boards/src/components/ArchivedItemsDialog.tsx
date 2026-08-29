@@ -1,4 +1,5 @@
 import { useApi } from '@backstage/frontend-plugin-api';
+import { VisuallyHidden } from 'react-aria';
 import {
   Button,
   Cell,
@@ -18,6 +19,7 @@ import { RETENTION_DAYS } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
 import { queryKeys } from '../queries';
 import { AsyncList, formatDate, RefDisplay } from './common';
+import { ActionsCellContent } from './RowMenu';
 
 /**
  * Archived (soft-deleted) items of a board with restore. Items are
@@ -58,7 +60,10 @@ export function ArchivedItemsDialog(props: {
               <Column isRowHeader>Title</Column>
               <Column>Archived by</Column>
               <Column>Archived</Column>
-              <Column>Actions</Column>
+              {/* wider than the icon columns: it holds a text button */}
+              <Column style={{ width: 112 }}>
+                <VisuallyHidden>Actions</VisuallyHidden>
+              </Column>
             </TableHeader>
             <TableBody>
               {archived.map(item => (
@@ -73,17 +78,19 @@ export function ArchivedItemsDialog(props: {
                     {item.archivedAt ? formatDate(item.archivedAt) : ''}
                   </Cell>
                   <Cell>
-                    <Button
-                      variant="secondary"
-                      size="small"
-                      onPress={async () => {
-                        await boardsApi.restoreItem(boardId, item.id);
-                        await refresh();
-                        await onChanged();
-                      }}
-                    >
-                      Restore
-                    </Button>
+                    <ActionsCellContent>
+                      <Button
+                        variant="secondary"
+                        size="small"
+                        onPress={async () => {
+                          await boardsApi.restoreItem(boardId, item.id);
+                          await refresh();
+                          await onChanged();
+                        }}
+                      >
+                        Restore
+                      </Button>
+                    </ActionsCellContent>
                   </Cell>
                 </Row>
               ))}
