@@ -97,6 +97,10 @@ the repository. The frontend counterpart is `@internal/plugin-boards`.
   operations with typed schemas, enforcing the same permissions and
   producing the same history and notifications as the REST API; the full
   list is in [Actions](#actions) below.
+- **Name-based references** — actions take a `status` (column title), a
+  `priority` (name), and a `principalRef` instead of database ids; unknown
+  or ambiguous values fail with the valid values listed, and the read-only
+  `list-statuses` and `list-priorities` actions discover them per board.
 - **External managers** — integrations can create and update items carrying
   the external-management marker.
 
@@ -114,22 +118,24 @@ clients. The registry namespaces the names with the plugin id (e.g.
 Actions page of the TechDocs (`docs/features/actions.md` in the
 repository).
 
-| Action                    | Description                                                                                                 |
-| ------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `create-board`            | Creates a new board with optional columns, visibility, entity assignment, and admin grants.                 |
-| `update-board`            | Updates a board's name, referenced catalog entities, or visibility.                                         |
-| `delete-board`            | Archives a board; it becomes read-only for admins and is permanently deleted after 30 days.                 |
-| `add-board-permission`    | Grants a user or group a permission level (read, write, admin) on a board.                                  |
-| `update-board-permission` | Changes the level of an existing board permission entry.                                                    |
-| `remove-board-permission` | Removes a permission entry from a board.                                                                    |
-| `list-items`              | Lists the items of a board, optionally filtered by text and tags (all must match).                          |
-| `add-item`                | Adds an item to a board column. Service callers may mark items as externally managed (read-only for users). |
-| `update-item`             | Updates an item's title, description, creator, assignees, due date, or priority.                            |
-| `move-item`               | Moves an item to another column and/or position.                                                            |
-| `delete-item`             | Deletes an item from a board.                                                                               |
-| `add-comment`             | Adds a comment to a board item.                                                                             |
-| `update-comment`          | Edits an existing comment; the previous version is kept in the comment history.                             |
-| `set-item-tags`           | Replaces the tags of an item.                                                                               |
+| Action                    | Description                                                                                                        |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `create-board`            | Creates a new board with optional columns, visibility, entity assignment, and admin grants.                        |
+| `update-board`            | Updates a board's name, referenced catalog entities, or visibility.                                                |
+| `delete-board`            | Archives a board; it becomes read-only for admins and is permanently deleted after 30 days.                        |
+| `add-board-permission`    | Grants a user or group a permission level (read, write, admin) on a board.                                         |
+| `update-board-permission` | Changes the level of a principal's existing board permission entry.                                                |
+| `remove-board-permission` | Removes a principal's permission entry from a board.                                                               |
+| `list-items`              | Lists the items of a board, optionally filtered by text and tags (all must match).                                 |
+| `add-item`                | Adds an item to a board status column. Service callers may mark items as externally managed (read-only for users). |
+| `update-item`             | Updates an item's title, description, creator, assignees, due date, or priority.                                   |
+| `move-item`               | Moves an item to another status column and/or position.                                                            |
+| `delete-item`             | Deletes an item from a board.                                                                                      |
+| `add-comment`             | Adds a comment to a board item.                                                                                    |
+| `update-comment`          | Edits an existing comment; the previous version is kept in the comment history.                                    |
+| `set-item-tags`           | Replaces the tags of an item.                                                                                      |
+| `list-statuses`           | Lists a board's status columns in board order; their titles are the valid `status` values for the item actions.    |
+| `list-priorities`         | Lists a board's priorities ordered from highest to lowest; their names are the valid `priority` values.            |
 
 ## Scheduled reminders
 

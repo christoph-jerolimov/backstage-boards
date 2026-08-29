@@ -1,20 +1,28 @@
-# boards/actions Specification
+## ADDED Requirements
 
-## Purpose
-Exposes board and item operations as actions in the Backstage actions registry so that other plugins, automation, and future sync modules (GitHub, Jira) can operate on boards programmatically.
+### Requirement: Status and priority listing actions
+The backend SHALL register read-only actions `list-statuses` and `list-priorities` that return, for a given board id, the board's column titles and priority names respectively, each with its color and order, honoring the same read-permission rules as the REST API. These actions let external callers discover the valid `status` and `priority` values before invoking mutating actions.
 
-## Requirements
+#### Scenario: List statuses via action
+- **WHEN** the `list-statuses` action is invoked with a board id by a caller with read access
+- **THEN** it returns the board's columns in board order, each with its title, color, and position
 
-### Requirement: Board actions
-The backend SHALL register actions in the Backstage actions registry to create a board, update a board (name, visibility, entity assignment, columns), and delete a board. Each action SHALL declare typed input/output schemas and SHALL enforce the same permission rules as the REST API for the calling credentials.
+#### Scenario: List priorities via action
+- **WHEN** the `list-priorities` action is invoked with a board id by a caller with read access
+- **THEN** it returns the board's priority definitions ordered by priority order (1 = highest), each with its name, color, and order
 
-#### Scenario: Create board via action
-- **WHEN** the `create-board` action is invoked with a name and optional columns
-- **THEN** a board is created exactly as if created through the UI, and the action output includes the new board's id
+### Requirement: String references resolve strictly
+Actions that accept a `status` (column title) or `priority` (name) SHALL resolve the string against the target board's columns or priorities using an exact match on the stored value after trimming surrounding whitespace. When no column or priority matches, the action SHALL fail with an error that names the unknown value and lists the available values, and no data SHALL be changed. When more than one column or priority matches (stored titles/names are not unique), the action SHALL fail as ambiguous rather than picking one.
 
-#### Scenario: Action permission enforcement
-- **WHEN** an action mutating a board is invoked with credentials lacking the required permission level
-- **THEN** the action fails with a permission error and no data is changed
+#### Scenario: Unknown status fails the action
+- **WHEN** `add-item` is invoked with a `status` that matches none of the board's column titles
+- **THEN** the action fails with an error naming the unknown status and the board's available column titles, and no item is created
+
+#### Scenario: Ambiguous priority fails the action
+- **WHEN** `update-item` is invoked with a `priority` that matches more than one of the board's priority names
+- **THEN** the action fails with an error stating the reference is ambiguous, and the item is unchanged
+
+## MODIFIED Requirements
 
 ### Requirement: Permission actions
 The backend SHALL register actions to add, update, and remove board permission entries (user/group + level) and to change a board's public visibility mode. These actions SHALL require `admin` access on the target board. `update-board-permission` and `remove-board-permission` SHALL reference the entry by the principal's entity ref (`principalRef`), which is unique per board, and SHALL fail with a not-found error when no entry for that principal exists on the board.
@@ -56,25 +64,3 @@ The backend SHALL register a read-only `list-items` action that returns a board'
 #### Scenario: Items report status and priority as strings
 - **WHEN** the `list-items` action returns items for a board with columns and priorities
 - **THEN** each item carries the title of its column as `status` and, when set, its priority's name as `priority`, with no column or priority database ids in the output
-
-### Requirement: Status and priority listing actions
-The backend SHALL register read-only actions `list-statuses` and `list-priorities` that return, for a given board id, the board's column titles and priority names respectively, each with its color and order, honoring the same read-permission rules as the REST API. These actions let external callers discover the valid `status` and `priority` values before invoking mutating actions.
-
-#### Scenario: List statuses via action
-- **WHEN** the `list-statuses` action is invoked with a board id by a caller with read access
-- **THEN** it returns the board's columns in board order, each with its title, color, and position
-
-#### Scenario: List priorities via action
-- **WHEN** the `list-priorities` action is invoked with a board id by a caller with read access
-- **THEN** it returns the board's priority definitions ordered by priority order (1 = highest), each with its name, color, and order
-
-### Requirement: String references resolve strictly
-Actions that accept a `status` (column title) or `priority` (name) SHALL resolve the string against the target board's columns or priorities using an exact match on the stored value after trimming surrounding whitespace. When no column or priority matches, the action SHALL fail with an error that names the unknown value and lists the available values, and no data SHALL be changed. When more than one column or priority matches (stored titles/names are not unique), the action SHALL fail as ambiguous rather than picking one.
-
-#### Scenario: Unknown status fails the action
-- **WHEN** `add-item` is invoked with a `status` that matches none of the board's column titles
-- **THEN** the action fails with an error naming the unknown status and the board's available column titles, and no item is created
-
-#### Scenario: Ambiguous priority fails the action
-- **WHEN** `update-item` is invoked with a `priority` that matches more than one of the board's priority names
-- **THEN** the action fails with an error stating the reference is ambiguous, and the item is unchanged

@@ -4,7 +4,14 @@ import {
   UserInfoService,
 } from '@backstage/backend-plugin-api';
 import { ActionsRegistryActionOptions } from '@backstage/backend-plugin-api/alpha';
-import { RETENTION_DAYS } from '@internal/plugin-boards-common';
+import { ConflictError, NotFoundError } from '@backstage/errors';
+import {
+  BoardColumn,
+  BoardPermissionEntry,
+  BoardPriority,
+  BoardWithContext,
+  RETENTION_DAYS,
+} from '@internal/plugin-boards-common';
 import { AnyZodObject } from 'zod/v3';
 import { BoardsService } from './service/BoardsService';
 import { BoardsPrincipal } from './service/access';
@@ -44,6 +51,78 @@ export async function credentialsToPrincipal(
     return { type: 'service', subject: credentials.principal.subject };
   }
   return { type: 'anonymous' };
+}
+
+/**
+ * Resolves a status string (column title) to the board's column. External
+ * callers never see column ids, so the match is on the trimmed title:
+ * unknown titles fail listing the valid ones, and duplicated titles fail
+ * as ambiguous rather than picking one.
+ */
+export function resolveStatus(
+  board: Pick<BoardWithContext, 'columns'>,
+  status: string,
+): BoardColumn {
+  const wanted = status.trim();
+  const matches = board.columns.filter(column => column.title === wanted);
+  if (matches.length === 0) {
+    const available = board.columns
+      .map(column => `'${column.title}'`)
+      .join(', ');
+    throw new NotFoundError(
+      `Unknown status '${wanted}'; the board's statuses are: ${available}`,
+    );
+  }
+  if (matches.length > 1) {
+    throw new ConflictError(
+      `Status '${wanted}' is ambiguous; ${matches.length} columns of this board share that title`,
+    );
+  }
+  return matches[0];
+}
+
+/** Resolves a priority name to the board's priority, like {@link resolveStatus}. */
+export function resolvePriority(
+  board: Pick<BoardWithContext, 'priorities'>,
+  priority: string,
+): BoardPriority {
+  const wanted = priority.trim();
+  const matches = board.priorities.filter(entry => entry.name === wanted);
+  if (matches.length === 0) {
+    const available = board.priorities
+      .map(entry => `'${entry.name}'`)
+      .join(', ');
+    throw new NotFoundError(
+      `Unknown priority '${wanted}'; the board's priorities are: ${available}`,
+    );
+  }
+  if (matches.length > 1) {
+    throw new ConflictError(
+      `Priority '${wanted}' is ambiguous; ${matches.length} priorities of this board share that name`,
+    );
+  }
+  return matches[0];
+}
+
+/**
+ * Resolves a user/group entity ref to the board's permission entry. Entries
+ * are unique per principal on a board, so no ambiguity case exists here.
+ */
+export async function resolvePermissionEntry(
+  service: Pick<BoardsService, 'listPermissions'>,
+  principal: BoardsPrincipal,
+  boardId: string,
+  principalRef: string,
+): Promise<BoardPermissionEntry> {
+  const wanted = principalRef.trim();
+  const entries = await service.listPermissions(principal, boardId);
+  const entry = entries.find(candidate => candidate.principalRef === wanted);
+  if (!entry) {
+    throw new NotFoundError(
+      `No permission entry for '${wanted}' on this board`,
+    );
+  }
+  return entry;
 }
 
 const LEVELS = ['read', 'write', 'admin'] as const;
@@ -158,7 +237,7 @@ export function registerActions(options: ActionsOptions): void {
             .describe('User or group entity ref, e.g. user:default/jane'),
           level: z.enum(LEVELS),
         }),
-      output: z => z.object({ id: z.string() }),
+      output: z => z.object({ principalRef: z.string() }),
     },
     action: async ({ input, credentials }) => {
       const entry = await service.addPermission(
@@ -166,49 +245,68 @@ export function registerActions(options: ActionsOptions): void {
         input.boardId,
         { principalRef: input.principalRef, level: input.level },
       );
-      return { output: { id: entry.id } };
+      return { output: { principalRef: entry.principalRef } };
     },
   });
 
   actionsRegistry.register({
     name: 'update-board-permission',
     title: 'Update Board Permission',
-    description: 'Changes the level of an existing board permission entry.',
+    description:
+      "Changes the level of a principal's existing board permission entry.",
     schema: {
       input: z =>
         z.object({
           boardId: z.string(),
-          permissionId: z.string(),
+          principalRef: z
+            .string()
+            .describe('User or group entity ref, e.g. user:default/jane'),
           level: z.enum(LEVELS),
         }),
-      output: z => z.object({ id: z.string() }),
+      output: z => z.object({ principalRef: z.string() }),
     },
     action: async ({ input, credentials }) => {
-      const entry = await service.updatePermission(
-        await toPrincipal(credentials),
+      const principal = await toPrincipal(credentials);
+      const entry = await resolvePermissionEntry(
+        service,
+        principal,
         input.boardId,
-        input.permissionId,
+        input.principalRef,
+      );
+      const updated = await service.updatePermission(
+        principal,
+        input.boardId,
+        entry.id,
         input.level,
       );
-      return { output: { id: entry.id } };
+      return { output: { principalRef: updated.principalRef } };
     },
   });
 
   actionsRegistry.register({
     name: 'remove-board-permission',
     title: 'Remove Board Permission',
-    description: 'Removes a permission entry from a board.',
+    description: "Removes a principal's permission entry from a board.",
     attributes: { destructive: true },
     schema: {
-      input: z => z.object({ boardId: z.string(), permissionId: z.string() }),
+      input: z =>
+        z.object({
+          boardId: z.string(),
+          principalRef: z
+            .string()
+            .describe('User or group entity ref, e.g. user:default/jane'),
+        }),
       output: z => z.object({}),
     },
     action: async ({ input, credentials }) => {
-      await service.removePermission(
-        await toPrincipal(credentials),
+      const principal = await toPrincipal(credentials);
+      const entry = await resolvePermissionEntry(
+        service,
+        principal,
         input.boardId,
-        input.permissionId,
+        input.principalRef,
       );
+      await service.removePermission(principal, input.boardId, entry.id);
       return { output: {} };
     },
   });
@@ -228,7 +326,9 @@ export function registerActions(options: ActionsOptions): void {
           priorities: z
             .array(z.string())
             .optional()
-            .describe('Priority ids; items matching any of them are returned'),
+            .describe(
+              'Priority names; items matching any of them are returned',
+            ),
         }),
       output: z =>
         z.object({
@@ -236,29 +336,38 @@ export function registerActions(options: ActionsOptions): void {
             z.object({
               id: z.string(),
               title: z.string(),
-              columnId: z.string(),
+              status: z.string().describe('Title of the column the item is in'),
               tags: z.array(z.string()),
               assignees: z.array(z.string()),
-              priorityId: z.string().optional(),
+              priority: z.string().optional().describe('Priority name'),
             }),
           ),
         }),
     },
     action: async ({ input, credentials }) => {
-      const items = await service.listItems(
-        await toPrincipal(credentials),
-        input.boardId,
-        { text: input.text, tags: input.tags, priorities: input.priorities },
+      const principal = await toPrincipal(credentials);
+      const board = await service.getBoard(principal, input.boardId);
+      const priorities = input.priorities?.map(
+        name => resolvePriority(board, name).id,
       );
+      const items = await service.listItems(principal, input.boardId, {
+        text: input.text,
+        tags: input.tags,
+        priorities,
+      });
+      const statusById = new Map(board.columns.map(c => [c.id, c.title]));
+      const priorityById = new Map(board.priorities.map(p => [p.id, p.name]));
       return {
         output: {
           items: items.map(item => ({
             id: item.id,
             title: item.title,
-            columnId: item.columnId,
+            status: statusById.get(item.columnId) ?? '',
             tags: item.tags,
             assignees: item.assignees,
-            priorityId: item.priorityId,
+            priority: item.priorityId
+              ? priorityById.get(item.priorityId)
+              : undefined,
           })),
         },
       };
@@ -274,15 +383,17 @@ export function registerActions(options: ActionsOptions): void {
       input: z =>
         z.object({
           boardId: z.string(),
-          columnId: z.string(),
+          status: z
+            .string()
+            .describe("Title of one of the board's columns, e.g. 'To do'"),
           title: z.string(),
           creatorRef: z.string().optional(),
           assignees: z.array(z.string()).optional(),
           tags: z.array(z.string()).optional(),
-          priorityId: z
+          priority: z
             .string()
             .optional()
-            .describe("Id of one of the board's priorities"),
+            .describe("Name of one of the board's priorities"),
           externalManager: z
             .string()
             .optional()
@@ -293,19 +404,22 @@ export function registerActions(options: ActionsOptions): void {
       output: z => z.object({ id: z.string() }),
     },
     action: async ({ input, credentials }) => {
-      const item = await service.createItem(
-        await toPrincipal(credentials),
-        input.boardId,
-        {
-          columnId: input.columnId,
-          title: input.title,
-          creatorRef: input.creatorRef,
-          assignees: input.assignees,
-          tags: input.tags,
-          priorityId: input.priorityId,
-          externalManager: input.externalManager,
-        },
-      );
+      const principal = await toPrincipal(credentials);
+      const board = await service.getBoard(principal, input.boardId);
+      const column = resolveStatus(board, input.status);
+      const priorityId =
+        input.priority === undefined
+          ? undefined
+          : resolvePriority(board, input.priority).id;
+      const item = await service.createItem(principal, input.boardId, {
+        columnId: column.id,
+        title: input.title,
+        creatorRef: input.creatorRef,
+        assignees: input.assignees,
+        tags: input.tags,
+        priorityId,
+        externalManager: input.externalManager,
+      });
       return { output: { id: item.id } };
     },
   });
@@ -332,19 +446,25 @@ export function registerActions(options: ActionsOptions): void {
             .nullable()
             .optional()
             .describe('Due date as YYYY-MM-DD, or null to clear it'),
-          priorityId: z
+          priority: z
             .string()
             .nullable()
             .optional()
             .describe(
-              "Id of one of the board's priorities, or null to clear it",
+              "Name of one of the board's priorities, or null to clear it",
             ),
         }),
       output: z => z.object({ id: z.string() }),
     },
     action: async ({ input, credentials }) => {
+      const principal = await toPrincipal(credentials);
+      let priorityId: string | null | undefined = input.priority;
+      if (typeof input.priority === 'string') {
+        const board = await service.getBoard(principal, input.boardId);
+        priorityId = resolvePriority(board, input.priority).id;
+      }
       const item = await service.updateItem(
-        await toPrincipal(credentials),
+        principal,
         input.boardId,
         input.itemId,
         {
@@ -353,7 +473,7 @@ export function registerActions(options: ActionsOptions): void {
           creatorRef: input.creatorRef,
           assignees: input.assignees,
           dueDate: input.dueDate,
-          priorityId: input.priorityId,
+          priorityId,
         },
       );
       return { output: { id: item.id } };
@@ -363,25 +483,33 @@ export function registerActions(options: ActionsOptions): void {
   actionsRegistry.register({
     name: 'move-item',
     title: 'Move Board Item',
-    description: 'Moves an item to another column and/or position.',
+    description: 'Moves an item to another status column and/or position.',
     schema: {
       input: z =>
         z.object({
           boardId: z.string(),
           itemId: z.string(),
-          columnId: z.string(),
+          status: z
+            .string()
+            .describe("Title of one of the board's columns, e.g. 'Done'"),
           position: z.number().optional(),
         }),
-      output: z => z.object({ id: z.string(), columnId: z.string() }),
+      output: z => z.object({ id: z.string(), status: z.string() }),
     },
     action: async ({ input, credentials }) => {
+      const principal = await toPrincipal(credentials);
+      const board = await service.getBoard(principal, input.boardId);
+      const column = resolveStatus(board, input.status);
       const item = await service.moveItem(
-        await toPrincipal(credentials),
+        principal,
         input.boardId,
         input.itemId,
-        { columnId: input.columnId, position: input.position },
+        {
+          columnId: column.id,
+          position: input.position,
+        },
       );
-      return { output: { id: item.id, columnId: item.columnId } };
+      return { output: { id: item.id, status: column.title } };
     },
   });
 
@@ -476,6 +604,78 @@ export function registerActions(options: ActionsOptions): void {
         { tags: input.tags },
       );
       return { output: { id: item.id } };
+    },
+  });
+
+  actionsRegistry.register({
+    name: 'list-statuses',
+    title: 'List Board Statuses',
+    description:
+      "Lists a board's status columns in board order; their titles are the valid `status` values for the item actions.",
+    attributes: { readOnly: true },
+    schema: {
+      input: z => z.object({ boardId: z.string() }),
+      output: z =>
+        z.object({
+          statuses: z.array(
+            z.object({
+              title: z.string(),
+              color: z.string().optional(),
+              position: z.number().describe('1-based position on the board'),
+            }),
+          ),
+        }),
+    },
+    action: async ({ input, credentials }) => {
+      const board = await service.getBoard(
+        await toPrincipal(credentials),
+        input.boardId,
+      );
+      return {
+        output: {
+          statuses: board.columns.map((column, index) => ({
+            title: column.title,
+            color: column.color,
+            position: index + 1,
+          })),
+        },
+      };
+    },
+  });
+
+  actionsRegistry.register({
+    name: 'list-priorities',
+    title: 'List Board Priorities',
+    description:
+      "Lists a board's priorities ordered from highest to lowest; their names are the valid `priority` values for the item actions.",
+    attributes: { readOnly: true },
+    schema: {
+      input: z => z.object({ boardId: z.string() }),
+      output: z =>
+        z.object({
+          priorities: z.array(
+            z.object({
+              name: z.string(),
+              color: z.string().optional(),
+              order: z.number().describe('1-based order; 1 is the highest'),
+            }),
+          ),
+        }),
+    },
+    action: async ({ input, credentials }) => {
+      const board = await service.getBoard(
+        await toPrincipal(credentials),
+        input.boardId,
+      );
+      return {
+        output: {
+          priorities: board.priorities.map(entry => ({
+            name: entry.name,
+            color: entry.color,
+            order: entry.order,
+          })),
+        },
+      };
     },
   });
 }

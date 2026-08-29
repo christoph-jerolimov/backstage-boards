@@ -166,7 +166,11 @@ board-specific lives in `plugins/`.
   in the Backstage actions registry with typed schemas.
 - **Same rules as the API** — actions enforce the same permissions and
   produce the same history and notifications as the UI.
-- **`list-items`** — a read-only query action honoring the item filters.
+- **Name-based references** — statuses (column titles), priorities, and
+  permission principals are passed as strings, never as database ids;
+  unknown or ambiguous values fail the action with the valid values listed.
+- **Read-only queries** — `list-items` honoring the item filters, plus
+  `list-statuses` and `list-priorities` to discover a board's valid values.
 - **External managers** — integrations can create and update items carrying
   the external-management marker.
 

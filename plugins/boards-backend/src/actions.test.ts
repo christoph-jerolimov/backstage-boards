@@ -8,6 +8,9 @@ import {
   ActionsOptions,
   BoardsActionsRegistry,
   registerActions,
+  resolvePermissionEntry,
+  resolvePriority,
+  resolveStatus,
 } from './actions';
 import { BoardsService } from './service/BoardsService';
 import { createTestService, testLogger } from './service/testUtils';
@@ -135,7 +138,84 @@ function createRegistry() {
 /** The output shapes the tests below read. */
 type BoardOutput = { id: string; name: string };
 type IdOutput = { id: string };
-type ItemsOutput = { items: Array<{ id: string; title: string }> };
+type ItemsOutput = {
+  items: Array<{ id: string; title: string; status: string }>;
+};
+
+describe('resolveStatus', () => {
+  const board = {
+    columns: [
+      { id: 'c1', boardId: 'b', title: 'To do', position: 100 },
+      { id: 'c2', boardId: 'b', title: 'Done', position: 200 },
+      { id: 'c3', boardId: 'b', title: 'Done', position: 300 },
+    ],
+  };
+
+  it('finds a column by trimmed title', () => {
+    expect(resolveStatus(board, ' To do ').id).toBe('c1');
+  });
+
+  it('fails on an unknown title, listing the available ones', () => {
+    expect(() => resolveStatus(board, 'Blocked')).toThrow(
+      /Unknown status 'Blocked'; the board's statuses are: 'To do', 'Done', 'Done'/,
+    );
+  });
+
+  it('fails on an ambiguous title', () => {
+    expect(() => resolveStatus(board, 'Done')).toThrow(
+      /Status 'Done' is ambiguous; 2 columns/,
+    );
+  });
+});
+
+describe('resolvePriority', () => {
+  const board = {
+    priorities: [
+      { id: 'p1', boardId: 'b', name: 'high', order: 1 },
+      { id: 'p2', boardId: 'b', name: 'low', order: 2 },
+      { id: 'p3', boardId: 'b', name: 'low', order: 3 },
+    ],
+  };
+
+  it('finds a priority by trimmed name', () => {
+    expect(resolvePriority(board, ' high ').id).toBe('p1');
+  });
+
+  it('fails on an unknown name, listing the available ones', () => {
+    expect(() => resolvePriority(board, 'urgent')).toThrow(
+      /Unknown priority 'urgent'; the board's priorities are: 'high', 'low', 'low'/,
+    );
+  });
+
+  it('fails on an ambiguous name', () => {
+    expect(() => resolvePriority(board, 'low')).toThrow(
+      /Priority 'low' is ambiguous; 2 priorities/,
+    );
+  });
+});
+
+describe('resolvePermissionEntry', () => {
+  const principal = { type: 'anonymous' } as const;
+  const entry = {
+    id: 'e1',
+    boardId: 'b',
+    principalRef: 'user:default/jane',
+    level: 'read' as const,
+  };
+  const service = { listPermissions: async () => [entry] };
+
+  it('finds the entry for a principal ref', async () => {
+    await expect(
+      resolvePermissionEntry(service, principal, 'b', ' user:default/jane '),
+    ).resolves.toEqual(entry);
+  });
+
+  it('fails when the principal has no entry', async () => {
+    await expect(
+      resolvePermissionEntry(service, principal, 'b', 'user:default/john'),
+    ).rejects.toThrow(/No permission entry for 'user:default\/john'/);
+  });
+});
 
 describe('actions', () => {
   let knex: Knex;
@@ -165,12 +245,11 @@ describe('actions', () => {
       { name: 'B' },
       aliceCredentials,
     );
-    const columns = await knex('board_columns').where('board_id', board.id);
     await registry.invoke(
       'add-item',
       {
         boardId: board.id,
-        columnId: columns[0].id,
+        status: 'To do',
         title: 'Tagged',
         tags: ['bug'],
       },
@@ -178,7 +257,7 @@ describe('actions', () => {
     );
     await registry.invoke(
       'add-item',
-      { boardId: board.id, columnId: columns[0].id, title: 'Untagged' },
+      { boardId: board.id, status: 'To do', title: 'Untagged' },
       aliceCredentials,
     );
     const listed = await registry.invoke<ItemsOutput>(
@@ -187,57 +266,56 @@ describe('actions', () => {
       aliceCredentials,
     );
     expect(listed.items.map(entry => entry.title)).toEqual(['Tagged']);
+    expect(listed.items[0].status).toBe('To do');
     await expect(
       registry.invoke('list-items', { boardId: board.id }, bobCredentials),
     ).rejects.toThrow(/not found/);
   });
 
-  it('items carry priorities through add, update, and list', async () => {
+  it('items carry priorities as names through add, update, and list', async () => {
     const board = await registry.invoke<BoardOutput>(
       'create-board',
       { name: 'B' },
       aliceCredentials,
     );
-    const columns = await knex('board_columns').where('board_id', board.id);
     const priorities = await knex('board_priorities')
       .where('board_id', board.id)
       .orderBy('ord');
-    const critical = priorities[0];
     const high = priorities[1];
     const added = await registry.invoke<IdOutput>(
       'add-item',
       {
         boardId: board.id,
-        columnId: columns[0].id,
+        status: 'To do',
         title: 'Urgent',
-        priorityId: critical.id,
+        priority: 'critical',
       },
       aliceCredentials,
     );
     await registry.invoke(
       'add-item',
-      { boardId: board.id, columnId: columns[0].id, title: 'Later' },
+      { boardId: board.id, status: 'To do', title: 'Later' },
       aliceCredentials,
     );
     const listed = await registry.invoke<{
-      items: Array<{ title: string; priorityId?: string }>;
+      items: Array<{ title: string; priority?: string }>;
     }>(
       'list-items',
-      { boardId: board.id, priorities: [critical.id] },
+      { boardId: board.id, priorities: ['critical'] },
       aliceCredentials,
     );
     expect(listed.items.map(entry => entry.title)).toEqual(['Urgent']);
-    expect(listed.items[0].priorityId).toBe(critical.id);
+    expect(listed.items[0].priority).toBe('critical');
     await registry.invoke(
       'update-item',
-      { boardId: board.id, itemId: added.id, priorityId: high.id },
+      { boardId: board.id, itemId: added.id, priority: 'high' },
       aliceCredentials,
     );
     const row = await knex('items').where('id', added.id).first();
     expect(row?.priority_id).toBe(high.id);
     await registry.invoke(
       'update-item',
-      { boardId: board.id, itemId: added.id, priorityId: null },
+      { boardId: board.id, itemId: added.id, priority: null },
       aliceCredentials,
     );
     const clearedRow = await knex('items').where('id', added.id).first();
@@ -261,6 +339,8 @@ describe('actions', () => {
         'add-comment',
         'update-comment',
         'set-item-tags',
+        'list-statuses',
+        'list-priorities',
       ].sort(),
     );
   });
@@ -308,10 +388,9 @@ describe('actions', () => {
       { name: 'B' },
       aliceCredentials,
     );
-    const columns = await knex('board_columns').where('board_id', board.id);
     const item = await registry.invoke<IdOutput>(
       'add-item',
-      { boardId: board.id, columnId: columns[0].id, title: 'Item' },
+      { boardId: board.id, status: 'To do', title: 'Item' },
       aliceCredentials,
     );
     await registry.invoke(
@@ -319,11 +398,12 @@ describe('actions', () => {
       { boardId: board.id, itemId: item.id, title: 'Renamed' },
       aliceCredentials,
     );
-    await registry.invoke(
+    const moved = await registry.invoke<{ id: string; status: string }>(
       'move-item',
-      { boardId: board.id, itemId: item.id, columnId: columns[1].id },
+      { boardId: board.id, itemId: item.id, status: 'In progress' },
       aliceCredentials,
     );
+    expect(moved.status).toBe('In progress');
     await registry.invoke(
       'set-item-tags',
       { boardId: board.id, itemId: item.id, tags: ['infra'] },
@@ -340,10 +420,9 @@ describe('actions', () => {
       { name: 'B' },
       aliceCredentials,
     );
-    const columns = await knex('board_columns').where('board_id', board.id);
     const item = await registry.invoke<IdOutput>(
       'add-item',
-      { boardId: board.id, columnId: columns[0].id, title: 'Item' },
+      { boardId: board.id, status: 'To do', title: 'Item' },
       aliceCredentials,
     );
     const comment = await registry.invoke<IdOutput>(
@@ -363,18 +442,179 @@ describe('actions', () => {
     expect(versions.map(v => v.text).sort()).toEqual(['v1', 'v2']);
   });
 
+  it('fails add-item and move-item on an unknown status without changing anything', async () => {
+    const board = await registry.invoke<BoardOutput>(
+      'create-board',
+      { name: 'B' },
+      aliceCredentials,
+    );
+    await expect(
+      registry.invoke(
+        'add-item',
+        { boardId: board.id, status: 'Nope', title: 'Item' },
+        aliceCredentials,
+      ),
+    ).rejects.toThrow(
+      /Unknown status 'Nope'; the board's statuses are: 'To do', 'In progress', 'Done'/,
+    );
+    await expect(knex('items')).resolves.toHaveLength(0);
+    const item = await registry.invoke<IdOutput>(
+      'add-item',
+      { boardId: board.id, status: 'To do', title: 'Item' },
+      aliceCredentials,
+    );
+    await expect(
+      registry.invoke(
+        'move-item',
+        { boardId: board.id, itemId: item.id, status: 'Nope' },
+        aliceCredentials,
+      ),
+    ).rejects.toThrow(/Unknown status 'Nope'/);
+    const row = await knex('items').where('id', item.id).first();
+    const todo = await knex('board_columns')
+      .where({ board_id: board.id, title: 'To do' })
+      .first();
+    expect(row?.column_id).toBe(todo?.id);
+  });
+
+  it('fails add-item on an ambiguous status', async () => {
+    const board = await registry.invoke<BoardOutput>(
+      'create-board',
+      { name: 'B', columns: ['Doing', 'Doing'] },
+      aliceCredentials,
+    );
+    await expect(
+      registry.invoke(
+        'add-item',
+        { boardId: board.id, status: 'Doing', title: 'Item' },
+        aliceCredentials,
+      ),
+    ).rejects.toThrow(/Status 'Doing' is ambiguous/);
+    await expect(knex('items')).resolves.toHaveLength(0);
+  });
+
+  it('fails on unknown priorities in add, update, and list', async () => {
+    const board = await registry.invoke<BoardOutput>(
+      'create-board',
+      { name: 'B' },
+      aliceCredentials,
+    );
+    await expect(
+      registry.invoke(
+        'add-item',
+        { boardId: board.id, status: 'To do', title: 'A', priority: 'urgent' },
+        aliceCredentials,
+      ),
+    ).rejects.toThrow(
+      /Unknown priority 'urgent'; the board's priorities are: 'critical', 'high', 'medium', 'low'/,
+    );
+    const item = await registry.invoke<IdOutput>(
+      'add-item',
+      { boardId: board.id, status: 'To do', title: 'A' },
+      aliceCredentials,
+    );
+    await expect(
+      registry.invoke(
+        'update-item',
+        { boardId: board.id, itemId: item.id, priority: 'urgent' },
+        aliceCredentials,
+      ),
+    ).rejects.toThrow(/Unknown priority 'urgent'/);
+    const row = await knex('items').where('id', item.id).first();
+    expect(row?.priority_id).toBeNull();
+    await expect(
+      registry.invoke(
+        'list-items',
+        { boardId: board.id, priorities: ['urgent'] },
+        aliceCredentials,
+      ),
+    ).rejects.toThrow(/Unknown priority 'urgent'/);
+  });
+
+  it('permission entries are addressed by principal ref', async () => {
+    const board = await registry.invoke<BoardOutput>(
+      'create-board',
+      { name: 'B' },
+      aliceCredentials,
+    );
+    await registry.invoke(
+      'add-board-permission',
+      { boardId: board.id, principalRef: 'user:default/bob', level: 'read' },
+      aliceCredentials,
+    );
+    await registry.invoke(
+      'update-board-permission',
+      { boardId: board.id, principalRef: 'user:default/bob', level: 'write' },
+      aliceCredentials,
+    );
+    const updated = await knex('board_permissions').where(
+      'principal_ref',
+      'user:default/bob',
+    );
+    expect(updated).toEqual([expect.objectContaining({ level: 'write' })]);
+    await expect(
+      registry.invoke(
+        'update-board-permission',
+        {
+          boardId: board.id,
+          principalRef: 'user:default/carol',
+          level: 'read',
+        },
+        aliceCredentials,
+      ),
+    ).rejects.toThrow(/No permission entry for 'user:default\/carol'/);
+    await registry.invoke(
+      'remove-board-permission',
+      { boardId: board.id, principalRef: 'user:default/bob' },
+      aliceCredentials,
+    );
+    await expect(
+      knex('board_permissions').where('principal_ref', 'user:default/bob'),
+    ).resolves.toHaveLength(0);
+  });
+
+  it('list-statuses and list-priorities expose names, order, and colors', async () => {
+    const board = await registry.invoke<BoardOutput>(
+      'create-board',
+      { name: 'B' },
+      aliceCredentials,
+    );
+    const statuses = await registry.invoke<{
+      statuses: Array<{ title: string; color?: string; position: number }>;
+    }>('list-statuses', { boardId: board.id }, aliceCredentials);
+    expect(statuses.statuses).toEqual([
+      { title: 'To do', position: 1 },
+      { title: 'In progress', position: 2 },
+      { title: 'Done', position: 3 },
+    ]);
+    const priorities = await registry.invoke<{
+      priorities: Array<{ name: string; color?: string; order: number }>;
+    }>('list-priorities', { boardId: board.id }, aliceCredentials);
+    expect(priorities.priorities).toEqual([
+      { name: 'critical', color: 'red', order: 1 },
+      { name: 'high', color: 'orange', order: 2 },
+      { name: 'medium', order: 3 },
+      { name: 'low', order: 4 },
+    ]);
+    await expect(
+      registry.invoke('list-statuses', { boardId: board.id }, bobCredentials),
+    ).rejects.toThrow(/not found/);
+    await expect(
+      registry.invoke('list-priorities', { boardId: board.id }, bobCredentials),
+    ).rejects.toThrow(/not found/);
+  });
+
   it('service callers can create external read-only items via actions', async () => {
     const board = await registry.invoke<BoardOutput>(
       'create-board',
       { name: 'B', admins: ['user:default/alice'] },
       serviceCredentials,
     );
-    const columns = await knex('board_columns').where('board_id', board.id);
     const item = await registry.invoke<IdOutput>(
       'add-item',
       {
         boardId: board.id,
-        columnId: columns[0].id,
+        status: 'To do',
         title: 'PR #1',
         externalManager: 'github',
       },
