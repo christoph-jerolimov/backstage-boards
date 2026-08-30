@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useApi } from '@backstage/frontend-plugin-api';
-import { RiCloseLine } from '@remixicon/react';
+import {
+  RiArrowDownSLine,
+  RiArrowUpSLine,
+  RiCloseLine,
+} from '@remixicon/react';
 import {
   Box,
   Button,
@@ -40,6 +44,15 @@ export function ItemDrawer(props: {
   canWrite: boolean;
   /** Columns at their hard WIP limit: status entries into them disable. */
   fullColumnIds?: Set<string>;
+  /** Previous/next navigation along the page's visible item order. */
+  nav?: {
+    prevId?: string;
+    nextId?: string;
+    /** 1-based position of the open item in the walked order. */
+    position: number;
+    total: number;
+    onNavigate: (itemId: string) => void;
+  };
   /** Tags used on the board, offered as suggestions when adding. */
   tagSuggestions?: string[];
   onClose: () => void;
@@ -118,6 +131,32 @@ export function ItemDrawer(props: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // j/k walk the page's item order — but never while typing
+  const nav = props.nav;
+  useEffect(() => {
+    if (!nav) {
+      return undefined;
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.ctrlKey || event.metaKey) {
+        return;
+      }
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('input, textarea, [contenteditable="true"]')) {
+        return;
+      }
+      if (event.key === 'j' && nav.nextId) {
+        event.preventDefault();
+        nav.onNavigate(nav.nextId);
+      } else if (event.key === 'k' && nav.prevId) {
+        event.preventDefault();
+        nav.onNavigate(nav.prevId);
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [nav]);
+
   const addComment = async () => {
     const text = newComment.trim();
     if (!text) return;
@@ -177,6 +216,39 @@ export function ItemDrawer(props: {
               }
             />
             <Flex align="center" gap="1">
+              {props.nav && (
+                <>
+                  <ButtonIcon
+                    aria-label="Previous item"
+                    variant="tertiary"
+                    size="small"
+                    isDisabled={!props.nav.prevId}
+                    icon={<RiArrowUpSLine size={16} />}
+                    onPress={() => {
+                      const prev = props.nav?.prevId;
+                      if (prev) props.nav?.onNavigate(prev);
+                    }}
+                  />
+                  <ButtonIcon
+                    aria-label="Next item"
+                    variant="tertiary"
+                    size="small"
+                    isDisabled={!props.nav.nextId}
+                    icon={<RiArrowDownSLine size={16} />}
+                    onPress={() => {
+                      const next = props.nav?.nextId;
+                      if (next) props.nav?.onNavigate(next);
+                    }}
+                  />
+                  <Text
+                    variant="body-x-small"
+                    color="secondary"
+                    style={{ whiteSpace: 'nowrap' }}
+                  >
+                    {props.nav.position} of {props.nav.total}
+                  </Text>
+                </>
+              )}
               <WatchButton
                 watching={!!item.watching}
                 targetLabel="this item"

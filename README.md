@@ -58,7 +58,9 @@ board-specific lives in `plugins/`.
   across groups) with a visible focus; shortcuts on the focused item move
   it between columns (`Ctrl+←`/`Ctrl+→`), select it (`Space`), open the
   item menu (`Enter`) and the status/assignee/due-date/priority pickers
-  (`s`, `a`, `d`, `p`), set a priority by digit, and archive (`Delete`).
+  (`s`, `a`, `d`, `p`), set a priority by digit, and archive (`Delete`);
+  in the details drawer, `j`/`k` (or header arrows) walk the visible
+  item order.
 - **Optimistic updates** — moves and edits apply instantly and roll back on
   failure.
 - **Item fields** — title, description, tags, creator, and multiple

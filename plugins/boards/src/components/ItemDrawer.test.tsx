@@ -59,6 +59,12 @@ function renderDrawer(
     canWrite?: boolean;
     priorities?: ReturnType<typeof testPriorities>;
     storage?: ReturnType<typeof mockApis.storage>;
+    nav?: {
+      prevId?: string;
+      nextId?: string;
+      position: number;
+      total: number;
+    };
   } = {},
 ) {
   const boardsApi = testBoardsApi({
@@ -68,12 +74,14 @@ function renderDrawer(
   const storage = over.storage ?? mockApis.storage();
   const onClose = jest.fn();
   const onChanged = jest.fn().mockResolvedValue(undefined);
+  const onNavigate = jest.fn();
   renderWithProviders(
     <ItemDrawer
       board={{ ...board, priorities: over.priorities ?? [] }}
       item={over.item ?? testItem({ title: 'Ship the docs' })}
       canWrite={over.canWrite ?? true}
       tagSuggestions={['docs']}
+      nav={over.nav === undefined ? undefined : { ...over.nav, onNavigate }}
       onClose={onClose}
       onChanged={onChanged}
     />,
@@ -85,13 +93,59 @@ function renderDrawer(
       ],
     },
   );
-  return { boardsApi, onClose, onChanged, storage };
+  return { boardsApi, onClose, onChanged, storage, onNavigate };
 }
 
 /** The bucket the drawer keeps unsent input in. */
 function draftsBucket(storage: ReturnType<typeof mockApis.storage>) {
   return storage.forBucket('boards-item-drafts');
 }
+
+describe('ItemDrawer navigation', () => {
+  const nav = { prevId: 'item-0', nextId: 'item-2', position: 2, total: 3 };
+
+  it('walks with the header arrows and shows the position', async () => {
+    const { onNavigate } = renderDrawer({ nav });
+    expect(screen.getByText('2 of 3')).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Previous item' }),
+    );
+    expect(onNavigate).toHaveBeenCalledWith('item-0');
+    await userEvent.click(screen.getByRole('button', { name: 'Next item' }));
+    expect(onNavigate).toHaveBeenCalledWith('item-2');
+  });
+
+  it('disables the arrows at the ends', () => {
+    renderDrawer({ nav: { position: 1, total: 1 } });
+    expect(
+      screen.getByRole('button', { name: 'Previous item' }),
+    ).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Next item' })).toBeDisabled();
+  });
+
+  it('navigates with j and k', async () => {
+    const { onNavigate } = renderDrawer({ nav });
+    await userEvent.keyboard('j');
+    expect(onNavigate).toHaveBeenCalledWith('item-2');
+    await userEvent.keyboard('k');
+    expect(onNavigate).toHaveBeenCalledWith('item-0');
+  });
+
+  it('never navigates while typing', async () => {
+    const { onNavigate } = renderDrawer({ nav });
+    const comment = await screen.findByPlaceholderText(/Write a comment/);
+    await userEvent.type(comment, 'jk');
+    expect(onNavigate).not.toHaveBeenCalled();
+    expect(comment).toHaveValue('jk');
+  });
+
+  it('offers no navigation without a nav prop', () => {
+    renderDrawer();
+    expect(
+      screen.queryByRole('button', { name: 'Next item' }),
+    ).not.toBeInTheDocument();
+  });
+});
 
 describe('ItemDrawer', () => {
   it('shows the item with its status, dates and authors', async () => {

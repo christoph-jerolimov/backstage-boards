@@ -621,4 +621,22 @@ describe('BoardPage item drawer', () => {
       ).not.toBeInTheDocument(),
     );
   });
+
+  it('walks the board order with the drawer arrows', async () => {
+    renderBoard();
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Ship the docs' }),
+    );
+    await screen.findByRole('dialog', { name: 'Item Ship the docs' });
+    expect(screen.getByText('1 of 2')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Previous item' }),
+    ).toBeDisabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Next item' }));
+    expect(
+      await screen.findByRole('dialog', { name: 'Item Fix the build' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('2 of 2')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Next item' })).toBeDisabled();
+  });
 });
