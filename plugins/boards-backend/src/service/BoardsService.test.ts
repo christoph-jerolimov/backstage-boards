@@ -1001,6 +1001,75 @@ describe('BoardsService', () => {
     });
   });
 
+  describe('board description', () => {
+    it('sets, versions, and clears the description', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      expect(board.description).toBeUndefined();
+      expect(board.descriptionVersionCount).toBe(0);
+
+      const updated = await service.updateBoardDescription(
+        alice,
+        board.id,
+        'Sprint board for team X',
+      );
+      expect(updated.description).toBe('Sprint board for team X');
+      expect(updated.descriptionVersionCount).toBe(1);
+
+      const edited = await service.updateBoardDescription(
+        alice,
+        board.id,
+        'Reworked purpose',
+      );
+      expect(edited.descriptionVersionCount).toBe(2);
+      const versions = await service.listBoardDescriptionVersions(
+        alice,
+        board.id,
+      );
+      expect(versions.map(version => version.text)).toEqual([
+        'Sprint board for team X',
+        'Reworked purpose',
+      ]);
+      expect(versions[0].editedBy).toBe('user:default/alice');
+
+      const cleared = await service.updateBoardDescription(alice, board.id, '');
+      expect(cleared.description).toBeUndefined();
+      expect(cleared.descriptionVersionCount).toBe(3);
+    });
+
+    it('ignores a save with unchanged text', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      await service.updateBoardDescription(alice, board.id, 'Same');
+      const again = await service.updateBoardDescription(
+        alice,
+        board.id,
+        '  Same  ',
+      );
+      expect(again.descriptionVersionCount).toBe(1);
+    });
+
+    it('requires write access', async () => {
+      const board = await service.createBoard(alice, {
+        name: 'B',
+        visibility: 'logged-in-read',
+      });
+      await expect(
+        service.updateBoardDescription(bob, board.id, 'Nope'),
+      ).rejects.toThrow();
+    });
+
+    it('is copied on duplicate as a fresh first version', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      await service.updateBoardDescription(alice, board.id, 'One');
+      await service.updateBoardDescription(alice, board.id, 'Two');
+      const copy = await service.duplicateBoard(alice, board.id, {
+        copyColumns: true,
+        copyPermissions: false,
+      });
+      expect(copy.description).toBe('Two');
+      expect(copy.descriptionVersionCount).toBe(1);
+    });
+  });
+
   describe('column WIP limits', () => {
     it('stores, updates, and clears the limits', async () => {
       const board = await service.createBoard(alice, { name: 'B' });
@@ -1091,6 +1160,20 @@ describe('BoardsService', () => {
         columnId: colA.id,
       });
       expect(moved.columnId).toBe(colA.id);
+    });
+
+    it('copies the limits when duplicating with columns', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      await service.updateColumn(alice, board.id, board.columns[0].id, {
+        wipSoftLimit: 2,
+        wipHardLimit: 4,
+      });
+      const copy = await service.duplicateBoard(alice, board.id, {
+        copyColumns: true,
+        copyPermissions: false,
+      });
+      expect(copy.columns[0].wipSoftLimit).toBe(2);
+      expect(copy.columns[0].wipHardLimit).toBe(4);
     });
 
     it('archived items do not count against the limit', async () => {

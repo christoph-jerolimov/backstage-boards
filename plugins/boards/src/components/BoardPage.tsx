@@ -22,6 +22,7 @@ import { ArchivedBoardAlert, BoardHeader, BoardViewMode } from './BoardHeader';
 import { BoardDialogKind, BoardDialogs } from './BoardDialogs';
 import { ItemFilterBar, useItemFilter } from './ItemFilterBar';
 import { BulkActionsBar } from './BulkActionsBar';
+import { BoardDescription } from './BoardDescription';
 import { ErrorText } from './common';
 import { useBoardActions, useOpenItemParam } from './useBoardActions';
 import { useItemSelection } from './useItemSelection';
@@ -125,6 +126,10 @@ export function BoardPageContent(props: {
         guarded={guarded}
         onOpenDialog={setDialog}
       />
+
+      {(board.description || canWrite) && (
+        <BoardDescription board={board} canWrite={canWrite} />
+      )}
 
       <ItemFilterBar filter={filter} />
 

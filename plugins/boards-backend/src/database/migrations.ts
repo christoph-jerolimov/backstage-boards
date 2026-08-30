@@ -422,6 +422,34 @@ const columnWipLimits: Migration = {
   },
 };
 
+const boardDescriptions: Migration = {
+  name: '20260830_02_board_descriptions',
+  async up(knex) {
+    await knex.schema.alterTable('boards', table => {
+      table.text('description').nullable();
+    });
+    await knex.schema.createTable('board_description_versions', table => {
+      table.string('id').primary();
+      table
+        .string('board_id')
+        .notNullable()
+        .references('id')
+        .inTable('boards')
+        .onDelete('CASCADE');
+      table.text('text').notNullable();
+      table.string('edited_by').notNullable();
+      table.string('edited_at').notNullable();
+      table.index(['board_id']);
+    });
+  },
+  async down(knex) {
+    await knex.schema.dropTableIfExists('board_description_versions');
+    await knex.schema.alterTable('boards', table => {
+      table.dropColumn('description');
+    });
+  },
+};
+
 const migrations: Migration[] = [
   initial,
   itemDescriptions,
@@ -434,6 +462,7 @@ const migrations: Migration[] = [
   boardPriorities,
   itemChecklists,
   columnWipLimits,
+  boardDescriptions,
 ];
 
 export class BoardsMigrationSource implements Knex.MigrationSource<Migration> {

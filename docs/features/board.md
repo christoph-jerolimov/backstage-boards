@@ -123,3 +123,13 @@ access level, the [watch control](watching-and-notifications.md), and the
 board menu with board-level actions: settings, sharing, duplicating,
 archiving, the matrices, [recent changes](comments-and-history.md), and the
 [archived items](items.md) of the board.
+
+## Board description
+
+Right under the header a board can carry a markdown description — what
+the board is for, how the columns are used. Anyone with write access
+edits it in place (the same markdown block items use); saving an empty
+text clears it. Every edit is retained, and once the description has
+been edited more than once a **History** button shows the previous
+versions with author and timestamp. Duplicating the board copies the
+current text.

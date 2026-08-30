@@ -113,6 +113,14 @@ async function seedShowcaseBoard(): Promise<string> {
       })
     ).json();
     await api.put(`/api/boards/boards/${board.id}/favorite`, { headers });
+    await api.put(`/api/boards/boards/${board.id}/description`, {
+      headers,
+      data: {
+        text:
+          'Planning board for the **current sprint** — cards flow from ' +
+          'Todo to Done, and priorities mark what to pick up first.',
+      },
+    });
 
     const [todo, inProgress, done]: Column[] = board.columns;
     const priorities: Priority[] = board.priorities;

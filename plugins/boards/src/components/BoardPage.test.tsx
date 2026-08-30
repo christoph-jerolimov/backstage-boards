@@ -135,6 +135,47 @@ async function openBoardMenu() {
   await screen.findByRole('menuitem', { name: 'Recent changes…' });
 }
 
+describe('BoardPage description', () => {
+  it('lets a writer add a description under the header', async () => {
+    const { boardsApi } = renderBoard();
+    await userEvent.click(await screen.findByRole('button', { name: 'Add' }));
+    await userEvent.type(
+      screen.getByLabelText('Edit board description'),
+      'Sprint board for team X',
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(boardsApi.updateBoardDescription).toHaveBeenCalledWith(
+      'board-1',
+      'Sprint board for team X',
+    );
+  });
+
+  it('renders the description read-only for readers', async () => {
+    renderBoard({
+      board: {
+        access: 'read',
+        description: 'What this board is for',
+        descriptionVersionCount: 1,
+      },
+    });
+    expect(
+      await screen.findByText('What this board is for'),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Edit' }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Add' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows nothing to readers on a board without a description', async () => {
+    renderBoard({ board: { access: 'read' } });
+    await screen.findByText('Ship the docs');
+    expect(screen.queryByText(/Add a description/)).not.toBeInTheDocument();
+  });
+});
+
 describe('BoardPage loading', () => {
   it('shows a loading state first', () => {
     renderBoard();

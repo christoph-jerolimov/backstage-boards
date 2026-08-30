@@ -437,6 +437,7 @@ export class BoardsService {
       await trx('boards').insert({
         id: boardId,
         name,
+        description: null,
         visibility: options.visibility ?? 'private',
         created_by: creator,
         created_at: timestamp,
@@ -527,14 +528,73 @@ export class BoardsService {
       : false;
     const entityRefs =
       (await this.entityRefsByBoard([boardId])).get(boardId) ?? [];
+    const descriptionVersionCount = Number(
+      (
+        await this.knex('board_description_versions')
+          .where('board_id', boardId)
+          .count({ count: '*' })
+          .first()
+      )?.count ?? 0,
+    );
     return {
       ...toBoard(board, entityRefs),
+      description: board.description ?? undefined,
+      descriptionVersionCount,
       columns: columns.map(toColumn),
       priorities: priorities.map(toPriority),
       access: level,
       favorite,
       watching,
     };
+  }
+
+  /**
+   * Sets or clears the board's markdown description, retaining every
+   * effective change as a version. Content editing, so write access
+   * suffices (unlike the admin-gated board settings).
+   */
+  async updateBoardDescription(
+    principal: BoardsPrincipal,
+    boardId: string,
+    text: string,
+  ): Promise<BoardWithContext> {
+    const { board } = await this.requireBoard(principal, boardId, 'write');
+    const next = text.trim();
+    const current = board.description ?? '';
+    if (next !== current) {
+      const timestamp = now();
+      await this.knex.transaction(async trx => {
+        await trx('boards')
+          .where('id', boardId)
+          .update({ description: next || null, updated_at: timestamp });
+        await trx('board_description_versions').insert({
+          id: uuid(),
+          board_id: boardId,
+          text: next,
+          edited_by: actorRef(principal),
+          edited_at: timestamp,
+        });
+      });
+      await this.emitBoardSignal(boardId);
+    }
+    return this.getBoard(principal, boardId);
+  }
+
+  async listBoardDescriptionVersions(
+    principal: BoardsPrincipal,
+    boardId: string,
+  ): Promise<CommentVersion[]> {
+    await this.requireBoard(principal, boardId, 'read');
+    const versions = await this.knex('board_description_versions')
+      .where('board_id', boardId)
+      .orderBy('edited_at');
+    return versions.map(version => ({
+      id: version.id,
+      commentId: boardId,
+      text: version.text,
+      editedBy: version.edited_by,
+      editedAt: version.edited_at,
+    }));
   }
 
   /** Batch-loads the referenced entity refs for a set of boards. */
@@ -1023,17 +1083,41 @@ export class BoardsService {
         : undefined,
       visibility: options.copyPermissions ? board.visibility : 'private',
     });
+    if (board.description) {
+      // the current text only: the copy starts its own history,
+      // attributed to the duplicator
+      await this.knex('boards')
+        .where('id', created.id)
+        .update({ description: board.description });
+      await this.knex('board_description_versions').insert({
+        id: uuid(),
+        board_id: created.id,
+        text: board.description,
+        edited_by: actorRef(principal),
+        edited_at: now(),
+      });
+    }
     if (options.copyColumns) {
-      // carry over the colors, matching source order to created order
+      // carry over colors and WIP limits, matching source order to
+      // created order
       const newColumns = await this.knex('board_columns')
         .where('board_id', created.id)
         .orderBy('position');
       for (let index = 0; index < newColumns.length; index += 1) {
-        const color = sourceColumns[index]?.color ?? null;
-        if (color) {
+        const source = sourceColumns[index];
+        if (
+          source &&
+          (source.color ||
+            source.wip_soft_limit !== null ||
+            source.wip_hard_limit !== null)
+        ) {
           await this.knex('board_columns')
             .where('id', newColumns[index].id)
-            .update({ color });
+            .update({
+              color: source.color,
+              wip_soft_limit: source.wip_soft_limit,
+              wip_hard_limit: source.wip_hard_limit,
+            });
         }
       }
       if (options.copyItems) {

@@ -21,6 +21,7 @@ import {
 export interface BoardRow {
   id: string;
   name: string;
+  description: string | null;
   visibility: BoardVisibility;
   created_by: string;
   created_at: string;
@@ -113,6 +114,14 @@ export interface CommentVersionRow {
   edited_at: string;
 }
 
+export interface BoardDescriptionVersionRow {
+  id: string;
+  board_id: string;
+  text: string;
+  edited_by: string;
+  edited_at: string;
+}
+
 export interface ItemDescriptionVersionRow {
   id: string;
   item_id: string;
@@ -176,6 +185,7 @@ declare module 'knex/types/tables' {
     comments: Table<CommentRow>;
     comment_versions: Table<CommentVersionRow>;
     item_description_versions: Table<ItemDescriptionVersionRow>;
+    board_description_versions: Table<BoardDescriptionVersionRow>;
     changes: Table<ChangeRow>;
     favorites: Table<FavoriteRow>;
     watches: Table<WatchRow>;

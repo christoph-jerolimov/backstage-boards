@@ -152,6 +152,7 @@ export function testBoard(
   return {
     id: 'board-1',
     name: 'Roadmap',
+    descriptionVersionCount: 0,
     entityRefs: [],
     visibility: 'private',
     createdBy: 'user:default/alice',
@@ -247,6 +248,8 @@ export function testBoardsApi(
     listMyItems: jest.fn().mockResolvedValue([]),
     getBoard: jest.fn(),
     updateBoard: jest.fn().mockResolvedValue(undefined),
+    updateBoardDescription: jest.fn().mockResolvedValue(undefined),
+    listBoardDescriptionVersions: jest.fn().mockResolvedValue([]),
     deleteBoard: jest.fn().mockResolvedValue(undefined),
     hardDeleteBoard: jest.fn().mockResolvedValue(undefined),
     unarchiveBoard: jest.fn().mockResolvedValue(undefined),
