@@ -127,4 +127,28 @@ describe('ItemFilterBar', () => {
     expect(screen.queryByText('1 of 3 items')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Priority' })).toBeVisible();
   });
+
+  it('offers no overdue toggle while nothing is overdue', () => {
+    render([alicesItem, testItem({ id: 'item-3', dueDate: '2999-12-31' })]);
+    expect(
+      screen.queryByRole('button', { name: /^Overdue/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('narrows to overdue items with the toggle and clears with the bar', async () => {
+    render([
+      testItem({ id: 'item-1', title: 'Late', dueDate: '2000-01-01' }),
+      testItem({ id: 'item-2', title: 'Later', dueDate: '2000-01-02' }),
+      testItem({ id: 'item-3', title: 'Ahead', dueDate: '2999-12-31' }),
+      alicesItem,
+    ]);
+    await userEvent.click(screen.getByRole('button', { name: 'Overdue (2)' }));
+    expect(await screen.findByText('2 of 4 items')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '✓ Overdue (2)' })).toBeVisible();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Clear filters' }),
+    );
+    expect(screen.queryByText('2 of 4 items')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Overdue (2)' })).toBeVisible();
+  });
 });

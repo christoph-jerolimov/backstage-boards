@@ -43,6 +43,7 @@ import {
   isValidDueDate,
   isValidEntityRef,
   normalizeTags,
+  todayISO,
   isValidPrincipalRef,
   levelIncludes,
 } from '@internal/plugin-boards-common';
@@ -1639,6 +1640,10 @@ export class BoardsService {
     const priorities = filter?.priorities ?? [];
     if (priorities.length > 0) {
       query.whereIn('items.priority_id', priorities);
+    }
+    if (filter?.overdue) {
+      // plain string comparison is correct: due dates are `YYYY-MM-DD`
+      query.where('items.due_date', '<', todayISO());
     }
     const rows = await query;
     return this.hydrateItems(

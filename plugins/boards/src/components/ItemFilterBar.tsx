@@ -12,6 +12,7 @@ import {
   BoardItem,
   BoardPriority,
   ItemFilter,
+  dueState,
   isEmptyFilter,
   isTextRef,
   itemMatchesFilter,
@@ -50,12 +51,17 @@ export interface ItemFilterHandle {
   assigneeOptions: AssigneeOption[];
   /** The priorities in use on the board, highest (order 1) first. */
   priorityOptions: PriorityOption[];
+  /** Whether the overdue quick filter is on. */
+  overdue: boolean;
+  /** How many of the listed items are overdue right now. */
+  overdueCount: number;
   totalCount: number;
   active: boolean;
   setText: (text: string) => void;
   toggleTag: (tag: string) => void;
   toggleAssignee: (ref: string) => void;
   togglePriority: (priorityId: string) => void;
+  toggleOverdue: () => void;
   clear: () => void;
 }
 
@@ -77,6 +83,7 @@ export function useItemFilter(
   const [tags, setTags] = useState<string[]>([]);
   const [assignees, setAssignees] = useState<string[]>([]);
   const [priorities, setPriorities] = useState<string[]>([]);
+  const [overdue, setOverdue] = useState(false);
 
   const allAssignees = useMemo(
     () => [...new Set(items.flatMap(item => item.assignees))],
@@ -112,12 +119,16 @@ export function useItemFilter(
   }, [items, boardPriorities]);
 
   return useMemo(() => {
-    const filter: ItemFilter = { text, tags, assignees, priorities };
+    const filter: ItemFilter = { text, tags, assignees, priorities, overdue };
     return {
       filter,
       tags,
       assignees,
       priorities,
+      overdue,
+      overdueCount: items.filter(
+        item => item.dueDate && dueState(item.dueDate) === 'overdue',
+      ).length,
       filteredItems: items.filter(item => itemMatchesFilter(item, filter)),
       allTags: [...new Set(items.flatMap(item => item.tags))].sort(),
       assigneeOptions,
@@ -130,11 +141,13 @@ export function useItemFilter(
         setAssignees(current => toggled(current, ref)),
       togglePriority: (priorityId: string) =>
         setPriorities(current => toggled(current, priorityId)),
+      toggleOverdue: () => setOverdue(current => !current),
       clear: () => {
         setText('');
         setTags([]);
         setAssignees([]);
         setPriorities([]);
+        setOverdue(false);
       },
     };
   }, [
@@ -143,6 +156,7 @@ export function useItemFilter(
     tags,
     assignees,
     priorities,
+    overdue,
     assigneeOptions,
     priorityOptions,
   ]);
@@ -238,6 +252,16 @@ export function ItemFilterBar(props: {
             ))}
           </Menu>
         </MenuTrigger>
+      )}
+      {(filter.overdueCount > 0 || filter.overdue) && (
+        <Button
+          variant="tertiary"
+          size="small"
+          aria-pressed={filter.overdue}
+          onPress={filter.toggleOverdue}
+        >
+          {filter.overdue ? '\u2713 ' : ''}Overdue ({filter.overdueCount})
+        </Button>
       )}
       {filter.active && (
         <>

@@ -46,7 +46,8 @@ board-specific lives in `plugins/`.
 - **Item fields** — title, description, tags, creator, and multiple
   assignees, as catalog refs or free-text `text:` identities.
 - **Filter bar** — free-text search plus tag (all must match) and assignee
-  (any must match) filters, applied to both views and the API alike.
+  (any must match) filters, applied to both views and the API alike, and
+  an "Overdue (n)" quick-filter toggle for items due before today.
 - **Grouping** — group the board by assignee or by priority.
 - **Table sorting.**
 - **Configurable table columns** — choose which columns the table shows.

@@ -422,6 +422,7 @@ export async function createRouter(
         tags: asArray(req.query.tag),
         assignees: asArray(req.query.assignee),
         priorities: asArray(req.query.priority),
+        overdue: req.query.overdue === 'true',
       }),
     });
   });

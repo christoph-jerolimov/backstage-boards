@@ -124,9 +124,11 @@ An item SHALL have an optional markdown description using the same markdown subs
 - **THEN** the description is rendered without any edit controls
 
 ### Requirement: Filter and search items
-The board page SHALL provide a filter bar with free-text search matching item titles and descriptions (case-insensitive), a tag filter offering the tags in use on the board, and an assignee filter offering the assignees in use on the board. The assignee filter SHALL list each assignee referenced by at least one of the board's items — catalog refs by their resolved display name, free-text refs by their display text — sorted alphabetically by that label, and SHALL be offered only while at least one item has an assignee.
+The board page SHALL provide a filter bar with free-text search matching item titles and descriptions (case-insensitive), a tag filter offering the tags in use on the board, an assignee filter offering the assignees in use on the board, and an overdue quick filter. The assignee filter SHALL list each assignee referenced by at least one of the board's items — catalog refs by their resolved display name, free-text refs by their display text — sorted alphabetically by that label, and SHALL be offered only while at least one item has an assignee.
 
-An item matches the assignee filter if it is assigned to ANY of the selected assignees; it matches the tag filter only if it carries ALL selected tags. The filters combine with AND: an item is visible only if it satisfies the text, the tags, and the assignees. Active filters SHALL apply to both the board view and the table view, SHALL be reflected in the count of matching items, and SHALL all be reset by the filter bar's clear action. The items API SHALL accept the same filters.
+The overdue quick filter SHALL be a single toggle labelled with the live count of overdue listed items (for example "Overdue (4)"), offered only while at least one listed item is overdue or the toggle is active. An item is overdue when its due date lies before the current day. While the toggle is active, only overdue items match.
+
+An item matches the assignee filter if it is assigned to ANY of the selected assignees; it matches the tag filter only if it carries ALL selected tags. The filters combine with AND: an item is visible only if it satisfies the text, the tags, the assignees, and the overdue toggle. Active filters SHALL apply to both the board view and the table view, SHALL be reflected in the count of matching items, and SHALL all be reset by the filter bar's clear action. The items API SHALL accept the same filters.
 
 #### Scenario: Text search
 - **WHEN** a user types "login" into the search field
@@ -152,9 +154,17 @@ An item matches the assignee filter if it is assigned to ANY of the selected ass
 - **WHEN** text, tag, and assignee filters are active and the user clears them
 - **THEN** matching intersects all filters while active, and clearing restores the full item set
 
+#### Scenario: Overdue toggle narrows to overdue items
+- **WHEN** a board lists two items due before today, one due today, and one without a due date, and the user toggles "Overdue (2)"
+- **THEN** only the two overdue items remain visible in either view, the match count reads 2, and toggling again or clearing filters restores the full set
+
+#### Scenario: Overdue toggle hidden without overdue items
+- **WHEN** no listed item has a due date before today and the toggle is not active
+- **THEN** the filter bar offers no overdue toggle
+
 #### Scenario: API filtering
-- **WHEN** the items endpoint is called with `?text=…&tag=…&assignee=…`
-- **THEN** only items matching the text, carrying every requested tag, and assigned to at least one requested assignee are returned
+- **WHEN** the items endpoint is called with `?text=…&tag=…&assignee=…&overdue=true`
+- **THEN** only items matching the text, carrying every requested tag, assigned to at least one requested assignee, and due before the current day are returned
 
 ### Requirement: Item archival, restore, and purge
 Deleting an item SHALL archive it rather than remove it: the item disappears from the board, table, and filter views but retains its fields, comments, and history. Users with write access SHALL be able to view a board's archived items (with who archived them and when) and restore them; archival and restore SHALL be recorded in the item's change history. Items archived more than 30 days ago SHALL be permanently removed by a scheduled backend task, including their comments, versions, changes, and watches.
