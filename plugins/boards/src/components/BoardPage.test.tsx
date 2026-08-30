@@ -11,6 +11,7 @@ import {
   testColumn,
   testItem,
   testPriorities,
+  typeIntoRichText,
 } from './__testUtils__/testHelpers';
 
 const identityApi = {
@@ -141,7 +142,7 @@ describe('BoardPage description', () => {
   it('lets a writer add a description under the header', async () => {
     const { boardsApi } = renderBoard();
     await userEvent.click(await screen.findByRole('button', { name: 'Add' }));
-    await userEvent.type(
+    typeIntoRichText(
       screen.getByLabelText('Edit board description'),
       'Sprint board for team X',
     );

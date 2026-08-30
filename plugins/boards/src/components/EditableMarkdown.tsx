@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { Button, Flex, Text, TextAreaField } from '@backstage/ui';
+import { Button, Flex, Text } from '@backstage/ui';
 import { useQuery } from '@tanstack/react-query';
 import { CommentVersion } from '@internal/plugin-boards-common';
-import { formatDate, MarkdownContent, RefDisplay } from './common';
+import { formatDate, RefDisplay } from './common';
+import { RichTextEditor, RichTextViewer } from './richtext/RichText';
 
 /**
  * Shared markdown display/edit block with retained version history.
@@ -102,9 +103,9 @@ export function EditableMarkdown(props: {
       )}
       {editing ? (
         <Flex direction="column" gap="2">
-          <TextAreaField
-            aria-label={editAriaLabel}
-            value={draft}
+          <RichTextEditor
+            ariaLabel={editAriaLabel}
+            initialMarkdown={draft}
             onChange={next => {
               setDraft(next);
               onDraftChange?.(next);
@@ -131,7 +132,7 @@ export function EditableMarkdown(props: {
       ) : (
         <>
           {text ? (
-            <MarkdownContent text={text} />
+            <RichTextViewer markdown={text} />
           ) : (
             <Text variant="body-small" color="secondary">
               {emptyText ?? 'Nothing here yet.'}
@@ -153,7 +154,7 @@ export function EditableMarkdown(props: {
                 {formatDate(version.editedAt)} by{' '}
                 <RefDisplay refString={version.editedBy} />
               </Text>
-              <MarkdownContent text={version.text} />
+              <RichTextViewer markdown={version.text} />
             </div>
           ))}
         </div>

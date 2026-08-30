@@ -1,19 +1,7 @@
 import { useMemo, useState } from 'react';
-import { useApi } from '@backstage/frontend-plugin-api';
 import { Combobox } from '@backstage/ui';
-import { catalogApiRef } from '@backstage/plugin-catalog-react';
-import { stringifyEntityRef } from '@backstage/catalog-model';
-import { useQuery } from '@tanstack/react-query';
 import { TEXT_REF_PREFIX } from '@internal/plugin-boards-common';
-import { queryKeys } from '../queries';
-
-/** The entity fields the option labels are built from. */
-const FIELDS = [
-  'kind',
-  'metadata.namespace',
-  'metadata.name',
-  'metadata.title',
-];
+import { useCatalogOptions } from './useCatalogOptions';
 
 /**
  * Catalog-backed autocomplete over entity refs. Selecting an option calls
@@ -38,49 +26,27 @@ export function CatalogRefPicker(props: {
 }) {
   const { ariaLabel, label, placeholder, kinds, allowText, maxOptions } = props;
   const { exclude, onSelect } = props;
-  const catalogApi = useApi(catalogApiRef);
   const [input, setInput] = useState('');
-
-  const { data: entities } = useQuery({
-    queryKey: queryKeys.catalogEntities(kinds),
-    // the catalog changes far more slowly than a picker is opened
-    staleTime: 5 * 60_000,
-    queryFn: async () => {
-      const response = await catalogApi.getEntities({
-        ...(kinds ? { filter: { kind: kinds } } : {}),
-        fields: FIELDS,
-      });
-      return response.items;
-    },
+  const catalogOptions = useCatalogOptions({
+    input,
+    kinds,
+    maxOptions,
+    exclude,
   });
 
   const options = useMemo(() => {
-    const excluded = new Set(exclude ?? []);
-    const needle = input.toLocaleLowerCase('en-US');
-    const catalogOptions = (entities ?? [])
-      .map(entity => {
-        const ref = stringifyEntityRef(entity);
-        return {
-          value: ref,
-          label: `${entity.metadata.title ?? entity.metadata.name} (${ref})`,
-        };
-      })
-      .filter(option => !excluded.has(option.value))
-      .filter(
-        option =>
-          !input || option.label.toLocaleLowerCase('en-US').includes(needle),
-      )
-      .sort((a, b) => a.label.localeCompare(b.label))
-      .slice(0, maxOptions ?? Infinity);
     const trimmed = input.trim();
     if (allowText && trimmed && !trimmed.startsWith(TEXT_REF_PREFIX)) {
-      catalogOptions.push({
-        value: `${TEXT_REF_PREFIX}${trimmed}`,
-        label: `Use text “${trimmed}”`,
-      });
+      return [
+        ...catalogOptions,
+        {
+          value: `${TEXT_REF_PREFIX}${trimmed}`,
+          label: `Use text “${trimmed}”`,
+        },
+      ];
     }
     return catalogOptions;
-  }, [entities, exclude, input, allowText, maxOptions]);
+  }, [catalogOptions, input, allowText]);
 
   return (
     <Combobox

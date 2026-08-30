@@ -5,14 +5,7 @@ import {
   RiArrowUpSLine,
   RiCloseLine,
 } from '@remixicon/react';
-import {
-  Box,
-  Button,
-  ButtonIcon,
-  Flex,
-  Text,
-  TextAreaField,
-} from '@backstage/ui';
+import { Box, Button, ButtonIcon, Flex, Text } from '@backstage/ui';
 import {
   BoardItem,
   BoardWithContext,
@@ -23,6 +16,7 @@ import { boardsApiRef } from '../api';
 import { queryKeys, useItemsQuery, useMoveItem } from '../queries';
 import { WatchButton } from './WatchButton';
 import { EditableMarkdown } from './EditableMarkdown';
+import { RichTextEditor } from './richtext/RichText';
 import { AssigneesField, DrawerSection } from './ItemDrawerFields';
 import { useDraft } from './drafts';
 import { ActivityBlock } from './ItemTimeline';
@@ -161,11 +155,15 @@ export function ItemDrawer(props: {
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [nav]);
 
+  // bumped after a submitted comment so the composer remounts empty
+  const [composerGeneration, setComposerGeneration] = useState(0);
+
   const addComment = async () => {
     const text = newComment.trim();
     if (!text) return;
     await boardsApi.addComment(board.id, item.id, text);
     clearNewComment();
+    setComposerGeneration(generation => generation + 1);
     await changed();
   };
 
@@ -393,10 +391,12 @@ export function ItemDrawer(props: {
               composer={
                 canWrite ? (
                   <Flex direction="column" gap="2">
-                    <TextAreaField
-                      aria-label="New comment"
-                      placeholder="Write a comment… (markdown subset, entity refs like system:default/example auto-link)"
-                      value={newComment}
+                    <RichTextEditor
+                      // remounts empty after a submitted comment
+                      key={composerGeneration}
+                      ariaLabel="New comment"
+                      placeholder="Write a comment… (@ mentions an entity, #tags and markdown work)"
+                      initialMarkdown={newComment}
                       onChange={setNewComment}
                     />
                     <div>

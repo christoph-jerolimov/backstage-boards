@@ -46,8 +46,8 @@ describe('EditableMarkdown', () => {
     const props = renderBlock({ text: 'before' });
     await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
     const field = screen.getByRole('textbox', { name: 'Description' });
-    await userEvent.clear(field);
-    await userEvent.type(field, 'after');
+    // contenteditable has no clear(); select all and overtype instead
+    await userEvent.type(field, '{Control>}a{/Control}after');
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(props.onSave).toHaveBeenCalledWith('after');
   });
@@ -62,7 +62,10 @@ describe('EditableMarkdown', () => {
   it('refuses to clear the text unless empties are allowed', async () => {
     const props = renderBlock({ text: 'keep me', allowEmpty: false });
     await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
-    await userEvent.clear(screen.getByRole('textbox', { name: 'Description' }));
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Description' }),
+      '{Control>}a{/Control}{Backspace}',
+    );
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(props.onSave).not.toHaveBeenCalled();
   });
@@ -70,7 +73,10 @@ describe('EditableMarkdown', () => {
   it('clears the text when empties are allowed', async () => {
     const props = renderBlock({ text: 'clear me', allowEmpty: true });
     await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
-    await userEvent.clear(screen.getByRole('textbox', { name: 'Description' }));
+    await userEvent.type(
+      screen.getByRole('textbox', { name: 'Description' }),
+      '{Control>}a{/Control}{Backspace}',
+    );
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(props.onSave).toHaveBeenCalledWith('');
   });
