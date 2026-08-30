@@ -62,6 +62,12 @@ export interface BoardsApi {
   listMyItems(): Promise<MyBoardItem[]>;
   getBoard(boardId: string): Promise<BoardWithContext>;
   updateBoard(boardId: string, update: BoardUpdate): Promise<BoardWithContext>;
+  /** Sets or clears (empty text) the board's markdown description. */
+  updateBoardDescription(
+    boardId: string,
+    text: string,
+  ): Promise<BoardWithContext>;
+  listBoardDescriptionVersions(boardId: string): Promise<CommentVersion[]>;
   /** Archives the board (read-only, purged after 30 days). */
   deleteBoard(boardId: string): Promise<void>;
   /** Permanently deletes an archived board immediately. */
@@ -307,6 +313,20 @@ export class BoardsClient implements BoardsApi {
 
   getBoard(boardId: string): Promise<BoardWithContext> {
     return this.request('GET', `/boards/${boardId}`);
+  }
+
+  updateBoardDescription(
+    boardId: string,
+    text: string,
+  ): Promise<BoardWithContext> {
+    return this.request('PUT', `/boards/${boardId}/description`, { text });
+  }
+
+  listBoardDescriptionVersions(boardId: string): Promise<CommentVersion[]> {
+    return this.requestList<CommentVersion>(
+      `/boards/${boardId}/description/versions`,
+      'versions',
+    );
   }
 
   updateBoard(boardId: string, update: BoardUpdate): Promise<BoardWithContext> {

@@ -12,6 +12,9 @@ board-specific lives in `plugins/`.
 
 ### Boards
 
+- **Board description** — an optional markdown description under the
+  board header ("what this board is for, how we use the columns"),
+  editable in place by writers, with retained version history.
 - **Board list** — paginated "Favorites" and "All" tabs, with per-status item
   counts on every row.
 - **Board filters** — filter the list by free-text search, referenced entity,
@@ -26,7 +29,8 @@ board-specific lives in `plugins/`.
   backend also enforces — full columns accept no new or moved-in items,
   and the UI disables those affordances.
 - **Duplicate a board** — optionally copying items and entity references; the
-  copy belongs to the duplicator.
+  copy belongs to the duplicator and keeps the description, column colors,
+  and WIP limits.
 - **Board archival** — deleting archives the board for 30 days, read-only and
   reachable only by direct link, with "Unarchive" and "Delete now" actions.
 - **Entity assignment** — a board can reference any number of catalog

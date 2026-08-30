@@ -329,6 +329,30 @@ export async function createRouter(
     );
   });
 
+  router.put('/boards/:boardId/description', async (req, res) => {
+    const principal = await principalOf(req);
+    if (typeof req.body.text !== 'string') {
+      throw new InputError('Description text must be a string');
+    }
+    res.json(
+      await service.updateBoardDescription(
+        principal,
+        req.params.boardId,
+        req.body.text,
+      ),
+    );
+  });
+
+  router.get('/boards/:boardId/description/versions', async (req, res) => {
+    const principal = await principalOf(req);
+    res.json({
+      versions: await service.listBoardDescriptionVersions(
+        principal,
+        req.params.boardId,
+      ),
+    });
+  });
+
   router.patch('/boards/:boardId/columns/:columnId', async (req, res) => {
     const principal = await principalOf(req);
     res.json(

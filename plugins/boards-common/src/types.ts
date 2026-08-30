@@ -106,6 +106,10 @@ export interface Board {
 
 /** A board as returned to a specific user, with per-user context. */
 export interface BoardWithContext extends Board {
+  /** Markdown shown under the board header; absent when never set. */
+  description?: string;
+  /** Stored description versions; history is offered when > 1. */
+  descriptionVersionCount: number;
   columns: BoardColumn[];
   /** Priority definitions ordered by `order`; empty = feature unused. */
   priorities: BoardPriority[];

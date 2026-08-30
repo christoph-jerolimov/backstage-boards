@@ -33,23 +33,17 @@ describe('migrations', () => {
     await knex.destroy();
   });
 
-  it('rolls back the WIP limits migration', async () => {
+  it('rolls back the latest migration', async () => {
     const knex = await createTestKnex();
-    expect(await knex.schema.hasColumn('board_columns', 'wip_hard_limit')).toBe(
-      true,
-    );
+    expect(await knex.schema.hasColumn('boards', 'description')).toBe(true);
     await knex.migrate.down({
       migrationSource: new BoardsMigrationSource(),
     });
-    expect(await knex.schema.hasColumn('board_columns', 'wip_hard_limit')).toBe(
-      false,
-    );
+    expect(await knex.schema.hasColumn('boards', 'description')).toBe(false);
     await knex.migrate.latest({
       migrationSource: new BoardsMigrationSource(),
     });
-    expect(await knex.schema.hasColumn('board_columns', 'wip_hard_limit')).toBe(
-      true,
-    );
+    expect(await knex.schema.hasColumn('boards', 'description')).toBe(true);
     await knex.destroy();
   });
 });
