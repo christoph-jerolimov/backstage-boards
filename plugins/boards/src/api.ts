@@ -2,6 +2,7 @@ import { createApiRef, DiscoveryApi } from '@backstage/frontend-plugin-api';
 import {
   Board,
   BoardChangeEntry,
+  BoardInsights,
   BoardFilterOptions,
   BoardListFilter,
   BoardListResult,
@@ -68,6 +69,8 @@ export interface BoardsApi {
     text: string,
   ): Promise<BoardWithContext>;
   listBoardDescriptionVersions(boardId: string): Promise<CommentVersion[]>;
+  /** Server-computed flow aggregates for the board's Insights view. */
+  getBoardInsights(boardId: string): Promise<BoardInsights>;
   /** Archives the board (read-only, purged after 30 days). */
   deleteBoard(boardId: string): Promise<void>;
   /** Permanently deletes an archived board immediately. */
@@ -335,6 +338,10 @@ export class BoardsClient implements BoardsApi {
       `/boards/${boardId}/description/versions`,
       'versions',
     );
+  }
+
+  getBoardInsights(boardId: string): Promise<BoardInsights> {
+    return this.request('GET', `/boards/${boardId}/insights`);
   }
 
   updateBoard(boardId: string, update: BoardUpdate): Promise<BoardWithContext> {

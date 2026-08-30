@@ -2,6 +2,7 @@ import {
   RiArchiveLine,
   RiDeleteBinLine,
   RiFileCopyLine,
+  RiBarChartLine,
   RiGridLine,
   RiHistoryLine,
   RiKanbanView,
@@ -35,7 +36,7 @@ import { BoardDialogKind } from './BoardDialogs';
 import { useBoardsCreateAllowed } from './RequireBoardsUse';
 
 /** Every layout the board page can be shown in. */
-export const ALL_BOARD_VIEW_MODES = ['board', 'table'] as const;
+export const ALL_BOARD_VIEW_MODES = ['board', 'table', 'insights'] as const;
 
 export type BoardViewMode = (typeof ALL_BOARD_VIEW_MODES)[number];
 
@@ -148,6 +149,9 @@ export function BoardHeader(props: {
             </ToggleButton>
             <ToggleButton id="table" aria-label="Table view">
               <RiGridLine size={16} />
+            </ToggleButton>
+            <ToggleButton id="insights" aria-label="Insights view">
+              <RiBarChartLine size={16} />
             </ToggleButton>
           </ToggleButtonGroup>
           <MenuTrigger>

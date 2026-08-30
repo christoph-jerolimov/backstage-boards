@@ -41,6 +41,13 @@ board-specific lives in `plugins/`.
 - **Row and context menus** — board rows carry an actions menu that also opens
   at the pointer on right-click.
 
+### Insights
+
+- **Insights view** — cycle time per column, a cumulative flow diagram
+  (30 days), and weekly throughput into the last column, computed
+  server-side from the recorded item history, with links to the
+  assignee and priority matrices.
+
 ### Items
 
 - **Kanban and table views** — two switchable views over the same items.

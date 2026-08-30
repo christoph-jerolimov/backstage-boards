@@ -248,6 +248,47 @@ export interface CommentVersion {
   editedAt: string;
 }
 
+/** One column's cycle-time aggregate, from completed stays. */
+export interface ColumnCycleTime {
+  columnId: string;
+  title: string;
+  color?: ColumnColor;
+  /** Completed stays measured (an item entered and later left). */
+  stays: number;
+  /** Average stay duration in hours; 0 when no stays. */
+  averageHours: number;
+  /** Median stay duration in hours; 0 when no stays. */
+  medianHours: number;
+}
+
+/** Item counts per column at the end of one day. */
+export interface FlowDay {
+  /** `YYYY-MM-DD`. */
+  date: string;
+  /** Non-archived items per column id at that day's end. */
+  counts: Record<string, number>;
+}
+
+/** Items that reached the board's last column in one week. */
+export interface ThroughputWeek {
+  /** Monday of the ISO week, `YYYY-MM-DD`. */
+  weekStart: string;
+  count: number;
+}
+
+/** Server-computed board flow aggregates. */
+export interface BoardInsights {
+  /** The board's columns in display order (chart axes and colors). */
+  columns: Array<{ columnId: string; title: string; color?: ColumnColor }>;
+  cycleTimes: ColumnCycleTime[];
+  /** Last 30 days, oldest first. */
+  cumulativeFlow: FlowDay[];
+  /** Last 8 ISO weeks, oldest first. */
+  throughput: ThroughputWeek[];
+  /** Total moves the aggregates are based on. */
+  moveCount: number;
+}
+
 export type ChangeType =
   | 'created'
   | 'updated'

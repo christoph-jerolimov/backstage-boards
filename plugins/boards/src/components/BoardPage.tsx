@@ -26,6 +26,7 @@ import { BoardDialogKind, BoardDialogs } from './BoardDialogs';
 import { ItemFilterBar, useItemFilter } from './ItemFilterBar';
 import { BulkActionsBar } from './BulkActionsBar';
 import { BoardDescription } from './BoardDescription';
+import { InsightsView } from './InsightsView';
 import { ErrorText } from './common';
 import { EmptyState } from './EmptyState';
 import { useBoardActions, useOpenItemParam } from './useBoardActions';
@@ -161,11 +162,11 @@ export function BoardPageContent(props: {
         <BoardDescription board={board} canWrite={canWrite} />
       )}
 
-      <ItemFilterBar filter={filter} />
+      {view !== 'insights' && <ItemFilterBar filter={filter} />}
 
       {error && <ErrorText>{error}</ErrorText>}
 
-      {selectedItems.length > 0 && (
+      {view !== 'insights' && selectedItems.length > 0 && (
         <BulkActionsBar
           board={board}
           selectedItems={selectedItems}
@@ -176,7 +177,10 @@ export function BoardPageContent(props: {
         />
       )}
 
-      {view === 'board' ? (
+      {view === 'insights' && (
+        <InsightsView board={board} onOpenDialog={setDialog} />
+      )}
+      {view === 'board' && (
         <BoardView
           board={board}
           items={filter.filteredItems}
@@ -186,7 +190,8 @@ export function BoardPageContent(props: {
           groupBy={groupBy}
           selection={canWrite ? selection : undefined}
         />
-      ) : (
+      )}
+      {view === 'table' && (
         <TableView
           board={board}
           items={filter.filteredItems}

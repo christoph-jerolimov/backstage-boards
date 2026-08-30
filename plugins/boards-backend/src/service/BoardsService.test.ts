@@ -1070,6 +1070,109 @@ describe('BoardsService', () => {
     });
   });
 
+  describe('board insights', () => {
+    it('computes cycle times from the move history', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const [first, second] = board.columns;
+      const last = board.columns[board.columns.length - 1];
+      const item = await service.createItem(alice, board.id, {
+        columnId: first.id,
+        title: 'Flowing',
+      });
+      await service.moveItem(alice, board.id, item.id, {
+        columnId: second.id,
+      });
+      await service.moveItem(alice, board.id, item.id, { columnId: last.id });
+      // rewrite the recorded times: 2 days in the first column, 3 in
+      // the second
+      await knex('items')
+        .where('id', item.id)
+        .update({ created_at: '2026-08-01T00:00:00.000Z' });
+      await knex('changes')
+        .where({ item_id: item.id, type: 'moved' })
+        .andWhere('new_value', JSON.stringify(second.title))
+        .update({ at: '2026-08-03T00:00:00.000Z' });
+      await knex('changes')
+        .where({ item_id: item.id, type: 'moved' })
+        .andWhere('new_value', JSON.stringify(last.title))
+        .update({ at: '2026-08-06T00:00:00.000Z' });
+
+      const insights = await service.getBoardInsights(alice, board.id);
+      const of = (columnId: string) =>
+        insights.cycleTimes.find(entry => entry.columnId === columnId)!;
+      expect(of(first.id).stays).toBe(1);
+      expect(of(first.id).averageHours).toBeCloseTo(48);
+      expect(of(second.id).stays).toBe(1);
+      expect(of(second.id).medianHours).toBeCloseTo(72);
+      expect(of(last.id).stays).toBe(0);
+      expect(insights.moveCount).toBe(2);
+    });
+
+    it('counts weekly arrivals in the last column as throughput', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const [first] = board.columns;
+      const last = board.columns[board.columns.length - 1];
+      const arrive = async (title: string) => {
+        const item = await service.createItem(alice, board.id, {
+          columnId: first.id,
+          title,
+        });
+        await service.moveItem(alice, board.id, item.id, {
+          columnId: last.id,
+        });
+        return item;
+      };
+      await arrive('This week');
+      await arrive('This week too');
+      const older = await arrive('Last week');
+      await knex('changes')
+        .where({ item_id: older.id, type: 'moved' })
+        .update({
+          at: new Date(Date.now() - 7 * 24 * 3_600_000).toISOString(),
+        });
+
+      const insights = await service.getBoardInsights(alice, board.id);
+      const weeks = insights.throughput;
+      expect(weeks).toHaveLength(8);
+      expect(weeks[weeks.length - 1].count).toBe(2);
+      expect(
+        weeks.slice(0, -1).reduce((sum, entry) => sum + entry.count, 0),
+      ).toBe(1);
+    });
+
+    it('reports the current distribution in the cumulative flow', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const [first, second] = board.columns;
+      await service.createItem(alice, board.id, {
+        columnId: first.id,
+        title: 'One',
+      });
+      await service.createItem(alice, board.id, {
+        columnId: second.id,
+        title: 'Two',
+      });
+      const archived = await service.createItem(alice, board.id, {
+        columnId: second.id,
+        title: 'Gone',
+      });
+      await service.deleteItem(alice, board.id, archived.id);
+
+      const insights = await service.getBoardInsights(alice, board.id);
+      expect(insights.cumulativeFlow).toHaveLength(30);
+      const today = insights.cumulativeFlow[insights.cumulativeFlow.length - 1];
+      expect(today.counts[first.id]).toBe(1);
+      expect(today.counts[second.id]).toBe(1);
+    });
+
+    it('yields empty aggregates for a board without history', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const insights = await service.getBoardInsights(alice, board.id);
+      expect(insights.moveCount).toBe(0);
+      expect(insights.cycleTimes.every(entry => entry.stays === 0)).toBe(true);
+      expect(insights.throughput.every(entry => entry.count === 0)).toBe(true);
+    });
+  });
+
   describe('column WIP limits', () => {
     it('stores, updates, and clears the limits', async () => {
       const board = await service.createBoard(alice, { name: 'B' });

@@ -11,6 +11,7 @@ import {
   Board,
   BoardChangeEntry,
   BoardColumn,
+  BoardInsights,
   BoardPriority,
   COLUMN_COLORS,
   ColumnColor,
@@ -28,6 +29,9 @@ import {
   BoardWithContext,
   ChangeRecord,
   ChangeType,
+  ColumnCycleTime,
+  FlowDay,
+  ThroughputWeek,
   ChecklistEntry,
   CommentVersion,
   ItemComment,
@@ -2680,6 +2684,171 @@ export class BoardsService {
       }),
     ];
     return entries.sort((a, b) => a.at.localeCompare(b.at));
+  }
+
+  /**
+   * Server-computed flow aggregates: cycle time per column, cumulative
+   * flow (30 days), and throughput into the last column (8 weeks),
+   * reconstructed from the recorded status moves. Moves store column
+   * titles, so intervals are mapped to current columns by title;
+   * intervals whose title no longer resolves are dropped.
+   */
+  async getBoardInsights(
+    principal: BoardsPrincipal,
+    boardId: string,
+  ): Promise<BoardInsights> {
+    await this.requireBoard(principal, boardId, 'read');
+    const columns = await this.knex('board_columns')
+      .where('board_id', boardId)
+      .orderBy('position');
+    const columnByTitle = new Map<string, ColumnRow>();
+    for (const column of columns) {
+      if (!columnByTitle.has(column.title)) {
+        columnByTitle.set(column.title, column);
+      }
+    }
+    const items = await this.knex('items').where('board_id', boardId);
+    const moves = await this.knex('changes')
+      .where({ board_id: boardId, type: 'moved', field: 'status' })
+      .orderBy('at');
+    // change values are stored JSON-encoded (see recordChange)
+    const titleOf = (value: string | null): string => {
+      if (value === null) {
+        return '';
+      }
+      try {
+        const parsed = JSON.parse(value);
+        return typeof parsed === 'string' ? parsed : '';
+      } catch {
+        return value;
+      }
+    };
+    const movesByItem = new Map<string, ChangeRow[]>();
+    for (const move of moves) {
+      const list = movesByItem.get(move.item_id) ?? [];
+      list.push(move);
+      movesByItem.set(move.item_id, list);
+    }
+
+    // one interval per stay: [title, start, end); end undefined = still
+    // there (or until archival, tracked separately for the flow chart)
+    type Stay = { title: string; start: number; end?: number };
+    const stays: Array<{
+      item: (typeof items)[number];
+      intervals: Stay[];
+    }> = [];
+    for (const item of items) {
+      const itemMoves = movesByItem.get(item.id) ?? [];
+      const intervals: Stay[] = [];
+      let currentTitle =
+        itemMoves.length > 0
+          ? titleOf(itemMoves[0].old_value)
+          : columns.find(column => column.id === item.column_id)?.title ?? '';
+      let start = Date.parse(item.created_at);
+      for (const move of itemMoves) {
+        const at = Date.parse(move.at);
+        intervals.push({ title: currentTitle, start, end: at });
+        currentTitle = titleOf(move.new_value);
+        start = at;
+      }
+      intervals.push({ title: currentTitle, start });
+      stays.push({ item, intervals });
+    }
+
+    const cycleTimes: ColumnCycleTime[] = columns.map(column => {
+      const durations = stays
+        .flatMap(entry => entry.intervals)
+        .filter(stay => stay.end !== undefined && stay.title === column.title)
+        .map(stay => (stay.end! - stay.start) / 3_600_000)
+        .sort((a, b) => a - b);
+      const total = durations.reduce((sum, hours) => sum + hours, 0);
+      let median = 0;
+      if (durations.length % 2 === 1) {
+        median = durations[(durations.length - 1) / 2];
+      } else if (durations.length > 0) {
+        median =
+          (durations[durations.length / 2 - 1] +
+            durations[durations.length / 2]) /
+          2;
+      }
+      return {
+        columnId: column.id,
+        title: column.title,
+        color: column.color ?? undefined,
+        stays: durations.length,
+        averageHours: durations.length === 0 ? 0 : total / durations.length,
+        medianHours: median,
+      };
+    });
+
+    const dayMs = 24 * 3_600_000;
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+    const cumulativeFlow: FlowDay[] = [];
+    for (let back = 29; back >= 0; back -= 1) {
+      const instant = endOfToday.getTime() - back * dayMs;
+      const counts: Record<string, number> = {};
+      for (const column of columns) {
+        counts[column.id] = 0;
+      }
+      for (const { item, intervals } of stays) {
+        if (Date.parse(item.created_at) > instant) {
+          continue;
+        }
+        if (item.archived_at && Date.parse(item.archived_at) <= instant) {
+          continue;
+        }
+        const stay = intervals.find(
+          entry =>
+            entry.start <= instant &&
+            (entry.end === undefined || entry.end > instant),
+        );
+        const column = stay ? columnByTitle.get(stay.title) : undefined;
+        if (column) {
+          counts[column.id] = (counts[column.id] ?? 0) + 1;
+        }
+      }
+      cumulativeFlow.push({
+        date: todayISO(new Date(instant)),
+        counts,
+      });
+    }
+
+    // Monday of the ISO week the timestamp falls into
+    const weekStartOf = (timestamp: number): string => {
+      const date = new Date(timestamp);
+      date.setHours(0, 0, 0, 0);
+      const day = (date.getDay() + 6) % 7;
+      return todayISO(new Date(date.getTime() - day * dayMs));
+    };
+    const lastColumnTitle = columns[columns.length - 1]?.title;
+    const arrivalWeeks = new Map<string, number>();
+    for (const move of moves) {
+      if (lastColumnTitle && titleOf(move.new_value) === lastColumnTitle) {
+        const week = weekStartOf(Date.parse(move.at));
+        arrivalWeeks.set(week, (arrivalWeeks.get(week) ?? 0) + 1);
+      }
+    }
+    const throughput: ThroughputWeek[] = [];
+    const thisWeek = weekStartOf(Date.now());
+    for (let back = 7; back >= 0; back -= 1) {
+      const weekStart = todayISO(
+        new Date(Date.parse(`${thisWeek}T00:00:00`) - back * 7 * dayMs),
+      );
+      throughput.push({ weekStart, count: arrivalWeeks.get(weekStart) ?? 0 });
+    }
+
+    return {
+      columns: columns.map(column => ({
+        columnId: column.id,
+        title: column.title,
+        color: column.color ?? undefined,
+      })),
+      cycleTimes,
+      cumulativeFlow,
+      throughput,
+      moveCount: moves.length,
+    };
   }
 
   async getBoardChanges(
