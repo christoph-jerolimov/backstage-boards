@@ -841,3 +841,22 @@ describe('BoardView WIP limits', () => {
     expect(screen.getByRole('button', { name: 'Save limits' })).toBeDisabled();
   });
 });
+
+describe('BoardView reader empty board', () => {
+  it('explains a column-less board to a reader', () => {
+    renderBoard({ columns: [], items: [], canWrite: false });
+    expect(
+      screen.getByText('This board has no columns yet'),
+    ).toBeInTheDocument();
+  });
+
+  it('keeps the add-column affordance for writers', () => {
+    renderBoard({ columns: [], items: [] });
+    expect(
+      screen.getByRole('button', { name: 'Add column' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('This board has no columns yet'),
+    ).not.toBeInTheDocument();
+  });
+});

@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { identityApiRef } from '@backstage/frontend-plugin-api';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
-import { boardsApiRef, BoardsApi } from '../api';
+import { boardsApiRef, BoardsApi, BoardsRequestError } from '../api';
 import { rootRouteRef } from '../routes';
 import { BoardPageContent } from './BoardPage';
 import {
@@ -182,11 +182,26 @@ describe('BoardPage loading', () => {
     expect(screen.getByText('Loading board…')).toBeInTheDocument();
   });
 
-  it('reports a board that could not be loaded', async () => {
+  it('reports a board that could not be loaded, with a retry', async () => {
     renderBoard({ boardError: new Error('Forbidden') });
     expect(
-      await screen.findByText('Board could not be loaded: Forbidden'),
+      await screen.findByText('The board could not be loaded'),
     ).toBeInTheDocument();
+    expect(screen.getByText('Forbidden')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeVisible();
+  });
+
+  it('shows the not-found page for a 404 with a way back', async () => {
+    renderBoard({
+      boardError: new BoardsRequestError('NotFoundError: nope', 404),
+    });
+    expect(await screen.findByText('Board not found')).toBeInTheDocument();
+    expect(
+      screen.getByText(/may have been deleted|may not have access/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Back to boards' }),
+    ).toBeVisible();
   });
 });
 

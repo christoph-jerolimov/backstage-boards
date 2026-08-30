@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { useDrag, useDrop } from 'react-aria';
 import type { DropItem } from 'react-aria';
-import { RiMore2Fill } from '@remixicon/react';
+import { RiLayoutColumnLine, RiMore2Fill } from '@remixicon/react';
 import {
   Button,
   ButtonIcon,
@@ -35,6 +35,7 @@ import {
   positionBefore,
 } from './grouping';
 import { GroupLabel } from './GroupLabel';
+import { EmptyState } from './EmptyState';
 import { ItemActions, ItemMenu } from './ItemMenu';
 import { RowMenuHandle, useRowMenu } from './RowMenu';
 import { handleItemShortcut, ItemShortcutContext } from './itemShortcuts';
@@ -989,6 +990,15 @@ export function BoardView(props: {
         </Fragment>
       ))}
       {insertAt === board.columns.length && titleField}
+      {!canWrite && board.columns.length === 0 && (
+        <div style={{ flexGrow: 1 }}>
+          <EmptyState
+            icon={<RiLayoutColumnLine size={28} />}
+            title="This board has no columns yet"
+            description="Someone with write access needs to add columns before items can be tracked here."
+          />
+        </div>
+      )}
       {canWrite && board.columns.length === 0 && insertAt === undefined && (
         <Button
           variant="tertiary"

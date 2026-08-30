@@ -211,6 +211,14 @@ export interface BoardsClientOptions {
   };
 }
 
+/** A failed backend call, carrying the HTTP status for the UI. */
+export class BoardsRequestError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+    this.name = 'BoardsRequestError';
+  }
+}
+
 export class BoardsClient implements BoardsApi {
   constructor(private readonly options: BoardsClientOptions) {}
 
@@ -233,7 +241,7 @@ export class BoardsClient implements BoardsApi {
       } catch {
         // keep the default message
       }
-      throw new Error(message);
+      throw new BoardsRequestError(message, response.status);
     }
     return response;
   }
