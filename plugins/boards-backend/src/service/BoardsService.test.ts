@@ -2226,12 +2226,18 @@ describe('BoardsService', () => {
 
   describe('board change feed', () => {
     it('lists recent changes newest first with item titles', async () => {
+      // ordering is by the change timestamp alone, so the writes must not
+      // land within the same millisecond
+      const nextMillisecond = () =>
+        new Promise(resolve => setTimeout(resolve, 2));
       const board = await service.createBoard(alice, { name: 'B' });
       const item = await service.createItem(alice, board.id, {
         columnId: board.columns[0].id,
         title: 'First',
       });
+      await nextMillisecond();
       await service.updateItem(alice, board.id, item.id, { title: 'Renamed' });
+      await nextMillisecond();
       await service.createItem(alice, board.id, {
         columnId: board.columns[0].id,
         title: 'Second',
