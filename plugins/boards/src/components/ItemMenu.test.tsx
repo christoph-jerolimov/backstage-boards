@@ -122,6 +122,29 @@ describe('ItemMenu', () => {
     ).toEqual(['Open details', 'Copy link']);
   });
 
+  it('offers Move to board… when the page provides the opener', async () => {
+    const actions = { ...testActions(), moveItemToBoard: jest.fn() };
+    renderWithProviders(
+      <MenuTrigger>
+        <Button>Actions</Button>
+        <ItemMenu
+          item={testItem()}
+          columns={columns}
+          priorities={[]}
+          readonly={false}
+          actions={actions}
+          assigneePool={[]}
+        />
+      </MenuTrigger>,
+      { apis: [[identityApiRef, identityApi]] },
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Actions' }));
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Move to board…' }),
+    );
+    expect(actions.moveItemToBoard).toHaveBeenCalledWith('item-1');
+  });
+
   it('duplicates the item', async () => {
     const { actions, item } = await openMenu({});
     await userEvent.click(

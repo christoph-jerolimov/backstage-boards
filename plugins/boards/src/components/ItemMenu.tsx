@@ -35,6 +35,8 @@ export interface ItemActions {
   setItemPriority: (itemId: string, priorityId: string | null) => Promise<void>;
   /** Copies the item on its board; absent where duplication is not offered. */
   duplicateItem?: (itemId: string) => Promise<void>;
+  /** Opens the move-to-another-board dialog; absent where not offered. */
+  moveItemToBoard?: (itemId: string) => void;
   deleteItem: (itemId: string) => Promise<void>;
 }
 
@@ -261,6 +263,11 @@ export function ItemMenu(props: {
       {!readonly && actions.duplicateItem && (
         <MenuItem onAction={() => actions.duplicateItem!(item.id)}>
           Duplicate item
+        </MenuItem>
+      )}
+      {!readonly && actions.moveItemToBoard && (
+        <MenuItem onAction={() => actions.moveItemToBoard!(item.id)}>
+          Move to board…
         </MenuItem>
       )}
       {!readonly && (

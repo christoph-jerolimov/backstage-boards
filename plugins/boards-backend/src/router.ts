@@ -553,6 +553,32 @@ export async function createRouter(
       );
   });
 
+  router.post(
+    '/boards/:boardId/items/:itemId/move-to-board',
+    async (req, res) => {
+      const principal = await principalOf(req);
+      if (
+        typeof req.body.targetBoardId !== 'string' ||
+        typeof req.body.targetColumnId !== 'string'
+      ) {
+        throw new InputError(
+          'targetBoardId and targetColumnId must be strings',
+        );
+      }
+      res.status(201).json(
+        await service.moveItemToBoard(
+          principal,
+          req.params.boardId,
+          req.params.itemId,
+          {
+            targetBoardId: req.body.targetBoardId,
+            targetColumnId: req.body.targetColumnId,
+          },
+        ),
+      );
+    },
+  );
+
   router.post('/boards/:boardId/items/:itemId/move', async (req, res) => {
     const principal = await principalOf(req);
     if (!req.body.columnId) {

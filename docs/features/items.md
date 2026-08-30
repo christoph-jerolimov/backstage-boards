@@ -52,6 +52,16 @@ description, tags, assignees, due date, and priority travel along, and
 the checklist arrives with every entry unchecked. Comments and history
 stay with the original — the copy starts fresh, created by you.
 
+## Moving an item to another board
+
+**Move to board…** in the item menu opens a two-step dialog: pick a
+target board (only boards you can write to are offered), then one of
+its columns, then **Move**. The item is recreated there with its
+fields, comments, and full history — plus a record naming the board it
+came from — and the original is archived here (restorable like any
+archived item). The priority carries over only when the target board
+defines one with the same name; watches stay behind.
+
 ## Permalinks
 
 Every item menu offers **Copy link**: the item's permalink — the board

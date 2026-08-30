@@ -1070,6 +1070,140 @@ describe('BoardsService', () => {
     });
   });
 
+  describe('move item to another board', () => {
+    it('moves fields, comments, and history, archiving the original', async () => {
+      const source = await service.createBoard(alice, { name: 'Source' });
+      const targetBoard = await service.createBoard(alice, {
+        name: 'Target',
+      });
+      const critical = source.priorities[0];
+      const item = await service.createItem(alice, source.id, {
+        columnId: source.columns[0].id,
+        title: 'Migrating',
+        tags: ['ops'],
+        assignees: ['user:default/alice'],
+        priorityId: critical.id,
+        checklist: [{ text: 'Step one', checked: true }],
+      });
+      await service.updateItem(alice, source.id, item.id, {
+        description: 'First version',
+      });
+      await service.updateItem(alice, source.id, item.id, {
+        description: 'Second version',
+      });
+      await service.addComment(alice, source.id, item.id, 'A note');
+
+      const moved = await service.moveItemToBoard(alice, source.id, item.id, {
+        targetBoardId: targetBoard.id,
+        targetColumnId: targetBoard.columns[1].id,
+      });
+      expect(moved.boardId).toBe(targetBoard.id);
+      expect(moved.columnId).toBe(targetBoard.columns[1].id);
+      expect(moved.title).toBe('Migrating');
+      expect(moved.tags).toEqual(['ops']);
+      expect(moved.assignees).toEqual(['user:default/alice']);
+      expect(moved.description).toBe('Second version');
+      expect(moved.descriptionVersionCount).toBe(2);
+      // the default priorities match by name, so critical carries over
+      expect(
+        targetBoard.priorities.find(p => p.id === moved.priorityId)?.name,
+      ).toBe(critical.name);
+      expect(moved.checklist?.[0]).toMatchObject({
+        text: 'Step one',
+        checked: true,
+      });
+
+      const timeline = await service.getTimeline(
+        alice,
+        targetBoard.id,
+        moved.id,
+      );
+      const kinds = timeline.map(entry => entry.kind);
+      expect(kinds).toContain('comment');
+      // creation, description edits, and the cross-board move record
+      const changes = timeline.filter(entry => entry.kind === 'change');
+      expect(changes.length).toBeGreaterThanOrEqual(3);
+
+      const archived = await service.listArchivedItems(alice, source.id);
+      expect(archived.map(entry => entry.title)).toEqual(['Migrating']);
+      expect(await service.listItems(alice, source.id)).toHaveLength(0);
+    });
+
+    it('drops the priority when the target has no name match', async () => {
+      const source = await service.createBoard(alice, { name: 'Source' });
+      const target = await service.createBoard(alice, {
+        name: 'Target',
+        priorities: [{ name: 'other' }],
+      });
+      const item = await service.createItem(alice, source.id, {
+        columnId: source.columns[0].id,
+        title: 'Item',
+        priorityId: source.priorities[0].id,
+      });
+      const moved = await service.moveItemToBoard(alice, source.id, item.id, {
+        targetBoardId: target.id,
+        targetColumnId: target.columns[0].id,
+      });
+      expect(moved.priorityId).toBeUndefined();
+    });
+
+    it('requires write access on the target board', async () => {
+      const source = await service.createBoard(bob, { name: 'Source' });
+      const target = await service.createBoard(alice, {
+        name: 'Target',
+        visibility: 'logged-in-read',
+      });
+      const item = await service.createItem(bob, source.id, {
+        columnId: source.columns[0].id,
+        title: 'Item',
+      });
+      await expect(
+        service.moveItemToBoard(bob, source.id, item.id, {
+          targetBoardId: target.id,
+          targetColumnId: target.columns[0].id,
+        }),
+      ).rejects.toThrow();
+    });
+
+    it('honors the target column hard WIP limit', async () => {
+      const source = await service.createBoard(alice, { name: 'Source' });
+      const target = await service.createBoard(alice, { name: 'Target' });
+      await service.updateColumn(alice, target.id, target.columns[0].id, {
+        wipHardLimit: 1,
+      });
+      await service.createItem(alice, target.id, {
+        columnId: target.columns[0].id,
+        title: 'Occupant',
+      });
+      const item = await service.createItem(alice, source.id, {
+        columnId: source.columns[0].id,
+        title: 'Item',
+      });
+      await expect(
+        service.moveItemToBoard(alice, source.id, item.id, {
+          targetBoardId: target.id,
+          targetColumnId: target.columns[0].id,
+        }),
+      ).rejects.toThrow('at its WIP limit of 1');
+      // nothing changed on either side
+      expect(await service.listItems(alice, source.id)).toHaveLength(1);
+    });
+
+    it('rejects moving to the same board and external items', async () => {
+      const source = await service.createBoard(alice, { name: 'Source' });
+      const item = await service.createItem(alice, source.id, {
+        columnId: source.columns[0].id,
+        title: 'Item',
+      });
+      await expect(
+        service.moveItemToBoard(alice, source.id, item.id, {
+          targetBoardId: source.id,
+          targetColumnId: source.columns[1].id,
+        }),
+      ).rejects.toThrow('already on this board');
+    });
+  });
+
   describe('duplicate item', () => {
     it('copies fields and lands directly after the original', async () => {
       const board = await service.createBoard(alice, { name: 'B' });

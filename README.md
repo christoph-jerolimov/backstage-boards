@@ -85,6 +85,9 @@ board-specific lives in `plugins/`.
 - **Duplicate an item** — copies an item in place (fields, tags,
   assignees, due date, priority, unchecked checklist) as a fresh item
   below the original.
+- **Move an item to another board** — a two-step dialog (board, then
+  column); the item travels with its comments and history, and the
+  original is archived on the source board.
 - **Item archival** — deleted items are archived, listed with who archived
   them and when, restorable for 30 days before purge.
 - **Externally managed items** — items owned by an integration are read-only

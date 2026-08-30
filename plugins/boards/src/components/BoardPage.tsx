@@ -32,6 +32,7 @@ import { ItemFilterBar, useItemFilter } from './ItemFilterBar';
 import { BulkActionsBar } from './BulkActionsBar';
 import { BoardDescription } from './BoardDescription';
 import { InsightsView } from './InsightsView';
+import { MoveItemDialog } from './MoveItemDialog';
 import { ErrorText } from './common';
 import { EmptyState } from './EmptyState';
 import { useBoardActions, useOpenItemParam } from './useBoardActions';
@@ -136,6 +137,7 @@ export function BoardPageContent(props: {
   const { view, setView, groupBy, setGroupBy, tableSort, setTableSort } =
     useBoardViewParams();
   const [dialog, setDialog] = useState<BoardDialogKind | undefined>();
+  const [moveItemId, setMoveItemId] = useState<string | undefined>();
 
   const {
     data: board,
@@ -148,6 +150,14 @@ export function BoardPageContent(props: {
   const { actions, bulk, guarded, refreshAll, error } = useBoardActions(
     boardId,
     openItem,
+  );
+  // the shared actions plus the page-level move dialog opener
+  const pageActions = useMemo(
+    () => ({
+      ...actions,
+      moveItemToBoard: (itemId: string) => setMoveItemId(itemId),
+    }),
+    [actions],
   );
   const filter = useItemFilter(items ?? [], board?.priorities, {
     inUrl: true,
@@ -316,7 +326,7 @@ export function BoardPageContent(props: {
           items={filter.filteredItems}
           allItems={items ?? []}
           canWrite={canWrite}
-          actions={actions}
+          actions={pageActions}
           groupBy={groupBy}
           selection={canWrite ? selection : undefined}
         />
@@ -326,7 +336,7 @@ export function BoardPageContent(props: {
           board={board}
           items={filter.filteredItems}
           canWrite={canWrite}
-          actions={actions}
+          actions={pageActions}
           groupBy={groupBy}
           openItem={actions.openItem}
           selection={canWrite ? selection : undefined}
@@ -362,6 +372,19 @@ export function BoardPageContent(props: {
           onChanged={refreshAll}
         />
       )}
+
+      {moveItemId &&
+        (() => {
+          const moveItem = (items ?? []).find(entry => entry.id === moveItemId);
+          return moveItem ? (
+            <MoveItemDialog
+              board={board}
+              item={moveItem}
+              onClose={() => setMoveItemId(undefined)}
+              onMoved={refreshAll}
+            />
+          ) : null;
+        })()}
 
       <BoardDialogs
         board={board}

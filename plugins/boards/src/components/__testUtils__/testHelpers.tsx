@@ -286,6 +286,7 @@ export function testBoardsApi(
     moveItem: jest.fn(),
     deleteItem: jest.fn().mockResolvedValue(undefined),
     duplicateItem: jest.fn(),
+    moveItemToBoard: jest.fn(),
     listArchivedItems: jest.fn().mockResolvedValue([]),
     restoreItem: jest.fn(),
     setWatchItem: jest.fn().mockResolvedValue(undefined),
