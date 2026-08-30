@@ -143,44 +143,40 @@ function KeyBadge(props: { label: string }) {
   );
 }
 
-function RowList(props: { title: string; rows: ShortcutRow[] }) {
+function ShortcutSection(props: { title: string; rows: ShortcutRow[] }) {
   if (props.rows.length === 0) {
     return null;
   }
   return (
-    <>
-      <Text variant="body-medium" weight="bold" as="h3">
-        {props.title}
-      </Text>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'auto 1fr',
-          columnGap: 16,
-          rowGap: 6,
-          alignItems: 'baseline',
-        }}
-      >
-        {props.rows.map(row => (
-          <Fragment key={row.keys.join('-')}>
-            <span style={{ whiteSpace: 'nowrap' }}>
-              {row.keys.map((key, index) => (
-                <Fragment key={key}>
-                  {/* spell the relation out so several badges never
-                      read as a chord: "s, c or m", "← / →" */}
-                  {index > 0 &&
-                    (row.conjunction === 'or'
-                      ? `${index === row.keys.length - 1 ? ' or ' : ', '}`
-                      : ' / ')}
-                  <KeyBadge label={key} />
-                </Fragment>
-              ))}
-            </span>
+    <tbody>
+      <tr>
+        <th colSpan={2} style={{ textAlign: 'left', padding: '8px 0 4px' }}>
+          <Text variant="body-medium" weight="bold" as="h3">
+            {props.title}
+          </Text>
+        </th>
+      </tr>
+      {props.rows.map(row => (
+        <tr key={row.keys.join('-')} style={{ verticalAlign: 'baseline' }}>
+          <td style={{ whiteSpace: 'nowrap', padding: '3px 16px 3px 0' }}>
+            {row.keys.map((key, index) => (
+              <Fragment key={key}>
+                {/* spell the relation out so several badges never
+                    read as a chord: "s, c or m", "← / →" */}
+                {index > 0 &&
+                  (row.conjunction === 'or'
+                    ? `${index === row.keys.length - 1 ? ' or ' : ', '}`
+                    : ' / ')}
+                <KeyBadge label={key} />
+              </Fragment>
+            ))}
+          </td>
+          <td style={{ padding: '3px 0' }}>
             <Text variant="body-small">{row.description}</Text>
-          </Fragment>
-        ))}
-      </div>
-    </>
+          </td>
+        </tr>
+      ))}
+    </tbody>
   );
 }
 
@@ -209,16 +205,17 @@ export function ShortcutHelpDialog(props: {
     >
       <DialogHeader>Keyboard shortcuts</DialogHeader>
       <DialogBody>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <RowList
+        {/* one table across the sections so the key column lines up */}
+        <table style={{ borderCollapse: 'collapse' }}>
+          <ShortcutSection
             title="Navigate"
             rows={visibleShortcutRows(NAVIGATION_SHORTCUT_ROWS, options)}
           />
-          <RowList
+          <ShortcutSection
             title="Focused item"
             rows={visibleShortcutRows(ITEM_SHORTCUT_ROWS, options)}
           />
-        </div>
+        </table>
       </DialogBody>
     </Dialog>
   );
