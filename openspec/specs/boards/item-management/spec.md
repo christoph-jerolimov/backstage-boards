@@ -740,13 +740,13 @@ with the number of selected items, a way to clear the selection, and
 actions that apply to every selected item: a status dropdown listing
 all board columns, an assignee dropdown, a due-date dropdown with the
 quick due-date choices (Today, Tomorrow, This week, Remove due date),
-and an Archive button. The bar SHALL be hidden while nothing is
-selected. In the status dropdown, a column SHALL show a checkmark when
-all selected items are in it and a dash when only some are. Choosing a
-status SHALL move all selected items to that column, choosing a
-due-date option SHALL set (or remove) the due date on all selected
-items, and Archive SHALL archive all selected items and clear the
-selection. Failures of individual item updates SHALL surface as an
+a tags dropdown, and an Archive button. The bar SHALL be hidden while
+nothing is selected. In the status dropdown, a column SHALL show a
+checkmark when all selected items are in it and a dash when only some
+are. Choosing a status SHALL move all selected items to that column,
+choosing a due-date option SHALL set (or remove) the due date on all
+selected items, and Archive SHALL archive all selected items and clear
+the selection. Failures of individual item updates SHALL surface as an
 error while the remaining items still update, and the views SHALL
 reflect all resulting changes.
 
@@ -842,3 +842,37 @@ SHALL remain visually distinguishable (e.g. dimmed) during the drag.
   cards of a group section
 - **THEN** the card lands exactly between those two cards in that
   section's visible order
+
+### Requirement: Bulk tag change
+The bulk tags dropdown SHALL list every tag used on the board's items,
+sorted alphabetically, followed by an "Add tag…" entry and a "Remove
+all tags" entry. A tag entry SHALL show a checkmark when every selected
+item carries that tag and a dash when only some do. Choosing a tag
+SHALL add it to every selected item missing it, except when all
+selected items already carry it, in which case it SHALL remove it from
+every selected item. "Add tag…" SHALL let the user type a tag; the
+typed value SHALL be normalized like tags added in the item details
+drawer and then added to every selected item missing it. "Remove all
+tags" SHALL clear the tags of every selected item.
+
+#### Scenario: Tag a mixed selection
+- **WHEN** a tag is present on some but not all selected items (shown
+  with a dash) and the user chooses that tag
+- **THEN** the tag is added to every selected item that was missing it,
+  and reopening the dropdown shows a checkmark for that tag
+
+#### Scenario: Toggle off a uniform tag
+- **WHEN** every selected item carries a tag (shown with a checkmark)
+  and the user chooses that tag
+- **THEN** the tag is removed from every selected item
+
+#### Scenario: Add a new tag to the selection
+- **WHEN** the user chooses "Add tag…", types `q3-carryover`, and
+  confirms
+- **THEN** every selected item gains the `q3-carryover` tag, and the
+  dropdown lists it with a checkmark afterwards
+
+#### Scenario: Clear all tags
+- **WHEN** the user chooses "Remove all tags" while some selected items
+  have tags
+- **THEN** every selected item ends up with no tags

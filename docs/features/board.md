@@ -31,8 +31,8 @@ assignees, and tags. Click a column header to sort. The column-picker button
 above the table chooses which columns are shown; the leading selection
 column and the trailing actions column always stay put.
 
-Selecting rows with the checkboxes enables bulk actions: change the assignee
-or the priority of every selected item at once (see
+Selecting rows with the checkboxes enables bulk actions: change the status,
+assignee, priority, due date, or tags of every selected item at once (see
 [Working with items](items.md)). The selection is shared with the kanban
 view — selected cards show a marked outline there, and switching views
 keeps the selection.

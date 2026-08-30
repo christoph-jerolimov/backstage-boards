@@ -116,6 +116,7 @@ export function BoardPageContent(props: {
           board={board}
           selectedItems={selectedItems}
           assigneePool={assigneePool(filter.filteredItems)}
+          tagPool={filter.allTags}
           bulk={bulk}
           onClear={selection.clear}
         />
