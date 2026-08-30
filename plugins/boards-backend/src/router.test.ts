@@ -338,6 +338,25 @@ describe('createRouter', () => {
     ]);
   });
 
+  it('serves board insights to readers', async () => {
+    const board = (
+      await request(app)
+        .post('/boards')
+        .set('x-test-user', 'alice')
+        .send({ name: 'B' })
+        .expect(201)
+    ).body;
+    const insights = (
+      await request(app)
+        .get(`/boards/${board.id}/insights`)
+        .set('x-test-user', 'alice')
+        .expect(200)
+    ).body;
+    expect(insights.cumulativeFlow).toHaveLength(30);
+    expect(insights.throughput).toHaveLength(8);
+    expect(insights.moveCount).toBe(0);
+  });
+
   it('rejects board creation without a name', async () => {
     await request(app)
       .post('/boards')

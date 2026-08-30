@@ -51,6 +51,7 @@ export const queryKeys = {
     ['boards', boardId, 'items', itemId, 'watchers'] as const,
   timeline: (boardId: string, itemId: string) =>
     ['boards', boardId, 'items', itemId, 'timeline'] as const,
+  boardInsights: (boardId: string) => ['boards', boardId, 'insights'] as const,
   boardDescriptionVersions: (boardId: string) =>
     ['boards', boardId, 'description-versions'] as const,
   descriptionVersions: (boardId: string, itemId: string) =>

@@ -343,6 +343,11 @@ export async function createRouter(
     );
   });
 
+  router.get('/boards/:boardId/insights', async (req, res) => {
+    const principal = await principalOf(req);
+    res.json(await service.getBoardInsights(principal, req.params.boardId));
+  });
+
   router.get('/boards/:boardId/description/versions', async (req, res) => {
     const principal = await principalOf(req);
     res.json({

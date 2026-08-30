@@ -250,6 +250,13 @@ export function testBoardsApi(
     updateBoard: jest.fn().mockResolvedValue(undefined),
     updateBoardDescription: jest.fn().mockResolvedValue(undefined),
     listBoardDescriptionVersions: jest.fn().mockResolvedValue([]),
+    getBoardInsights: jest.fn().mockResolvedValue({
+      columns: [],
+      cycleTimes: [],
+      cumulativeFlow: [],
+      throughput: [],
+      moveCount: 0,
+    }),
     deleteBoard: jest.fn().mockResolvedValue(undefined),
     hardDeleteBoard: jest.fn().mockResolvedValue(undefined),
     unarchiveBoard: jest.fn().mockResolvedValue(undefined),
