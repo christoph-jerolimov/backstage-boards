@@ -3,7 +3,8 @@ import type { ReactNode } from 'react';
 import { Button, Flex, Text, TextAreaField } from '@backstage/ui';
 import { useQuery } from '@tanstack/react-query';
 import { CommentVersion } from '@internal/plugin-boards-common';
-import { formatDate, MarkdownContent, RefDisplay } from './common';
+import { formatDate, RefDisplay } from './common';
+import { MarkdownContent } from './MarkdownContent';
 
 /**
  * Shared markdown display/edit block with retained version history.

@@ -13,7 +13,7 @@ import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '../queries';
 import type { BulkActions } from './useBoardActions';
 import { useProfiles } from './useProfiles';
-import { RefLabel } from './common';
+import { RefLabel } from '@internal/plugin-boards-react';
 
 /** How much of the selection matches a value the menus offer. */
 type MatchState = 'all' | 'some' | 'none';

@@ -5,7 +5,14 @@ import { catalogApiRef } from '@backstage/plugin-catalog-react';
 import { stringifyEntityRef } from '@backstage/catalog-model';
 import { useQuery } from '@tanstack/react-query';
 import { TEXT_REF_PREFIX } from '@internal/plugin-boards-common';
-import { queryKeys } from '../queries';
+
+/**
+ * Cache key for catalog lookups, which belong to no single board. The
+ * same key the boards plugin has always used, so every picker on a page
+ * shares one catalog fetch.
+ */
+const catalogEntitiesKey = (kinds?: string[]) =>
+  ['boards', 'catalog-entities', kinds?.join(',') ?? 'all'] as const;
 
 /** The entity fields the option labels are built from. */
 const FIELDS = [
@@ -42,7 +49,7 @@ export function CatalogRefPicker(props: {
   const [input, setInput] = useState('');
 
   const { data: entities } = useQuery({
-    queryKey: queryKeys.catalogEntities(kinds),
+    queryKey: catalogEntitiesKey(kinds),
     // the catalog changes far more slowly than a picker is opened
     staleTime: 5 * 60_000,
     queryFn: async () => {

@@ -2,10 +2,12 @@ import {
   BoardPriority,
   relativeDueLabel,
 } from '@internal/plugin-boards-common';
-import { RefDisplay } from './common';
-import { formatDueDate } from './DueDate';
+import {
+  RefDisplay,
+  formatDueDate,
+  ColorDot,
+} from '@internal/plugin-boards-react';
 import { GroupByMode, REST_KEY, REST_LABEL } from './grouping';
-import { ColorDot } from './StatusBadge';
 
 /** Human label for a group heading produced by `groupItems`. */
 export function GroupLabel(props: {

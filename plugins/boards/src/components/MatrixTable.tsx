@@ -5,7 +5,7 @@ import {
   BoardItem,
   ColumnColor,
 } from '@internal/plugin-boards-common';
-import { StatusChip } from './StatusBadge';
+import { StatusChip } from '@internal/plugin-boards-react';
 
 /** One row of a matrix: how it reads, and which items it counts. */
 export interface MatrixRow {

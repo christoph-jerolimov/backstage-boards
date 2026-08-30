@@ -28,10 +28,14 @@ import {
   MAX_PRIORITIES,
 } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
-import { ErrorText, InlineEdit, selectedOption } from './common';
-import { EntityPicker } from './EntityPicker';
-import { ColorDot } from './StatusBadge';
-import { useAsyncAction } from './useAsyncAction';
+import {
+  ErrorText,
+  InlineEdit,
+  selectedOption,
+  EntityPicker,
+  ColorDot,
+  useAsyncAction,
+} from '@internal/plugin-boards-react';
 
 /** One priority row: order number, name, color, reorder and delete. */
 function PriorityRow(props: {

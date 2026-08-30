@@ -6,7 +6,7 @@ import { errorMessage, ItemUpdate } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
 import { invalidateBoard, useMoveItem, useRenameItem } from '../queries';
 import type { BoardActions } from './BoardView';
-import { useAsyncAction } from './useAsyncAction';
+import { useAsyncAction } from '@internal/plugin-boards-react';
 
 /** The item shown in the drawer is kept in the `item` search param. */
 export function useOpenItemParam() {

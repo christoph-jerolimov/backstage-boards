@@ -18,13 +18,16 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { boardsApiRef } from '../api';
 import { queryKeys, useItemsQuery, useMoveItem } from '../queries';
 import { WatchButton } from './WatchButton';
-import { EditableMarkdown } from './EditableMarkdown';
+import {
+  EditableMarkdown,
+  ChecklistEditor,
+  TagsEditor,
+  ErrorText,
+  InlineEdit,
+} from '@internal/plugin-boards-react';
 import { AssigneesField, DrawerSection } from './ItemDrawerFields';
 import { useDraft } from './drafts';
 import { ActivityBlock } from './ItemTimeline';
-import { ChecklistEditor } from './ChecklistEditor';
-import { TagsEditor } from './TagsEditor';
-import { ErrorText, InlineEdit } from './common';
 import {
   DueDateSelect,
   PrioritySelect,

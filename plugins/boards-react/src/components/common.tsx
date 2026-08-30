@@ -1,0 +1,226 @@
+import { useCallback, useEffect, useState } from 'react';
+import { Text, TextField } from '@backstage/ui';
+import { EntityRefLink } from '@backstage/plugin-catalog-react';
+import {
+  errorMessage,
+  isTextRef,
+  textRefDisplay,
+} from '@internal/plugin-boards-common';
+
+/**
+ * Narrows a selection key coming back from a `Select`, `Tabs` or
+ * `ToggleButtonGroup` to one of the options that was offered. Those
+ * callbacks are typed as a bare react-aria `Key`, so matching the key
+ * against the option list is what turns it back into the union the rest
+ * of the code works with; an unknown key yields undefined.
+ */
+export function selectedOption<T extends string>(
+  key: unknown,
+  options: readonly T[],
+): T | undefined {
+  return options.find(option => option === key);
+}
+
+/**
+ * A ref's resolved display name with the ref itself as a native tooltip,
+ * so the identity behind the name stays reachable. `text:` refs carry no
+ * tooltip: their label already is their whole value. The `title` sits on
+ * a span rather than a design-system `Tooltip` because these labels live
+ * inside menu items, whose focus is react-aria's to manage.
+ */
+export function RefLabel(props: {
+  entityRef: string;
+  children: React.ReactNode;
+}) {
+  const { entityRef, children } = props;
+  if (isTextRef(entityRef)) {
+    return <>{children}</>;
+  }
+  return <span title={entityRef}>{children}</span>;
+}
+
+/** Renders a creator/assignee/actor ref: catalog refs link, `text:` refs don't. */
+export function RefDisplay(props: { refString: string }) {
+  const { refString } = props;
+  if (isTextRef(refString)) {
+    return <span>{textRefDisplay(refString)}</span>;
+  }
+  return <EntityRefLink entityRef={refString} />;
+}
+
+/** A comma-separated run of entity links, as a board's references read. */
+export function EntityRefList(props: { entityRefs: string[] }) {
+  return (
+    <>
+      {props.entityRefs.map((ref, index) => (
+        <span key={ref}>
+          {index > 0 && ', '}
+          <EntityRefLink entityRef={ref} />
+        </span>
+      ))}
+    </>
+  );
+}
+
+/**
+ * An error message. One style for every failure a plugin reports, from
+ * the design system's status colors rather than a hand-picked hex.
+ */
+export function ErrorText(props: { children: React.ReactNode }) {
+  return (
+    <Text variant="body-small" color="danger">
+      {props.children}
+    </Text>
+  );
+}
+
+/**
+ * The loading → error → empty → content sequence every list renders. The
+ * states are given as nodes rather than rendered here, so a menu can put
+ * them in menu items and a page in plain text.
+ *
+ * `items` is what emptiness is measured on: usually the query's rows, but
+ * a caller that groups or filters them first passes the derived list.
+ */
+export function AsyncList<T>(props: {
+  isLoading: boolean;
+  error?: unknown;
+  /** The rows to render, or undefined while they are not loaded yet. */
+  items?: T[];
+  loading?: React.ReactNode;
+  empty: React.ReactNode;
+  renderError?: (message: string) => React.ReactNode;
+  children: (items: T[]) => React.ReactNode;
+}): React.ReactNode {
+  const { isLoading, error, items, loading, empty, renderError } = props;
+  if (error) {
+    const message = errorMessage(error);
+    return renderError ? (
+      renderError(message)
+    ) : (
+      <ErrorText>{message}</ErrorText>
+    );
+  }
+  if (isLoading || items === undefined) {
+    return loading ?? <Text>Loading…</Text>;
+  }
+  if (items.length === 0) {
+    return empty;
+  }
+  return props.children(items);
+}
+
+/**
+ * Click-to-edit text. Renders as text until clicked (when `canEdit`),
+ * then as a text field; Enter or blur commits, Escape cancels.
+ */
+export function InlineEdit(props: {
+  value: string;
+  canEdit: boolean;
+  onCommit: (value: string) => Promise<void> | void;
+  display?: React.ReactNode;
+  ariaLabel: string;
+  placeholder?: string;
+}) {
+  const { value, canEdit, onCommit, display, ariaLabel, placeholder } = props;
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+
+  useEffect(() => setDraft(value), [value]);
+
+  const commit = useCallback(async () => {
+    setEditing(false);
+    const next = draft.trim();
+    if (next && next !== value) {
+      await onCommit(next);
+    } else {
+      setDraft(value);
+    }
+  }, [draft, value, onCommit]);
+
+  if (!editing) {
+    return (
+      <span
+        role={canEdit ? 'button' : undefined}
+        tabIndex={canEdit ? 0 : undefined}
+        aria-label={canEdit ? `Edit ${ariaLabel}` : undefined}
+        style={canEdit ? { cursor: 'pointer' } : undefined}
+        onClick={canEdit ? () => setEditing(true) : undefined}
+        onKeyDown={
+          canEdit
+            ? event => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  setEditing(true);
+                }
+              }
+            : undefined
+        }
+      >
+        {display ?? value}
+      </span>
+    );
+  }
+  return (
+    <TextField
+      aria-label={ariaLabel}
+      value={draft}
+      placeholder={placeholder}
+      // eslint-disable-next-line jsx-a11y/no-autofocus -- focus moves into a field the user just revealed
+      autoFocus
+      onChange={setDraft}
+      onBlur={() => commit()}
+      onKeyDown={event => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          commit();
+        } else if (event.key === 'Escape') {
+          setDraft(value);
+          setEditing(false);
+        }
+      }}
+    />
+  );
+}
+
+/**
+ * A text field revealed in place of an "add" button: Enter submits,
+ * Escape cancels, and losing focus commits what is there.
+ */
+export function InlineAddField(props: {
+  ariaLabel: string;
+  placeholder: string;
+  value: string;
+  onChange: (value: string) => void;
+  onSubmit: () => void;
+  onBlur: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <TextField
+      aria-label={props.ariaLabel}
+      value={props.value}
+      onChange={props.onChange}
+      placeholder={props.placeholder}
+      // eslint-disable-next-line jsx-a11y/no-autofocus -- focus moves into a field the user just revealed
+      autoFocus
+      onBlur={props.onBlur}
+      onKeyDown={event => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          props.onSubmit();
+        } else if (event.key === 'Escape') {
+          props.onCancel();
+        }
+      }}
+    />
+  );
+}
+
+export function formatDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString();
+  } catch {
+    return iso;
+  }
+}

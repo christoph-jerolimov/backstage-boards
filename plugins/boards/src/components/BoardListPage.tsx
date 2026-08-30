@@ -41,14 +41,16 @@ import {
 import { BoardsFilterBar, useBoardFilter } from './BoardsFilterBar';
 import { MyItemsList } from './MyItemsPage';
 import { ActionsCellContent, useRowMenu, utilityColumnStyle } from './RowMenu';
-import { AsyncList, EntityRefList, ErrorText } from './common';
 import {
+  AsyncList,
+  EntityRefList,
+  ErrorText,
   DEFAULT_PAGE_SIZE,
   PageSize,
   TablePagination,
-} from './TablePagination';
+  useAsyncAction,
+} from '@internal/plugin-boards-react';
 import { FavoriteButton, FavoriteStar } from './FavoriteButton';
-import { useAsyncAction } from './useAsyncAction';
 import { useBoardsCreateAllowed } from './RequireBoardsUse';
 
 /** The shared board actions menu: row button and right-click alike. */

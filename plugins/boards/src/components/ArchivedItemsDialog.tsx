@@ -18,7 +18,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { RETENTION_DAYS } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
 import { queryKeys } from '../queries';
-import { AsyncList, formatDate, RefDisplay } from './common';
+import {
+  AsyncList,
+  formatDate,
+  RefDisplay,
+} from '@internal/plugin-boards-react';
 import { ActionsCellContent } from './RowMenu';
 
 /**

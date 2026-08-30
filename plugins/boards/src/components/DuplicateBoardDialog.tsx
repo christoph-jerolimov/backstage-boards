@@ -18,8 +18,10 @@ import {
 } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
 import { useBoardsBasePath } from '../routes';
-import { ErrorText } from './common';
-import { useAsyncAction } from './useAsyncAction';
+import {
+  ErrorText,
+  useAsyncAction,
+} from '@internal/plugin-boards-react';
 
 /** Duplicates a board's structure and optionally its items. */
 export function DuplicateBoardDialog(props: {

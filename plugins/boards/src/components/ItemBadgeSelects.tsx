@@ -10,8 +10,13 @@ import {
   todayISO,
   tomorrowISO,
 } from '@internal/plugin-boards-common';
-import { ColorDot, colorHex, PriorityChip, StatusBadge } from './StatusBadge';
-import { DueDateBadge } from './DueDate';
+import {
+  ColorDot,
+  colorHex,
+  PriorityChip,
+  StatusBadge,
+  DueDateBadge,
+} from '@internal/plugin-boards-react';
 
 /**
  * The status-chip look on a real menu-trigger button: the badge is the

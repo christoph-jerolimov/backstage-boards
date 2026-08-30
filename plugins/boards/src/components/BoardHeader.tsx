@@ -28,7 +28,11 @@ import { boardsApiRef } from '../api';
 import { queryKeys } from '../queries';
 import { useApi } from '@backstage/frontend-plugin-api';
 import { ALL_GROUP_BY_MODES, GroupByMode } from './grouping';
-import { EntityRefList, InlineEdit, selectedOption } from './common';
+import {
+  EntityRefList,
+  InlineEdit,
+  selectedOption,
+} from '@internal/plugin-boards-react';
 import { FavoriteButton } from './FavoriteButton';
 import { WatchButton } from './WatchButton';
 import { BoardDialogKind } from './BoardDialogs';

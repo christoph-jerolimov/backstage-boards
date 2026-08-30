@@ -2,7 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { boardsApiRef } from '../api';
 import { ArchivedItemsDialog } from './ArchivedItemsDialog';
-import { formatDate } from './common';
+import { formatDate } from '@internal/plugin-boards-react';
 import {
   renderWithProviders,
   testBoardsApi,

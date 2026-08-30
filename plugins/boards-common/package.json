@@ -16,7 +16,8 @@
     "pluginPackages": [
       "@internal/plugin-boards",
       "@internal/plugin-boards-backend",
-      "@internal/plugin-boards-common"
+      "@internal/plugin-boards-common",
+      "@internal/plugin-boards-react"
     ]
   },
   "sideEffects": false,

@@ -198,6 +198,7 @@ board-specific lives in `plugins/`.
 | `plugins/boards`                        | Boards frontend: `/boards`, the board view, the share dialog, the entity tab. |
 | `plugins/boards-backend`                | Boards backend: storage, `/api/boards` REST API, permissions, notifications.  |
 | `plugins/boards-common`                 | Types and helpers shared by the frontend, backend, and future sync modules.   |
+| `plugins/boards-react`                  | Reusable UI building blocks on `@backstage/ui`, usable from other plugins.    |
 | `plugins/catalog-backend-module-boards` | Catalog processor labelling the entities a board references.                  |
 | `docs`                                  | User and admin documentation, served as TechDocs (`mkdocs.yml` at the root).  |
 | `openspec/specs`                        | The behaviour specs the plugins are built against.                            |

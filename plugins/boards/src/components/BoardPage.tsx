@@ -18,7 +18,7 @@ import { ArchivedBoardAlert, BoardHeader, BoardViewMode } from './BoardHeader';
 import { BoardDialogKind, BoardDialogs } from './BoardDialogs';
 import { ItemFilterBar, useItemFilter } from './ItemFilterBar';
 import { BulkActionsBar } from './BulkActionsBar';
-import { ErrorText } from './common';
+import { ErrorText } from '@internal/plugin-boards-react';
 import { useBoardActions, useOpenItemParam } from './useBoardActions';
 import { useItemSelection } from './useItemSelection';
 import { assigneePool, GroupByMode } from './grouping';

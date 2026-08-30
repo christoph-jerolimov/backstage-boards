@@ -9,7 +9,10 @@ import {
   Text,
 } from '@backstage/ui';
 import { useQuery } from '@tanstack/react-query';
-import { AsyncList, RefDisplay } from './common';
+import {
+  AsyncList,
+  RefDisplay,
+} from '@internal/plugin-boards-react';
 
 /**
  * Combined watch control: the main segment toggles the current user's

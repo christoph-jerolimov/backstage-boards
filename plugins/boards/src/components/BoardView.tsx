@@ -37,11 +37,16 @@ import { ItemActions, ItemMenu } from './ItemMenu';
 import { RowMenuHandle, useRowMenu } from './RowMenu';
 import { handleItemShortcut, ItemShortcutContext } from './itemShortcuts';
 import type { SelectionHandle } from './useItemSelection';
-import { InlineAddField, InlineEdit } from './common';
+import {
+  InlineAddField,
+  InlineEdit,
+  ChecklistBadge,
+  DueDateBadge,
+  ColorDot,
+  ColumnDot,
+  PriorityChip,
+} from '@internal/plugin-boards-react';
 import { AssigneeAvatars } from './AssigneeAvatars';
-import { ChecklistBadge } from './ChecklistEditor';
-import { DueDateBadge } from './DueDate';
-import { ColorDot, ColumnDot, PriorityChip } from './StatusBadge';
 
 const DRAG_TYPE = 'application/x-boards-item';
 

@@ -18,8 +18,7 @@ import {
   refDisplayName,
 } from '@internal/plugin-boards-common';
 import { useProfiles } from './useProfiles';
-import { RefLabel } from './common';
-import { ColorDot } from './StatusBadge';
+import { RefLabel, ColorDot } from '@internal/plugin-boards-react';
 
 /** One entry of the assignee filter menu: the ref and how it reads. */
 export interface AssigneeOption {

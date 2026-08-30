@@ -6,8 +6,11 @@ import {
 } from '@internal/plugin-boards-common';
 import { useBoardListQuery, useBoardsSignal } from '../queries';
 import { useBoardsBasePath } from '../routes';
-import { AsyncList, ErrorText } from './common';
-import { StatusChip } from './StatusBadge';
+import {
+  AsyncList,
+  ErrorText,
+  StatusChip,
+} from '@internal/plugin-boards-react';
 
 export { BoardsWidgetProvider } from './widgetCommon';
 

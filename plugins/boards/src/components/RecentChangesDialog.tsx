@@ -14,7 +14,12 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { boardsApiRef } from '../api';
 import { queryKeys } from '../queries';
-import { AsyncList, changeSummary, formatDate, RefDisplay } from './common';
+import {
+  AsyncList,
+  formatDate,
+  RefDisplay,
+} from '@internal/plugin-boards-react';
+import { changeSummary } from './common';
 
 /** Board-wide feed of the most recent change records, newest first. */
 export function RecentChangesDialog(props: {

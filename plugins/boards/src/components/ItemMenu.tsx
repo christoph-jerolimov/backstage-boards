@@ -15,7 +15,7 @@ import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '../queries';
 import { useProfiles } from './useProfiles';
 import type { ItemSubmenuKind } from './RowMenu';
-import { RefLabel } from './common';
+import { RefLabel } from '@internal/plugin-boards-react';
 
 /**
  * The item mutations the item menu needs. Kept separate from the board

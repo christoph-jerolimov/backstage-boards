@@ -13,8 +13,12 @@ import {
 import { ItemComment, TimelineEntry } from '@internal/plugin-boards-common';
 import { boardsApiRef } from '../api';
 import { queryKeys } from '../queries';
-import { EditableMarkdown } from './EditableMarkdown';
-import { changeSummary, formatDate, RefDisplay } from './common';
+import {
+  EditableMarkdown,
+  formatDate,
+  RefDisplay,
+} from '@internal/plugin-boards-react';
+import { changeSummary } from './common';
 
 export function CommentBlock(props: {
   boardId: string;

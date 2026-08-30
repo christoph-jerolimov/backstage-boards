@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Flex, Text } from '@backstage/ui';
-import { PrincipalPicker } from './PrincipalPicker';
+import { PrincipalPicker } from '@internal/plugin-boards-react';
 import { RefChips } from './common';
 
 /** A headlined section of the drawer body, grouping related blocks. */

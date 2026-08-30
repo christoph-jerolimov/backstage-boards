@@ -33,7 +33,17 @@ import {
   useMyItemsQuery,
 } from '../queries';
 import { useBoardsBasePath } from '../routes';
-import { DueDateBadge } from './DueDate';
+import {
+  DueDateBadge,
+  AsyncList,
+  ErrorText,
+  formatDate,
+  RefDisplay,
+  selectedOption,
+  PriorityChip,
+  StatusBadge,
+  useAsyncAction,
+} from '@internal/plugin-boards-react';
 import {
   assigneePool,
   groupMyItems,
@@ -45,13 +55,6 @@ import { GroupLabel } from './GroupLabel';
 import { ItemDrawerHost } from './ItemDrawerHost';
 import { ItemActions, ItemMenu } from './ItemMenu';
 import { ActionsCellContent, useRowMenu, utilityColumnStyle } from './RowMenu';
-import {
-  AsyncList,
-  ErrorText,
-  formatDate,
-  RefDisplay,
-  selectedOption,
-} from './common';
 import { AssigneeAvatars } from './AssigneeAvatars';
 import {
   ColumnsMenu,
@@ -60,8 +63,6 @@ import {
   useVisibleColumns,
 } from './tableColumns';
 import { ItemFilterBar, useItemFilter } from './ItemFilterBar';
-import { PriorityChip, StatusBadge } from './StatusBadge';
-import { useAsyncAction } from './useAsyncAction';
 
 /** How the my-items group-by menu reads, in {@link MY_ITEMS_PAGE_GROUP_BY} order. */
 const GROUP_BY_LABELS: Record<(typeof MY_ITEMS_PAGE_GROUP_BY)[number], string> =

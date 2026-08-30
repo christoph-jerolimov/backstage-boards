@@ -39,10 +39,14 @@ import {
 import { handleItemShortcut, ItemShortcutContext } from './itemShortcuts';
 import type { SelectionHandle } from './useItemSelection';
 import type { BoardActions } from './BoardView';
-import { formatDate, RefDisplay } from './common';
+import {
+  formatDate,
+  RefDisplay,
+  DueDateBadge,
+  PriorityChip,
+  StatusBadge,
+} from '@internal/plugin-boards-react';
 import { AssigneeAvatars } from './AssigneeAvatars';
-import { DueDateBadge } from './DueDate';
-import { PriorityChip, StatusBadge } from './StatusBadge';
 
 const SORTABLE_COLUMNS = new Set<TableColumnId>(ITEM_SORT_COLUMNS);
 

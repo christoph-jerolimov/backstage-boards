@@ -16,7 +16,7 @@ import {
 } from '@internal/plugin-boards-common';
 import { useBoardFilterOptionsQuery } from '../queries';
 import { useProfiles } from './useProfiles';
-import { RefLabel } from './common';
+import { RefLabel } from '@internal/plugin-boards-react';
 
 /** How long typing settles before it becomes a request. */
 const SEARCH_DEBOUNCE_MS = 250;

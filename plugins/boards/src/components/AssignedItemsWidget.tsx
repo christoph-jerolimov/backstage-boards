@@ -4,10 +4,14 @@ import { Badge, Button, Flex, Text } from '@backstage/ui';
 import { MyBoardItem } from '@internal/plugin-boards-common';
 import { useBoardsSignal, useMyItemsQuery } from '../queries';
 import { useBoardsBasePath } from '../routes';
-import { AsyncList, ErrorText } from './common';
-import { DueDateBadge, formatDueDate } from './DueDate';
+import {
+  AsyncList,
+  ErrorText,
+  DueDateBadge,
+  formatDueDate,
+  PriorityChip,
+} from '@internal/plugin-boards-react';
 import { ItemDrawerHost } from './ItemDrawerHost';
-import { PriorityChip } from './StatusBadge';
 import {
   filterDueEntries,
   groupMyItems,

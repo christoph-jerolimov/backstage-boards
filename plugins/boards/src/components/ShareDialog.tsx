@@ -19,9 +19,13 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { boardsApiRef } from '../api';
 import { queryKeys } from '../queries';
-import { PrincipalPicker } from './PrincipalPicker';
-import { useAsyncAction } from './useAsyncAction';
-import { ErrorText, RefDisplay, selectedOption } from './common';
+import {
+  PrincipalPicker,
+  useAsyncAction,
+  ErrorText,
+  RefDisplay,
+  selectedOption,
+} from '@internal/plugin-boards-react';
 
 /** Exhaustive by construction: a new visibility must be labelled here. */
 const VISIBILITY_LABELS: Record<BoardVisibility, string> = {

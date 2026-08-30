@@ -6,17 +6,18 @@ continue with the boards-specific options in
 
 ## The plugins
 
-Boards ships as four packages:
+Boards ships as five packages:
 
 | Package                                          | Side     | Purpose                                                          |
 | ------------------------------------------------ | -------- | ---------------------------------------------------------------- |
 | `@internal/plugin-boards`                        | frontend | The `/boards` pages, the entity tab, and the home page cards.    |
 | `@internal/plugin-boards-backend`                | backend  | Storage, the `/api/boards` REST API, permissions, notifications. |
 | `@internal/plugin-boards-common`                 | shared   | Types and helpers used by both sides.                            |
+| `@internal/plugin-boards-react`                  | frontend | Reusable UI building blocks, usable from other frontend plugins. |
 | `@internal/plugin-catalog-backend-module-boards` | backend  | Catalog processor marking the entities a board references.       |
 
-Add them to the right workspaces of your app (the common package comes
-along as a dependency):
+Add them to the right workspaces of your app (the common and react
+packages come along as dependencies):
 
 ```sh
 yarn --cwd packages/app add @internal/plugin-boards
