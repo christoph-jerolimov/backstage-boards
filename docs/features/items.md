@@ -35,9 +35,12 @@ deleting it.
 
 ## Bulk actions
 
-In the table view, select several rows with the checkboxes and change the
-assignee or the priority of all selected items at once. Each bulk change is
-recorded in every affected item's history like any other edit.
+Select several items — with the row checkboxes in the table view, or with
+`Space` on a focused card or row in either view — and change the assignee
+or the priority of all selected items at once. The selection and its
+bulk-actions bar are shared between the board and table views, so switching
+views keeps it. Each bulk change is recorded in every affected item's
+history like any other edit.
 
 ## Deleting and restoring items
 

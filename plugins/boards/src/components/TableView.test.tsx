@@ -4,8 +4,17 @@ import userEvent from '@testing-library/user-event';
 import { identityApiRef, storageApiRef } from '@backstage/frontend-plugin-api';
 import { mockApis } from '@backstage/frontend-test-utils';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
-import { tomorrowISO } from '@internal/plugin-boards-common';
+import {
+  BoardItem,
+  BoardWithContext,
+  tomorrowISO,
+} from '@internal/plugin-boards-common';
 import { TableView } from './TableView';
+import { BulkActionsBar } from './BulkActionsBar';
+import { useItemSelection } from './useItemSelection';
+import { assigneePool, GroupByMode } from './grouping';
+import type { BoardActions } from './BoardView';
+import type { BulkActions } from './useBoardActions';
 import {
   renderWithProviders,
   testActions,
@@ -54,6 +63,47 @@ const items = [
   }),
 ];
 
+/**
+ * The page-level wiring around the table, mirroring `BoardPage`: the
+ * shared selection hook plus the bulk-actions bar above the view.
+ */
+function TableHarness(props: {
+  board: BoardWithContext;
+  items: BoardItem[];
+  canWrite: boolean;
+  groupBy: GroupByMode;
+  actions: BoardActions;
+  bulk: BulkActions;
+  openItem: (itemId: string) => void;
+}) {
+  const selection = useItemSelection();
+  const selectedItems = props.canWrite
+    ? props.items.filter(item => selection.selected.has(item.id))
+    : [];
+  return (
+    <>
+      {selectedItems.length > 0 && (
+        <BulkActionsBar
+          board={props.board}
+          selectedItems={selectedItems}
+          assigneePool={assigneePool(props.items)}
+          bulk={props.bulk}
+          onClear={selection.clear}
+        />
+      )}
+      <TableView
+        board={props.board}
+        items={props.items}
+        canWrite={props.canWrite}
+        actions={props.actions}
+        groupBy={props.groupBy}
+        openItem={props.openItem}
+        selection={props.canWrite ? selection : undefined}
+      />
+    </>
+  );
+}
+
 function renderTable(
   over: {
     board?: typeof board;
@@ -68,7 +118,7 @@ function renderTable(
   const openItem = jest.fn();
   const storage = over.storage ?? mockApis.storage();
   renderWithProviders(
-    <TableView
+    <TableHarness
       board={over.board ?? board}
       items={over.items ?? items}
       canWrite={over.canWrite ?? true}
@@ -355,7 +405,7 @@ describe('TableView', () => {
         return (
           <>
             <button onClick={() => setGroupBy('assignee')}>regroup</button>
-            <TableView
+            <TableHarness
               board={board}
               items={twoAssignees}
               canWrite
@@ -569,5 +619,99 @@ describe('TableView', () => {
         { itemId: 'item-2', update: { dueDate: null } },
       ]);
     });
+  });
+});
+
+describe('TableView keyboard', () => {
+  function row(name: RegExp) {
+    return screen.getByRole('row', { name });
+  }
+
+  it('moves the row focus with the arrows, across group boundaries', async () => {
+    renderTable({ groupBy: 'tags' });
+    // groups: docs (Beta task), then Untagged (Alpha task)
+    row(/Beta task/).focus();
+    await userEvent.keyboard('{ArrowDown}');
+    expect(row(/Alpha task/)).toHaveFocus();
+    await userEvent.keyboard('{ArrowUp}');
+    expect(row(/Beta task/)).toHaveFocus();
+    // the top edge keeps the focus in place
+    await userEvent.keyboard('{ArrowUp}');
+    expect(row(/Beta task/)).toHaveFocus();
+    // left and right do not navigate items in the table view
+    await userEvent.keyboard('{ArrowLeft}{ArrowRight}');
+    expect(row(/Beta task/)).toHaveFocus();
+  });
+
+  it('toggles the selection with Space without opening the item', async () => {
+    const { openItem } = renderTable();
+    row(/Alpha task/).focus();
+    await userEvent.keyboard(' ');
+    expect(rowCheckbox('Alpha task')).toBeChecked();
+    expect(screen.getByText('1 selected')).toBeInTheDocument();
+    await userEvent.keyboard(' ');
+    expect(rowCheckbox('Alpha task')).not.toBeChecked();
+    expect(openItem).not.toHaveBeenCalled();
+  });
+
+  it('opens the item menu with Enter instead of the drawer', async () => {
+    const { openItem } = renderTable();
+    row(/Alpha task/).focus();
+    await userEvent.keyboard('{Enter}');
+    expect(
+      await screen.findByRole('menuitem', { name: 'Open details' }),
+    ).toBeInTheDocument();
+    expect(openItem).not.toHaveBeenCalled();
+  });
+
+  it('changes the status to the neighbouring column with Ctrl+Arrow', async () => {
+    const { actions } = renderTable();
+    row(/Alpha task/).focus(); // item-2, in the first column
+    await userEvent.keyboard('{Control>}{ArrowRight}{/Control}');
+    expect(actions.moveItem).toHaveBeenCalledWith('item-2', {
+      columnId: 'column-2',
+    });
+    (actions.moveItem as jest.Mock).mockClear();
+    // no column left of the first one
+    await userEvent.keyboard('{Control>}{ArrowLeft}{/Control}');
+    expect(actions.moveItem).not.toHaveBeenCalled();
+  });
+
+  it('opens the move picker with s and moves via its entries', async () => {
+    const { actions } = renderTable();
+    row(/Alpha task/).focus();
+    await userEvent.keyboard('s');
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Done' }),
+    );
+    expect(actions.moveItem).toHaveBeenCalledWith('item-2', {
+      columnId: 'column-2',
+    });
+  });
+
+  it('sets the priority with a digit and archives with Delete', async () => {
+    const { actions } = renderTable();
+    row(/Alpha task/).focus();
+    await userEvent.keyboard('1');
+    expect(actions.setItemPriority).toHaveBeenCalledWith(
+      'item-2',
+      'priority-1',
+    );
+    await userEvent.keyboard('{Delete}');
+    expect(actions.deleteItem).toHaveBeenCalledWith('item-2');
+  });
+
+  it('keeps the shortcuts inert on an externally managed row', async () => {
+    const { actions } = renderTable({
+      items: [
+        ...items,
+        testItem({ id: 'item-3', title: 'Synced', externalManager: 'jira' }),
+      ],
+    });
+    row(/Synced/).focus();
+    await userEvent.keyboard(' ');
+    await userEvent.keyboard('{Delete}');
+    expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
+    expect(actions.deleteItem).not.toHaveBeenCalled();
   });
 });

@@ -319,3 +319,78 @@ describe('ItemMenu', () => {
     expect(actions.setAssignees).toHaveBeenCalledWith(item.id, []);
   });
 });
+
+describe('ItemMenu submenu mode', () => {
+  async function openFlat(options: {
+    submenu: 'move' | 'assignee' | 'due' | 'priority';
+    item?: BoardItem;
+    readonly?: boolean;
+    priorities?: BoardPriority[];
+  }) {
+    const actions = testActions();
+    const item = options.item ?? testItem();
+    renderWithProviders(
+      <MenuTrigger defaultOpen>
+        <Button>Actions</Button>
+        <ItemMenu
+          item={item}
+          columns={columns}
+          priorities={options.priorities ?? []}
+          readonly={options.readonly ?? false}
+          actions={actions}
+          assigneePool={[]}
+          submenu={options.submenu}
+        />
+      </MenuTrigger>,
+      {
+        apis: [
+          [identityApiRef, identityApi],
+          [catalogApiRef, stubCatalog()],
+        ],
+      },
+    );
+    return { actions, item };
+  }
+
+  it('renders only the move entries as a flat menu', async () => {
+    const { actions, item } = await openFlat({ submenu: 'move' });
+    const entries = await screen.findAllByRole('menuitem');
+    // the item sits in column-1, so only the other column is offered
+    expect(entries.map(entry => entry.textContent)).toEqual(['In progress']);
+    await userEvent.click(entries[0]);
+    expect(actions.moveItem).toHaveBeenCalledWith(item.id, {
+      columnId: 'column-2',
+    });
+  });
+
+  it('renders the due-date entries as a flat menu', async () => {
+    await openFlat({ submenu: 'due' });
+    const entries = await screen.findAllByRole('menuitem');
+    expect(entries.map(entry => entry.textContent)).toEqual([
+      'Today',
+      'Tomorrow',
+      'This week (Fri)',
+    ]);
+  });
+
+  it('renders the priority entries with the current one marked', async () => {
+    await openFlat({
+      submenu: 'priority',
+      priorities: testPriorities(),
+      item: testItem({ priorityId: 'priority-2' }),
+    });
+    const entries = await screen.findAllByRole('menuitem');
+    expect(entries.map(entry => entry.textContent)).toEqual([
+      'critical',
+      '✓ high',
+      'medium',
+      'low',
+      'Remove priority',
+    ]);
+  });
+
+  it('renders nothing read-only or for priorities without any', async () => {
+    await openFlat({ submenu: 'move', readonly: true });
+    expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
+  });
+});

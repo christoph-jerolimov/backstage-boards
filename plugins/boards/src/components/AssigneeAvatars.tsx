@@ -39,7 +39,7 @@ const STACK_STYLES = `
 .${STACK_CLASS} a:focus-visible {
   transform: scale(1.2);
   z-index: 1;
-  box-shadow: 0 0 0 2px var(--bui-fg-link);
+  box-shadow: 0 0 0 2px var(--bui-bg-solid);
 }
 `;
 

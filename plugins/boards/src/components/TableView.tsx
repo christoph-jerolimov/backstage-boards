@@ -1,4 +1,5 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
+import type { KeyboardEvent } from 'react';
 import { VisuallyHidden } from 'react-aria';
 import {
   Cell,
@@ -35,22 +36,15 @@ import {
   useRowMenu,
   utilityColumnStyle,
 } from './RowMenu';
+import { handleItemShortcut, ItemShortcutContext } from './itemShortcuts';
+import type { SelectionHandle } from './useItemSelection';
 import type { BoardActions } from './BoardView';
-import type { BulkActions } from './useBoardActions';
-import { BulkActionsBar } from './BulkActionsBar';
 import { formatDate, RefDisplay } from './common';
 import { AssigneeAvatars } from './AssigneeAvatars';
 import { DueDateBadge } from './DueDate';
 import { PriorityChip, StatusBadge } from './StatusBadge';
 
 const SORTABLE_COLUMNS = new Set<TableColumnId>(ITEM_SORT_COLUMNS);
-
-/** The shared item-id selection every group's table renders and edits. */
-interface SelectionHandle {
-  selected: ReadonlySet<string>;
-  toggleItem: (itemId: string) => void;
-  setMany: (itemIds: string[], on: boolean) => void;
-}
 
 function ItemsTable(props: {
   board: BoardWithContext;
@@ -208,48 +202,18 @@ export function TableView(props: {
   items: BoardItem[];
   canWrite: boolean;
   actions: BoardActions;
-  bulk: BulkActions;
   groupBy: GroupByMode;
   openItem: (itemId: string) => void;
+  /** The page's shared bulk selection; absent for readers. */
+  selection?: SelectionHandle;
 }) {
-  const { board, items, canWrite, actions, bulk, groupBy, openItem } = props;
+  const { board, items, canWrite, actions, groupBy, openItem, selection } =
+    props;
   const pool = assigneePool(items);
   const [sort, setSort] = useState<ItemSortDescriptor | undefined>(undefined);
-  // selection is a set of item ids: grouping only re-partitions the same
-  // items, so it survives a group-by change, and an item shown in several
-  // groups is one selection; ids of vanished items simply stop matching
-  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
-  const selection: SelectionHandle | undefined = canWrite
-    ? {
-        selected,
-        toggleItem: itemId =>
-          setSelected(current => {
-            const next = new Set(current);
-            if (!next.delete(itemId)) {
-              next.add(itemId);
-            }
-            return next;
-          }),
-        setMany: (itemIds, on) =>
-          setSelected(current => {
-            const next = new Set(current);
-            for (const itemId of itemIds) {
-              if (on) {
-                next.add(itemId);
-              } else {
-                next.delete(itemId);
-              }
-            }
-            return next;
-          }),
-      }
-    : undefined;
-  const selectedItems = canWrite
-    ? items.filter(item => selected.has(item.id))
-    : [];
   const rowMenu = useRowMenu<BoardItem>({
     name: item => item.title,
-    children: item => (
+    children: (item, submenu) => (
       <ItemMenu
         item={item}
         columns={board.columns}
@@ -257,6 +221,7 @@ export function TableView(props: {
         readonly={!canWrite || !!item.externalManager}
         actions={actions}
         assigneePool={pool}
+        submenu={submenu}
       />
     ),
   });
@@ -275,62 +240,154 @@ export function TableView(props: {
       />
     </Flex>
   );
-  const bulkBar =
-    selectedItems.length > 0 ? (
-      <BulkActionsBar
-        board={board}
-        selectedItems={selectedItems}
-        assigneePool={pool}
-        bulk={bulk}
-        onClear={() => setSelected(new Set())}
-      />
-    ) : null;
-  if (groupBy === 'none') {
-    return (
+
+  const groups =
+    groupBy === 'none'
+      ? [{ key: 'all', items }]
+      : groupItems(items, groupBy, board.priorities);
+
+  // ---- row focus: arrows walk all rendered rows, across the groups ----
+
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  // the items behind the rendered rows, in DOM order: each group's table
+  // sorts exactly like ItemsTable does, so index n here is row n there.
+  // An item shown in several groups appears once per row.
+  const flatItems = groups.flatMap(group =>
+    sortItems(group.items, sort, board.columns),
+  );
+  // where the keyboard focus should land after a mutation re-renders the
+  // rows (an archive's successor, a regrouped item), consumed below
+  const pendingFocusId = useRef<string | undefined>(undefined);
+
+  const allRows = () =>
+    Array.from(
+      wrapRef.current?.querySelectorAll<HTMLElement>('tbody tr') ?? [],
+    );
+  const focusRowAt = (index: number) => {
+    allRows()[index]?.focus();
+  };
+
+  const handleKeyDownCapture = (event: KeyboardEvent<HTMLDivElement>) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    // only keys on a row itself — cells, editors, and menus keep theirs
+    if (target.closest('tbody tr') !== target) {
+      return;
+    }
+    const rows = allRows();
+    const index = rows.indexOf(target);
+    const item = flatItems[index];
+    if (index < 0 || !item || rows.length !== flatItems.length) {
+      return;
+    }
+    const ctx: ItemShortcutContext = {
+      columns: board.columns,
+      priorities: board.priorities,
+      readonly: !canWrite || !!item.externalManager,
+      actions,
+      selection,
+      openMenu: kind => {
+        rowMenu.openForRow(item, target, kind === 'menu' ? undefined : kind);
+      },
+      onBeforeArchive: () => {
+        pendingFocusId.current =
+          flatItems[index + 1]?.id ?? flatItems[index - 1]?.id;
+      },
+      onAfterMove: () => {
+        pendingFocusId.current = item.id;
+      },
+    };
+    // capture phase: a handled key stops before react-aria's own row
+    // handling (Enter/Space would otherwise also trigger the row action)
+    if (handleItemShortcut(event, item, ctx)) {
+      return;
+    }
+    if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) {
+      return;
+    }
+    switch (event.key) {
+      case 'ArrowDown':
+        event.preventDefault();
+        event.stopPropagation();
+        focusRowAt(index + 1);
+        break;
+      case 'ArrowUp':
+        event.preventDefault();
+        event.stopPropagation();
+        focusRowAt(index - 1);
+        break;
+      case 'ArrowLeft':
+      case 'ArrowRight':
+        // no item navigation sideways in the table view
+        event.preventDefault();
+        event.stopPropagation();
+        break;
+      default:
+        break;
+    }
+  };
+
+  // re-focus after a keyboard action re-rendered the focused row away
+  // (archive, or a change that moved the item between groups). Only
+  // fires while focus fell back to the body, never stealing a focus the
+  // user moved elsewhere.
+  useEffect(() => {
+    const itemId = pendingFocusId.current;
+    if (!itemId) {
+      return;
+    }
+    pendingFocusId.current = undefined;
+    if (document.activeElement !== document.body) {
+      return;
+    }
+    const index = flatItems.findIndex(item => item.id === itemId);
+    if (index >= 0) {
+      focusRowAt(index);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, sort, groupBy]);
+
+  return (
+    // eslint-disable-next-line jsx-a11y/no-static-element-interactions
+    <div ref={wrapRef} onKeyDownCapture={handleKeyDownCapture}>
+      <style>{`
+        tbody tr[data-focus-visible] {
+          outline: 2px solid var(--bui-bg-solid);
+          outline-offset: -2px;
+        }
+      `}</style>
       <Flex direction="column" gap="2">
-        {bulkBar}
         {columnsMenu}
-        <ItemsTable
-          board={board}
-          items={items}
-          visibleColumns={visibleColumns}
-          openItem={openItem}
-          rowMenu={rowMenu}
-          sort={sort}
-          onSortChange={setSort}
-          selection={selection}
-        />
+        {groups.map(group => (
+          <Fragment key={group.key}>
+            {groupBy !== 'none' && (
+              <Text variant="body-medium" weight="bold" as="h3">
+                <GroupLabel
+                  mode={groupBy}
+                  groupKey={group.key}
+                  priorities={board.priorities}
+                  count={
+                    groupBy === 'priority' ? group.items.length : undefined
+                  }
+                />
+              </Text>
+            )}
+            <ItemsTable
+              board={board}
+              items={group.items}
+              visibleColumns={visibleColumns}
+              openItem={openItem}
+              rowMenu={rowMenu}
+              sort={sort}
+              onSortChange={setSort}
+              selection={selection}
+            />
+          </Fragment>
+        ))}
         {rowMenu.contextMenu}
       </Flex>
-    );
-  }
-  return (
-    <Flex direction="column" gap="2">
-      {bulkBar}
-      {columnsMenu}
-      {groupItems(items, groupBy, board.priorities).map(group => (
-        <Fragment key={group.key}>
-          <Text variant="body-medium" weight="bold" as="h3">
-            <GroupLabel
-              mode={groupBy}
-              groupKey={group.key}
-              priorities={board.priorities}
-              count={groupBy === 'priority' ? group.items.length : undefined}
-            />
-          </Text>
-          <ItemsTable
-            board={board}
-            items={group.items}
-            visibleColumns={visibleColumns}
-            openItem={openItem}
-            rowMenu={rowMenu}
-            sort={sort}
-            onSortChange={setSort}
-            selection={selection}
-          />
-        </Fragment>
-      ))}
-      {rowMenu.contextMenu}
-    </Flex>
+    </div>
   );
 }

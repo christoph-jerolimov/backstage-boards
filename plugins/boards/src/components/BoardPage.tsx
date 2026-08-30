@@ -17,9 +17,11 @@ import { ItemDrawer } from './ItemDrawer';
 import { ArchivedBoardAlert, BoardHeader, BoardViewMode } from './BoardHeader';
 import { BoardDialogKind, BoardDialogs } from './BoardDialogs';
 import { ItemFilterBar, useItemFilter } from './ItemFilterBar';
+import { BulkActionsBar } from './BulkActionsBar';
 import { ErrorText } from './common';
 import { useBoardActions, useOpenItemParam } from './useBoardActions';
-import { GroupByMode } from './grouping';
+import { useItemSelection } from './useItemSelection';
+import { assigneePool, GroupByMode } from './grouping';
 
 export function BoardPage() {
   const { boardId = '' } = useParams();
@@ -56,6 +58,9 @@ export function BoardPageContent(props: {
     openItem,
   );
   const filter = useItemFilter(items ?? [], board?.priorities);
+  // one id-based selection shared by the board and table views, so it
+  // survives switching between them
+  const selection = useItemSelection();
 
   useBoardsSignal(() => invalidateBoard(queryClient, boardId), { boardId });
 
@@ -75,6 +80,9 @@ export function BoardPageContent(props: {
   const canWrite = levelIncludes(board.access, 'write') && !archived;
   const isAdmin = levelIncludes(board.access, 'admin') && !archived;
   const openDrawerItem = (items ?? []).find(item => item.id === openItemId);
+  const selectedItems = canWrite
+    ? filter.filteredItems.filter(item => selection.selected.has(item.id))
+    : [];
 
   const content = (
     <Flex direction="column" gap="3" style={{ padding: 16 }}>
@@ -103,6 +111,16 @@ export function BoardPageContent(props: {
 
       {error && <ErrorText>{error}</ErrorText>}
 
+      {selectedItems.length > 0 && (
+        <BulkActionsBar
+          board={board}
+          selectedItems={selectedItems}
+          assigneePool={assigneePool(filter.filteredItems)}
+          bulk={bulk}
+          onClear={selection.clear}
+        />
+      )}
+
       {view === 'board' ? (
         <BoardView
           board={board}
@@ -110,6 +128,7 @@ export function BoardPageContent(props: {
           canWrite={canWrite}
           actions={actions}
           groupBy={groupBy}
+          selection={canWrite ? selection : undefined}
         />
       ) : (
         <TableView
@@ -117,9 +136,9 @@ export function BoardPageContent(props: {
           items={filter.filteredItems}
           canWrite={canWrite}
           actions={actions}
-          bulk={bulk}
           groupBy={groupBy}
           openItem={actions.openItem}
+          selection={canWrite ? selection : undefined}
         />
       )}
 
