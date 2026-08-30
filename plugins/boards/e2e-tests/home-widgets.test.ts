@@ -1,4 +1,5 @@
 import { expect, request, test, type Page } from '@playwright/test';
+import { suppressDevServerOverlay } from './devServerOverlay';
 
 const BACKEND_URL =
   process.env.PLAYWRIGHT_BACKEND_URL ?? 'http://localhost:7007';
@@ -73,39 +74,6 @@ async function openHome(page: Page) {
     .getByRole('button', { name: 'Enter' })
     .click({ timeout: 10_000 })
     .catch(() => undefined);
-}
-
-/**
- * The webpack dev server overlays an iframe on any uncaught runtime error,
- * and that iframe swallows clicks. The home page raises one without this
- * test doing anything: the stock "Random joke" widget fetches a public API
- * that a sandboxed or offline machine cannot reach, and it re-raises on
- * every retry — so the overlay is kept out for the page's whole lifetime
- * rather than removed once. The overlay does not exist in the built app CI
- * serves, so suppressing it here costs no coverage.
- */
-async function suppressDevServerOverlay(page: Page) {
-  await page.addInitScript(() => {
-    // the dev server has two of these, raised by different machinery
-    const OVERLAYS =
-      '#react-refresh-overlay, #webpack-dev-server-client-overlay';
-    const remove = () =>
-      document.querySelectorAll(OVERLAYS).forEach(node => node.remove());
-    const install = () => {
-      remove();
-      new MutationObserver(remove).observe(document.documentElement, {
-        childList: true,
-        subtree: true,
-      });
-    };
-    // an init script runs before the document is parsed, so there may be
-    // no documentElement to observe yet
-    if (document.documentElement) {
-      install();
-    } else {
-      document.addEventListener('DOMContentLoaded', install);
-    }
-  });
 }
 
 /**

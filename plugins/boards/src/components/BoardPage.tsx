@@ -259,7 +259,9 @@ export function BoardPageContent(props: {
   }, []);
 
   if (boardLoading) {
-    return <Text style={{ padding: 16 }}>Loading board…</Text>;
+    return (
+      <Text style={embedded ? undefined : { padding: 16 }}>Loading board…</Text>
+    );
   }
   if (boardError || !board) {
     const notFound =
@@ -306,7 +308,11 @@ export function BoardPageContent(props: {
     : [];
 
   const content = (
-    <Flex direction="column" gap="3" style={{ padding: 16 }}>
+    <Flex
+      direction="column"
+      gap="3"
+      style={embedded ? undefined : { padding: 16 }}
+    >
       {archived && (
         <ArchivedBoardAlert
           board={board}

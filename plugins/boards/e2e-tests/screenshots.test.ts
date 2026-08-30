@@ -5,6 +5,11 @@ import {
   type APIRequestContext,
   type Page,
 } from '@playwright/test';
+import { suppressDevServerOverlay } from './devServerOverlay';
+
+// dev-only error overlays (e.g. the browser's benign ResizeObserver
+// notice) would swallow clicks and never appear in the built app CI runs
+test.beforeEach(({ page }) => suppressDevServerOverlay(page));
 
 /*
  * Screenshots of every boards surface, in light and dark mode
@@ -152,9 +157,12 @@ async function seedShowcaseBoard(): Promise<string> {
       ],
     });
     await patchItem(design.id, {
+      // the @-mention and the bare URL render as links in the drawer
       description:
-        'Rework the **login flow** so that guests land on the board:\n\n' +
-        '- single sign-on first\n- guest access as fallback\n',
+        `Rework the **login flow** with @${ENTITY_REF} so that guests ` +
+        'land on the board:\n\n' +
+        '- single sign-on first\n- guest access as fallback\n\n' +
+        'Notes at https://example.com/login-flow.\n',
       dueDate: OVERDUE_DATE,
     });
     await api.post(
@@ -282,6 +290,13 @@ test('the item drawer shows description, checklist, and timeline', async ({
   const drawer = page.getByRole('dialog', { name: 'Item Design login flow' });
   await expect(
     drawer.getByText('Kickoff scheduled, notes attached.'),
+  ).toBeVisible();
+  // the description's @-mention and bare URL both render as links
+  await expect(
+    drawer.getByRole('link', { name: /example-website/ }),
+  ).toBeVisible();
+  await expect(
+    drawer.getByRole('link', { name: 'https://example.com/login-flow' }),
   ).toBeVisible();
   await expect(page).toHaveScreenshot('item-drawer.png');
 });
