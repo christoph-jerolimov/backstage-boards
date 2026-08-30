@@ -289,6 +289,42 @@ export interface BoardInsights {
   moveCount: number;
 }
 
+/** One item in a board export/import document. */
+export interface BoardDocumentItem {
+  title: string;
+  /** The column title the item sits in. */
+  status: string;
+  description?: string;
+  tags?: string[];
+  assignees?: string[];
+  dueDate?: string;
+  /** The priority name, resolved against the document's priorities. */
+  priority?: string;
+  checklist?: ChecklistEntry[];
+}
+
+/**
+ * The portable board document produced by export and accepted by
+ * import. Statuses and priorities are referenced by name, so the
+ * document is instance-independent.
+ */
+export interface BoardDocument {
+  format: 'backstage-boards';
+  version: 1;
+  board: {
+    name: string;
+    description?: string;
+    columns: Array<{
+      title: string;
+      color?: ColumnColor;
+      wipSoftLimit?: number;
+      wipHardLimit?: number;
+    }>;
+    priorities: Array<{ name: string; color?: ColumnColor }>;
+  };
+  items: BoardDocumentItem[];
+}
+
 export type ChangeType =
   | 'created'
   | 'updated'

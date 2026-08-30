@@ -338,6 +338,53 @@ describe('createRouter', () => {
     ]);
   });
 
+  it('exports a board as JSON and CSV and imports it back', async () => {
+    const board = (
+      await request(app)
+        .post('/boards')
+        .set('x-test-user', 'alice')
+        .send({ name: 'Portable' })
+        .expect(201)
+    ).body;
+    await request(app)
+      .post(`/boards/${board.id}/items`)
+      .set('x-test-user', 'alice')
+      .send({ columnId: board.columns[0].id, title: 'Item' })
+      .expect(201);
+
+    const document = (
+      await request(app)
+        .get(`/boards/${board.id}/export`)
+        .set('x-test-user', 'alice')
+        .expect(200)
+    ).body;
+    expect(document.format).toBe('backstage-boards');
+    expect(document.items).toHaveLength(1);
+
+    const csv = await request(app)
+      .get(`/boards/${board.id}/export?format=csv`)
+      .set('x-test-user', 'alice')
+      .expect(200)
+      .expect('Content-Type', /text\/csv/);
+    expect(csv.text).toContain('title,status');
+
+    const imported = (
+      await request(app)
+        .post('/boards/import')
+        .set('x-test-user', 'bob')
+        .send({ document, name: 'Copy' })
+        .expect(201)
+    ).body;
+    expect(imported.name).toBe('Copy');
+    expect(imported.createdBy).toBe('user:default/bob');
+
+    await request(app)
+      .post('/boards/import')
+      .set('x-test-user', 'bob')
+      .send({ document: { format: 'nope' } })
+      .expect(400);
+  });
+
   it('serves board insights to readers', async () => {
     const board = (
       await request(app)

@@ -43,6 +43,7 @@ import {
   useBoardsSignal,
 } from '../queries';
 import { EmptyState } from './EmptyState';
+import { ImportBoardDialog } from './ImportBoardDialog';
 import { BoardsFilterBar, useBoardFilter } from './BoardsFilterBar';
 import { MyItemsList } from './MyItemsPage';
 import { ActionsCellContent, useRowMenu, utilityColumnStyle } from './RowMenu';
@@ -230,6 +231,7 @@ export function BoardListPage() {
   // the framework's `boards.new.create` permission may reserve board
   // creation for some users; existing boards stay fully usable
   const canCreate = useBoardsCreateAllowed();
+  const [importOpen, setImportOpen] = useState(false);
   const {
     error,
     pending: creating,
@@ -280,12 +282,22 @@ export function BoardListPage() {
           Boards
         </Text>
         {canCreate && (
-          <Button variant="primary" onPress={() => setCreateOpen(true)}>
-            Create board
-          </Button>
+          <Flex gap="2">
+            <Button variant="secondary" onPress={() => setImportOpen(true)}>
+              Import board
+            </Button>
+            <Button variant="primary" onPress={() => setCreateOpen(true)}>
+              Create board
+            </Button>
+          </Flex>
         )}
       </Flex>
       {error && <ErrorText>{error}</ErrorText>}
+      <ImportBoardDialog
+        isOpen={importOpen}
+        onOpenChange={setImportOpen}
+        onImported={boardId => navigate(boardId)}
+      />
       <Tabs selectedKey={tab} onSelectionChange={key => setTab(String(key))}>
         <TabList>
           {/* both labels count each tab's whole set, so filtering never

@@ -16,6 +16,7 @@ nav:
       - The item details drawer: features/item-details.md
       - Priorities: features/priorities.md
       - Insights: features/insights.md
+      - Import and export: features/import-export.md
       - Comments and history: features/comments-and-history.md
       - Sharing a board: features/sharing.md
       - My items: features/my-items.md

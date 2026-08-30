@@ -1,6 +1,7 @@
 import {
   RiArchiveLine,
   RiDeleteBinLine,
+  RiDownloadLine,
   RiFileCopyLine,
   RiBarChartLine,
   RiGridLine,
@@ -198,6 +199,12 @@ export function BoardHeader(props: {
                   Duplicate board…
                 </MenuItem>
               )}
+              <MenuItem
+                iconStart={<RiDownloadLine size={16} />}
+                onAction={() => onOpenDialog('export')}
+              >
+                Export board…
+              </MenuItem>
               {isAdmin && (
                 <MenuItem
                   iconStart={<RiSettings3Line size={16} />}

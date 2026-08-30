@@ -1070,6 +1070,112 @@ describe('BoardsService', () => {
     });
   });
 
+  describe('board import and export', () => {
+    it('round-trips a board through JSON export and import', async () => {
+      const board = await service.createBoard(alice, { name: 'Exported' });
+      await service.updateBoardDescription(alice, board.id, 'The purpose');
+      await service.updateColumn(alice, board.id, board.columns[0].id, {
+        color: 'blue',
+        wipSoftLimit: 2,
+        wipHardLimit: 4,
+      });
+      const item = await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Carried, "quoted"',
+        tags: ['ops'],
+        assignees: ['user:default/alice'],
+        priorityId: board.priorities[0].id,
+        checklist: [{ text: 'Step', checked: true }],
+      });
+      await service.updateItem(alice, board.id, item.id, {
+        description: 'Details',
+        dueDate: '2026-09-04',
+      });
+
+      const document = await service.exportBoard(alice, board.id);
+      expect(document.format).toBe('backstage-boards');
+      expect(document.version).toBe(1);
+      expect(document.board.description).toBe('The purpose');
+      expect(document.board.columns[0]).toMatchObject({
+        color: 'blue',
+        wipSoftLimit: 2,
+        wipHardLimit: 4,
+      });
+      expect(document.items[0]).toMatchObject({
+        title: 'Carried, "quoted"',
+        status: board.columns[0].title,
+        description: 'Details',
+        dueDate: '2026-09-04',
+        tags: ['ops'],
+        priority: board.priorities[0].name,
+      });
+
+      const imported = await service.importBoard(bob, document, {
+        name: 'Imported',
+      });
+      expect(imported.name).toBe('Imported');
+      expect(imported.createdBy).toBe('user:default/bob');
+      expect(imported.description).toBe('The purpose');
+      expect(imported.columns.map(column => column.title)).toEqual(
+        board.columns.map(column => column.title),
+      );
+      expect(imported.columns[0]).toMatchObject({
+        color: 'blue',
+        wipSoftLimit: 2,
+        wipHardLimit: 4,
+      });
+      const items = await service.listItems(bob, imported.id);
+      expect(items).toHaveLength(1);
+      expect(items[0]).toMatchObject({
+        title: 'Carried, "quoted"',
+        description: 'Details',
+        dueDate: '2026-09-04',
+        createdBy: 'user:default/bob',
+      });
+      expect(items[0].checklist?.[0]).toMatchObject({
+        text: 'Step',
+        checked: true,
+      });
+      expect(
+        imported.priorities.find(p => p.id === items[0].priorityId)?.name,
+      ).toBe(board.priorities[0].name);
+    });
+
+    it('escapes the CSV export correctly', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Comma, and "quote"',
+        tags: ['a', 'b'],
+      });
+      const csv = await service.exportBoardCsv(alice, board.id);
+      const [header, row] = csv.trim().split('\n');
+      expect(header).toBe(
+        'title,status,priority,dueDate,assignees,tags,description',
+      );
+      expect(row).toContain('"Comma, and ""quote"""');
+      expect(row).toContain('a;b');
+    });
+
+    it('rejects malformed documents without creating anything', async () => {
+      await expect(
+        service.importBoard(alice, { format: 'nope' } as any),
+      ).rejects.toThrow('supported version');
+      const board = await service.createBoard(alice, { name: 'B' });
+      await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'X',
+      });
+      const broken = await service.exportBoard(alice, board.id);
+      broken.items[0].status = 'No such column';
+      const before = (await service.listBoards(alice)).total;
+      await expect(service.importBoard(alice, broken)).rejects.toThrow(
+        'unknown status',
+      );
+      expect((await service.listBoards(alice)).total).toBe(before);
+    });
+  });
+
   describe('move item to another board', () => {
     it('moves fields, comments, and history, archiving the original', async () => {
       const source = await service.createBoard(alice, { name: 'Source' });
