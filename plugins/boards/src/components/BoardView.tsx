@@ -841,6 +841,27 @@ export function BoardView(props: {
       onAfterMove: () => {
         pendingRefocus.current = true;
       },
+      reorder: direction => {
+        // ranks are computed against the column's position order (not
+        // the grouped visible order), so a reorder is a real move
+        const column = items
+          .filter(entry => entry.columnId === item.columnId)
+          .sort((a, b) => a.position - b.position);
+        const index = column.findIndex(entry => entry.id === item.id);
+        const target = index + direction;
+        if (index < 0 || target < 0 || target >= column.length) {
+          return;
+        }
+        // up: insert before the neighbour above; down: after the one below
+        actions.moveItem(item.id, {
+          columnId: item.columnId,
+          position: positionBefore(
+            column,
+            direction === -1 ? target : target + 1,
+          ),
+        });
+        pendingRefocus.current = true;
+      },
     };
     if (handleItemShortcut(event, item, ctx)) {
       return;
@@ -849,26 +870,44 @@ export function BoardView(props: {
       return;
     }
     const { list, index } = placeOf(item);
+    // j/k/h/l are pure aliases for the arrows; Home/End jump within
+    // the column
     switch (event.key) {
       case 'ArrowUp':
+      case 'k':
         event.preventDefault();
         if (index > 0) {
           focusItem(list[index - 1].id);
         }
         break;
       case 'ArrowDown':
+      case 'j':
         event.preventDefault();
         if (index >= 0 && index < list.length - 1) {
           focusItem(list[index + 1].id);
         }
         break;
       case 'ArrowLeft':
+      case 'h':
         event.preventDefault();
         focusSideways(item, -1);
         break;
       case 'ArrowRight':
+      case 'l':
         event.preventDefault();
         focusSideways(item, 1);
+        break;
+      case 'Home':
+        event.preventDefault();
+        if (list.length > 0) {
+          focusItem(list[0].id);
+        }
+        break;
+      case 'End':
+        event.preventDefault();
+        if (list.length > 0) {
+          focusItem(list[list.length - 1].id);
+        }
         break;
       default:
         break;

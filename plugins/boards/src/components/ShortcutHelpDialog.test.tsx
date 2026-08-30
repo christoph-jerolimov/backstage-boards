@@ -40,7 +40,8 @@ describe('ShortcutHelpDialog', () => {
       expect(screen.getByText(row.description)).toBeInTheDocument();
     }
     // spot-check the key badges render
-    expect(screen.getByText('Ctrl+→')).toBeInTheDocument();
+    expect(screen.getByText('Alt+→')).toBeInTheDocument();
+    expect(screen.getByText('Home')).toBeInTheDocument();
     expect(screen.getByText('Delete')).toBeInTheDocument();
   });
 
@@ -74,12 +75,12 @@ describe('ShortcutHelpDialog', () => {
   // handled. Changing the shortcuts fails this test until the help
   // dialog is updated too.
   describe('stays in sync with handleItemShortcut', () => {
-    const keyEvent = (key: string, ctrl: boolean) =>
+    const keyEvent = (key: string, modifier?: 'ctrl' | 'alt') =>
       ({
         key,
-        ctrlKey: ctrl,
+        ctrlKey: modifier === 'ctrl',
         metaKey: false,
-        altKey: false,
+        altKey: modifier === 'alt',
         shiftKey: false,
         preventDefault: jest.fn(),
         stopPropagation: jest.fn(),
@@ -112,8 +113,10 @@ describe('ShortcutHelpDialog', () => {
     it('documents every handled key', () => {
       // the complete key surface of handleItemShortcut
       const handledKeys = [
-        'ctrl:ArrowLeft',
-        'ctrl:ArrowRight',
+        'alt:ArrowLeft',
+        'alt:ArrowRight',
+        'alt:ArrowUp',
+        'alt:ArrowDown',
         ' ',
         'Enter',
         'Delete',
@@ -133,9 +136,14 @@ describe('ShortcutHelpDialog', () => {
     it('handles every documented key', () => {
       const item = testItem({ id: 'item-1', columnId: 'column-1' });
       for (const entry of documented) {
-        const ctrl = entry.startsWith('ctrl:');
-        const key = ctrl ? entry.slice('ctrl:'.length) : entry;
-        expect(handleItemShortcut(keyEvent(key, ctrl), item, ctx)).toBe(true);
+        const [, modifier, key] = entry.match(/^(?:(ctrl|alt):)?(.+)$/)!;
+        expect(
+          handleItemShortcut(
+            keyEvent(key, modifier as 'ctrl' | 'alt' | undefined),
+            item,
+            ctx,
+          ),
+        ).toBe(true);
       }
     });
   });

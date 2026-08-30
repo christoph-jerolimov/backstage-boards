@@ -59,10 +59,10 @@ function makeCtx(over: Partial<ItemShortcutContext> = {}) {
 const item = testItem({ id: 'item-1', columnId: 'column-2' });
 
 describe('handleItemShortcut', () => {
-  it('moves the item one column with Ctrl+Arrow and reports the move', () => {
+  it('moves the item one column with Alt+Arrow and reports the move', () => {
     const onAfterMove = jest.fn();
     const { ctx } = makeCtx({ onAfterMove });
-    const event = keyEvent('ArrowRight', { ctrlKey: true });
+    const event = keyEvent('ArrowRight', { altKey: true });
     expect(handleItemShortcut(event, item, ctx)).toBe(true);
     expect(ctx.actions.moveItem).toHaveBeenCalledWith('item-1', {
       columnId: 'column-3',
@@ -70,33 +70,73 @@ describe('handleItemShortcut', () => {
     expect(onAfterMove).toHaveBeenCalled();
     expect(event.preventDefault).toHaveBeenCalled();
 
-    const left = keyEvent('ArrowLeft', { ctrlKey: true });
+    const left = keyEvent('ArrowLeft', { altKey: true });
     expect(handleItemShortcut(left, item, ctx)).toBe(true);
     expect(ctx.actions.moveItem).toHaveBeenCalledWith('item-1', {
       columnId: 'column-1',
     });
   });
 
-  it('swallows Ctrl+Arrow at the edge without moving', () => {
+  it('swallows Alt+Arrow at the edge without moving', () => {
     const { ctx } = makeCtx();
     const edge = testItem({ id: 'item-1', columnId: 'column-3' });
     expect(
-      handleItemShortcut(keyEvent('ArrowRight', { ctrlKey: true }), edge, ctx),
+      handleItemShortcut(keyEvent('ArrowRight', { altKey: true }), edge, ctx),
     ).toBe(true);
     expect(ctx.actions.moveItem).not.toHaveBeenCalled();
+  });
+
+  it('no longer handles the old Ctrl+Arrow chord', () => {
+    const { ctx } = makeCtx();
+    expect(
+      handleItemShortcut(keyEvent('ArrowRight', { ctrlKey: true }), item, ctx),
+    ).toBe(false);
+    expect(ctx.actions.moveItem).not.toHaveBeenCalled();
+  });
+
+  it('reorders within the column with Alt+Up/Down via the callback', () => {
+    const reorder = jest.fn();
+    const { ctx } = makeCtx({ reorder });
+    expect(
+      handleItemShortcut(keyEvent('ArrowDown', { altKey: true }), item, ctx),
+    ).toBe(true);
+    expect(reorder).toHaveBeenCalledWith(1);
+    expect(
+      handleItemShortcut(keyEvent('ArrowUp', { altKey: true }), item, ctx),
+    ).toBe(true);
+    expect(reorder).toHaveBeenCalledWith(-1);
+  });
+
+  it('swallows Alt+Up/Down without a reorder callback or read-only', () => {
+    // the table view provides no callback; the chord must still never
+    // reach the browser
+    const { ctx } = makeCtx();
+    expect(
+      handleItemShortcut(keyEvent('ArrowUp', { altKey: true }), item, ctx),
+    ).toBe(true);
+    const reorder = jest.fn();
+    const { ctx: readonlyCtx } = makeCtx({ readonly: true, reorder });
+    expect(
+      handleItemShortcut(
+        keyEvent('ArrowDown', { altKey: true }),
+        item,
+        readonlyCtx,
+      ),
+    ).toBe(true);
+    expect(reorder).not.toHaveBeenCalled();
   });
 
   it('never moves a read-only item', () => {
     const { ctx } = makeCtx({ readonly: true });
     expect(
-      handleItemShortcut(keyEvent('ArrowRight', { ctrlKey: true }), item, ctx),
+      handleItemShortcut(keyEvent('ArrowRight', { altKey: true }), item, ctx),
     ).toBe(true);
     expect(ctx.actions.moveItem).not.toHaveBeenCalled();
   });
 
-  it('ignores Ctrl+Arrow with extra modifiers', () => {
+  it('ignores Alt+Arrow with extra modifiers', () => {
     const { ctx } = makeCtx();
-    const event = keyEvent('ArrowRight', { ctrlKey: true, shiftKey: true });
+    const event = keyEvent('ArrowRight', { altKey: true, shiftKey: true });
     expect(handleItemShortcut(event, item, ctx)).toBe(false);
     expect(ctx.actions.moveItem).not.toHaveBeenCalled();
   });

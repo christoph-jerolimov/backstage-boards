@@ -733,16 +733,38 @@ describe('TableView keyboard', () => {
     expect(openItem).not.toHaveBeenCalled();
   });
 
-  it('changes the status to the neighbouring column with Ctrl+Arrow', async () => {
+  it('changes the status to the neighbouring column with Alt+Arrow', async () => {
     const { actions } = renderTable();
     row(/Alpha task/).focus(); // item-2, in the first column
-    await userEvent.keyboard('{Control>}{ArrowRight}{/Control}');
+    await userEvent.keyboard('{Alt>}{ArrowRight}{/Alt}');
     expect(actions.moveItem).toHaveBeenCalledWith('item-2', {
       columnId: 'column-2',
     });
     (actions.moveItem as jest.Mock).mockClear();
     // no column left of the first one
-    await userEvent.keyboard('{Control>}{ArrowLeft}{/Control}');
+    await userEvent.keyboard('{Alt>}{ArrowLeft}{/Alt}');
+    expect(actions.moveItem).not.toHaveBeenCalled();
+  });
+
+  it('aliases j/k and jumps with Home/End across the rows', async () => {
+    renderTable({ groupBy: 'tags' });
+    // groups: docs (Beta task), then Untagged (Alpha task)
+    row(/Beta task/).focus();
+    await userEvent.keyboard('j');
+    expect(row(/Alpha task/)).toHaveFocus();
+    await userEvent.keyboard('k');
+    expect(row(/Beta task/)).toHaveFocus();
+    await userEvent.keyboard('{End}');
+    expect(row(/Alpha task/)).toHaveFocus();
+    await userEvent.keyboard('{Home}');
+    expect(row(/Beta task/)).toHaveFocus();
+  });
+
+  it('never reorders from the table with Alt+Up/Down', async () => {
+    const { actions } = renderTable();
+    row(/Alpha task/).focus();
+    await userEvent.keyboard('{Alt>}{ArrowUp}{/Alt}');
+    await userEvent.keyboard('{Alt>}{ArrowDown}{/Alt}');
     expect(actions.moveItem).not.toHaveBeenCalled();
   });
 

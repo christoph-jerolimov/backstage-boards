@@ -17,28 +17,35 @@ export type ItemMenuRequest = ItemSubmenuKind | 'menu';
  * same key handling.
  */
 export interface ItemShortcutContext {
-  /** The board's columns in display order — Ctrl+Arrow moves along them. */
+  /** The board's columns in display order — Alt+Arrow moves along them. */
   columns: BoardColumn[];
   priorities: BoardPriority[];
   /** Read-only surface or externally managed item: mutations stay inert. */
   readonly: boolean;
   actions: ItemActions;
   selection?: SelectionHandle;
-  /** Columns at their hard WIP limit: Ctrl+Arrow will not enter them. */
+  /** Columns at their hard WIP limit: Alt+Arrow will not enter them. */
   fullColumnIds?: Set<string>;
   openMenu: (kind: ItemMenuRequest) => void;
+  /**
+   * Moves the item one place up (-1) or down (1) within its column on
+   * Alt+Up/Down. Only the board view provides this — the table's row
+   * order is sorting/grouping, so it stays inert there.
+   */
+  reorder?: (direction: -1 | 1) => void;
   /** Runs before Delete archives, so the view can pick a focus successor. */
   onBeforeArchive?: () => void;
-  /** Runs when a Ctrl+Arrow move was issued, so the view can re-focus. */
+  /** Runs when an Alt+Arrow move was issued, so the view can re-focus. */
   onAfterMove?: () => void;
 }
 
 /**
  * The keyboard actions on a focused item (board card or table row):
- * Ctrl+Left/Right moves the item one column, Space toggles the bulk
- * selection, Enter opens the item menu, s/c/m/a/d/p open its submenus,
- * digits set the priority with that order (0 = 10), Delete archives.
- * Arrow navigation stays with the views, which call this first.
+ * Alt+Left/Right moves the item one column, Alt+Up/Down reorders it
+ * within its column (board view), Space toggles the bulk selection,
+ * Enter opens the item menu, s/c/m/a/d/p open its submenus, digits set
+ * the priority with that order (0 = 10), Delete archives. Plain-arrow
+ * focus navigation stays with the views, which call this first.
  *
  * Returns true when the event was handled (and its default prevented).
  * Callers MUST only invoke this while the item element itself is the
@@ -56,12 +63,12 @@ export function handleItemShortcut(
     event.stopPropagation();
     return true;
   };
-  const ctrlOnly =
-    event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey;
+  const altOnly =
+    event.altKey && !event.ctrlKey && !event.metaKey && !event.shiftKey;
   const plain =
     !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey;
 
-  if (ctrlOnly && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+  if (altOnly && (event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
     if (!ctx.readonly) {
       const delta = event.key === 'ArrowRight' ? 1 : -1;
       const index = ctx.columns.findIndex(
@@ -74,7 +81,15 @@ export function handleItemShortcut(
         ctx.onAfterMove?.();
       }
     }
-    // swallowed even at the edges, so the browser never navigates
+    // swallowed even at the edges: Alt+Arrow is browser history
+    // navigation on some platforms and must never leave the board
+    return handled();
+  }
+  if (altOnly && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+    if (!ctx.readonly) {
+      ctx.reorder?.(event.key === 'ArrowDown' ? 1 : -1);
+    }
+    // swallowed also where reordering does not apply (the table view)
     return handled();
   }
   if (!plain) {

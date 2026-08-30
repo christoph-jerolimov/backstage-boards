@@ -26,11 +26,17 @@ export interface ShortcutRow {
 export const NAVIGATION_SHORTCUT_ROWS: ShortcutRow[] = [
   {
     keys: ['↑', '↓'],
-    description: 'Previous / next item — table rows continue across the groups',
+    description:
+      'Previous / next item, j / k work too — table rows continue across the groups',
   },
   {
     keys: ['←', '→'],
-    description: 'Neighbouring column on the board (no effect in the table)',
+    description:
+      'Neighbouring column on the board, h / l work too (no effect in the table)',
+  },
+  {
+    keys: ['Home', 'End'],
+    description: 'First / last card of the column, or first / last table row',
   },
   {
     keys: ['?'],
@@ -41,10 +47,16 @@ export const NAVIGATION_SHORTCUT_ROWS: ShortcutRow[] = [
 /** The shortcuts acting on the focused card or row. */
 export const ITEM_SHORTCUT_ROWS: ShortcutRow[] = [
   {
-    keys: ['Ctrl+←', 'Ctrl+→'],
+    keys: ['Alt+←', 'Alt+→'],
     description: 'Move the item one column left / right',
     needsWrite: true,
-    covers: ['ctrl:ArrowLeft', 'ctrl:ArrowRight'],
+    covers: ['alt:ArrowLeft', 'alt:ArrowRight'],
+  },
+  {
+    keys: ['Alt+↑', 'Alt+↓'],
+    description: 'Move the card up / down in its column (board view)',
+    needsWrite: true,
+    covers: ['alt:ArrowUp', 'alt:ArrowDown'],
   },
   {
     keys: ['Space'],
