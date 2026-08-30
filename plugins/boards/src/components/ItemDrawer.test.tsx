@@ -134,10 +134,14 @@ describe('ItemDrawer navigation', () => {
 
   it('never navigates while typing', async () => {
     const { onNavigate } = renderDrawer({ nav });
-    const comment = await screen.findByPlaceholderText(/Write a comment/);
+    const comment = await screen.findByRole('textbox', {
+      name: 'New comment',
+    });
+    // seed content so the editor holds a caret (jsdom cannot place one)
+    typeIntoRichText(comment, 'draft ');
     await userEvent.type(comment, 'jk');
     expect(onNavigate).not.toHaveBeenCalled();
-    expect(comment).toHaveValue('jk');
+    expect(comment).toHaveTextContent(/jk/);
   });
 
   it('offers no navigation without a nav prop', () => {
