@@ -1,5 +1,5 @@
 import { CSSProperties, useCallback, useEffect, useState } from 'react';
-import { Badge, Button, Flex, Text, TextField } from '@backstage/ui';
+import { Badge, Button, Flex, Link, Text, TextField } from '@backstage/ui';
 import { EntityRefLink } from '@backstage/plugin-catalog-react';
 import {
   errorMessage,
@@ -170,14 +170,14 @@ function InlineTokens(props: { tokens: InlineToken[] }) {
             return <code key={index}>{token.value}</code>;
           case 'link':
             return (
-              <a
+              <Link
                 key={index}
                 href={token.href}
                 target="_blank"
                 rel="noopener noreferrer"
               >
                 <InlineTokens tokens={token.children} />
-              </a>
+              </Link>
             );
           case 'entity':
             return <EntityRefLink key={index} entityRef={token.entityRef} />;
