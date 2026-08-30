@@ -13,6 +13,7 @@ import {
   testColumn,
   testItem,
   testPriorities,
+  typeIntoRichText,
 } from './__testUtils__/testHelpers';
 
 const catalogApi = {
@@ -326,7 +327,7 @@ describe('ItemDrawer', () => {
   it('saves the description', async () => {
     const { boardsApi } = renderDrawer();
     await userEvent.click(screen.getByRole('button', { name: 'Add' }));
-    await userEvent.type(
+    typeIntoRichText(
       screen.getByRole('textbox', { name: 'Edit description' }),
       'Some details',
     );
@@ -533,7 +534,7 @@ describe('ItemDrawer', () => {
     const storage = mockApis.storage();
     const { boardsApi } = renderDrawer({ storage });
     await screen.findByText('Looks good');
-    await userEvent.type(
+    typeIntoRichText(
       screen.getByRole('textbox', { name: 'New comment' }),
       'half a thought',
     );
@@ -560,9 +561,9 @@ describe('ItemDrawer', () => {
     draftsBucket(storage).set('comment-board-1-item-1', 'unsent words');
     renderDrawer({ storage });
     await screen.findByText('Looks good');
-    expect(screen.getByRole('textbox', { name: 'New comment' })).toHaveValue(
-      'unsent words',
-    );
+    expect(
+      screen.getByRole('textbox', { name: 'New comment' }),
+    ).toHaveTextContent('unsent words');
   });
 
   it('persists the description draft and clears it on save', async () => {
@@ -572,7 +573,7 @@ describe('ItemDrawer', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Add' }));
     const editor = screen.getByRole('textbox', { name: 'Edit description' });
     // the editor opens with the stored draft instead of the saved text
-    expect(editor).toHaveValue('draft notes');
+    expect(editor).toHaveTextContent('draft notes');
     await userEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(boardsApi.updateItem).toHaveBeenCalledWith('board-1', 'item-1', {
       description: 'draft notes',
@@ -586,7 +587,7 @@ describe('ItemDrawer', () => {
 
   it('adds a comment', async () => {
     const { boardsApi } = renderDrawer();
-    await userEvent.type(
+    typeIntoRichText(
       await screen.findByRole('textbox', { name: 'New comment' }),
       'Nice work',
     );

@@ -1,4 +1,6 @@
 import { ReactElement } from 'react';
+import { act } from '@testing-library/react';
+import { $getRoot, type LexicalEditor } from 'lexical';
 import { SWRConfig } from 'swr';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { renderInTestApp } from '@backstage/frontend-test-utils';
@@ -304,4 +306,22 @@ export function testBoardsApi(
     getTimeline: jest.fn().mockResolvedValue([]),
     ...over,
   };
+}
+
+/**
+ * Appends text to a rich text editor through its Lexical instance.
+ * jsdom cannot place a caret in an empty contenteditable, so typing via
+ * keyboard events only works once the editor has content; this helper
+ * covers the empty-editor cases (real typing is exercised in
+ * EditableMarkdown.test.tsx and in the e2e suite).
+ */
+export function typeIntoRichText(field: HTMLElement, text: string) {
+  const { __lexicalEditor: editor } = field as unknown as {
+    __lexicalEditor: LexicalEditor;
+  };
+  act(() =>
+    editor.update(() => {
+      $getRoot().selectEnd().insertText(text);
+    }),
+  );
 }
