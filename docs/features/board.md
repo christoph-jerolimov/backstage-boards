@@ -39,7 +39,8 @@ keeps the selection.
 
 ## Keyboard navigation
 
-Both views are fully keyboard-operable. On the kanban view, tab to a card
+Both views are fully keyboard-operable — press `?` on the board page for
+this overview in the app. On the kanban view, tab to a card
 and use the arrow keys: `↑`/`↓` walk the cards of a column, `←`/`→` jump
 to the neighbouring column, and a visible focus ring follows along. In the
 table view, `↑`/`↓` move the row focus, continuing across group boundaries
@@ -58,6 +59,7 @@ While an item (card or row) is focused:
 | `p`                 | Open the priority picker (boards with priorities) |
 | `1`–`9`, `0`        | Set the priority with that order (`0` = 10)       |
 | `Delete`            | Archive the item                                  |
+| `?`                 | Open the shortcut overview                        |
 
 The shortcuts only fire on the focused item itself — typing in an inline
 editor or an open menu is never hijacked — and they stay inert on

@@ -309,6 +309,60 @@ describe('BoardPage views', () => {
   });
 });
 
+describe('BoardPage shortcut help', () => {
+  it('opens on ? and closes with Escape', async () => {
+    renderBoard();
+    await screen.findByText('Todo (1)');
+    await userEvent.keyboard('?');
+    expect(
+      await screen.findByRole('heading', { name: 'Keyboard shortcuts' }),
+    ).toBeInTheDocument();
+    // a board with write access but no priorities: priority rows hidden
+    expect(screen.getByText('Archive the item')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Set the priority with that order (0 = 10)'),
+    ).not.toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('heading', { name: 'Keyboard shortcuts' }),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
+  it('opens while a card is focused', async () => {
+    renderBoard();
+    const card = await screen.findByRole('button', { name: 'Ship the docs' });
+    card.focus();
+    await userEvent.keyboard('?');
+    expect(
+      await screen.findByRole('heading', { name: 'Keyboard shortcuts' }),
+    ).toBeInTheDocument();
+  });
+
+  it('never opens while typing in the search field', async () => {
+    renderBoard();
+    await screen.findByText('Todo (1)');
+    const search = screen.getByRole('searchbox', { name: 'Search items' });
+    await userEvent.type(search, 'what?');
+    expect(search).toHaveValue('what?');
+    expect(
+      screen.queryByRole('heading', { name: 'Keyboard shortcuts' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows readers the navigation shortcuts only', async () => {
+    renderBoard({ board: { access: 'read' } });
+    await screen.findByText('Todo (1)');
+    await userEvent.keyboard('?');
+    expect(
+      await screen.findByRole('heading', { name: 'Keyboard shortcuts' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Show this overview')).toBeInTheDocument();
+    expect(screen.queryByText('Archive the item')).not.toBeInTheDocument();
+  });
+});
+
 describe('BoardPage filtering', () => {
   it('filters by text and reports how many items match', async () => {
     renderBoard();
