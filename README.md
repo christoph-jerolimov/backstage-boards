@@ -82,6 +82,9 @@ board-specific lives in `plugins/`.
   due-date, tag, and archive actions.
 - **Item permalinks** — a Copy link entry in every item menu puts a
   direct link to the item (board URL + `?item=`) on the clipboard.
+- **Duplicate an item** — copies an item in place (fields, tags,
+  assignees, due date, priority, unchecked checklist) as a fresh item
+  below the original.
 - **Item archival** — deleted items are archived, listed with who archived
   them and when, restorable for 30 days before purge.
 - **Externally managed items** — items owned by an integration are read-only

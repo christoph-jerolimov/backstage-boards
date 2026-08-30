@@ -400,6 +400,7 @@ describe('ItemDrawer', () => {
       'Due date',
       'Priority',
       'Assignee',
+      'Duplicate item',
       'Delete item',
     ]);
   });

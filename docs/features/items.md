@@ -44,6 +44,14 @@ bulk-actions bar are shared between the board and table views, so switching
 views keeps it. Each bulk change is recorded in every affected item's
 history like any other edit.
 
+## Duplicating an item
+
+**Duplicate item** in the item menu copies the item onto the same
+board, directly below the original: title (with a "(copy)" suffix),
+description, tags, assignees, due date, and priority travel along, and
+the checklist arrives with every entry unchecked. Comments and history
+stay with the original — the copy starts fresh, created by you.
+
 ## Permalinks
 
 Every item menu offers **Copy link**: the item's permalink — the board

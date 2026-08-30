@@ -2266,6 +2266,78 @@ export class BoardsService {
     return this.getItem(principal, boardId, itemId);
   }
 
+  /**
+   * Creates a copy of an item on the same board, directly after the
+   * original in its column: fields, tags, assignees, due date,
+   * priority, description (as the copy's first version), and the
+   * checklist with every entry unchecked. Comments, history, watches,
+   * and the external-manager flag stay behind; the duplicator is the
+   * creator.
+   */
+  async duplicateItem(
+    principal: BoardsPrincipal,
+    boardId: string,
+    itemId: string,
+  ): Promise<BoardItem> {
+    await this.requireBoard(principal, boardId, 'write');
+    const row = await this.knex('items')
+      .where({ id: itemId, board_id: boardId })
+      .whereNull('archived_at')
+      .first();
+    if (!row) {
+      throw new NotFoundError(`Item ${itemId} not found`);
+    }
+    const [tags, assignees, checklist] = await Promise.all([
+      this.knex('item_tags').where('item_id', itemId),
+      this.knex('item_assignees').where('item_id', itemId),
+      this.knex('item_checklist_entries')
+        .where('item_id', itemId)
+        .orderBy('position'),
+    ]);
+    // land directly after the original: halfway to the next item
+    const next = await this.knex('items')
+      .where('column_id', row.column_id)
+      .whereNull('archived_at')
+      .where('position', '>', row.position)
+      .orderBy('position')
+      .first();
+    const position = next
+      ? (row.position + next.position) / 2
+      : row.position + POSITION_STEP;
+    const copy = await this.createItem(principal, boardId, {
+      columnId: row.column_id,
+      title: `${row.title} (copy)`,
+      position,
+      tags: tags.map(entry => entry.tag),
+      assignees: assignees.map(entry => entry.assignee_ref),
+      priorityId: row.priority_id ?? undefined,
+      checklist: checklist.map(entry => ({
+        text: entry.text,
+        checked: false,
+      })),
+    });
+    if (row.description || row.due_date) {
+      const timestamp = now();
+      await this.knex.transaction(async trx => {
+        await trx('items').where('id', copy.id).update({
+          description: row.description,
+          due_date: row.due_date,
+        });
+        if (row.description) {
+          await trx('item_description_versions').insert({
+            id: uuid(),
+            item_id: copy.id,
+            text: row.description,
+            edited_by: actorRef(principal),
+            edited_at: timestamp,
+          });
+        }
+      });
+      await this.emitBoardSignal(boardId, copy.id);
+    }
+    return this.getItem(principal, boardId, copy.id);
+  }
+
   async moveItem(
     principal: BoardsPrincipal,
     boardId: string,

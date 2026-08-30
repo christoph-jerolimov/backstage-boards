@@ -1070,6 +1070,91 @@ describe('BoardsService', () => {
     });
   });
 
+  describe('duplicate item', () => {
+    it('copies fields and lands directly after the original', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const columnId = board.columns[0].id;
+      const critical = board.priorities[0];
+      const original = await service.createItem(alice, board.id, {
+        columnId,
+        title: 'Weekly report',
+        tags: ['ops', 'recurring'],
+        assignees: ['user:default/alice'],
+        priorityId: critical.id,
+        checklist: [
+          { text: 'Collect numbers', checked: true },
+          { text: 'Send it', checked: false },
+        ],
+      });
+      await service.updateItem(alice, board.id, original.id, {
+        description: 'Every **Friday**',
+        dueDate: '2026-09-04',
+      });
+      const below = await service.createItem(alice, board.id, {
+        columnId,
+        title: 'Below',
+      });
+
+      const copy = await service.duplicateItem(alice, board.id, original.id);
+      expect(copy.title).toBe('Weekly report (copy)');
+      expect(copy.tags.sort()).toEqual(['ops', 'recurring']);
+      expect(copy.assignees).toEqual(['user:default/alice']);
+      expect(copy.priorityId).toBe(critical.id);
+      expect(copy.description).toBe('Every **Friday**');
+      expect(copy.descriptionVersionCount).toBe(1);
+      expect(copy.dueDate).toBe('2026-09-04');
+      expect(copy.checklist?.map(entry => entry.checked)).toEqual([
+        false,
+        false,
+      ]);
+      expect(copy.createdBy).toBe('user:default/alice');
+      // between the original and the next item
+      const items = await service.listItems(alice, board.id);
+      const ordered = items
+        .filter(item => item.columnId === columnId)
+        .sort((a, b) => a.position - b.position)
+        .map(item => item.title);
+      expect(ordered).toEqual([
+        'Weekly report',
+        'Weekly report (copy)',
+        'Below',
+      ]);
+      // no comments or history beyond creation
+      const timeline = await service.getTimeline(alice, board.id, copy.id);
+      expect(timeline).toHaveLength(1);
+      expect(below.id).toBeTruthy();
+    });
+
+    it('requires write access', async () => {
+      const board = await service.createBoard(alice, {
+        name: 'B',
+        visibility: 'logged-in-read',
+      });
+      const item = await service.createItem(alice, board.id, {
+        columnId: board.columns[0].id,
+        title: 'Item',
+      });
+      await expect(
+        service.duplicateItem(bob, board.id, item.id),
+      ).rejects.toThrow();
+    });
+
+    it('honors the hard WIP limit', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const columnId = board.columns[0].id;
+      const item = await service.createItem(alice, board.id, {
+        columnId,
+        title: 'Only one fits',
+      });
+      await service.updateColumn(alice, board.id, columnId, {
+        wipHardLimit: 1,
+      });
+      await expect(
+        service.duplicateItem(alice, board.id, item.id),
+      ).rejects.toThrow('at its WIP limit of 1');
+    });
+  });
+
   describe('board insights', () => {
     it('computes cycle times from the move history', async () => {
       const board = await service.createBoard(alice, { name: 'B' });

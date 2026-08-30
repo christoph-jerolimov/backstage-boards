@@ -540,6 +540,19 @@ export async function createRouter(
     },
   );
 
+  router.post('/boards/:boardId/items/:itemId/duplicate', async (req, res) => {
+    const principal = await principalOf(req);
+    res
+      .status(201)
+      .json(
+        await service.duplicateItem(
+          principal,
+          req.params.boardId,
+          req.params.itemId,
+        ),
+      );
+  });
+
   router.post('/boards/:boardId/items/:itemId/move', async (req, res) => {
     const principal = await principalOf(req);
     if (!req.body.columnId) {
