@@ -113,6 +113,10 @@ export function ItemDrawer(props: {
     setItemDueDate: (_itemId, dueDate) => patchItem({ dueDate }),
     setAssignees: (_itemId, assignees) => patchItem({ assignees }),
     setItemPriority: (_itemId, priorityId) => patchItem({ priorityId }),
+    duplicateItem: async () => {
+      await boardsApi.duplicateItem(board.id, item.id);
+      await onChanged();
+    },
     deleteItem: async () => {
       await boardsApi.deleteItem(board.id, item.id);
       onClose();

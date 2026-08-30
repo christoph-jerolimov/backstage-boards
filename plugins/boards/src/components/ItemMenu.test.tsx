@@ -96,6 +96,7 @@ describe('ItemMenu', () => {
       'Move to column',
       'Due date',
       'Assignee',
+      'Duplicate item',
       'Delete item',
     ]);
   });
@@ -109,6 +110,7 @@ describe('ItemMenu', () => {
       'Move to column',
       'Due date',
       'Assignee',
+      'Duplicate item',
       'Delete item',
     ]);
   });
@@ -118,6 +120,14 @@ describe('ItemMenu', () => {
     expect(
       screen.getAllByRole('menuitem').map(entry => entry.textContent),
     ).toEqual(['Open details', 'Copy link']);
+  });
+
+  it('duplicates the item', async () => {
+    const { actions, item } = await openMenu({});
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: 'Duplicate item' }),
+    );
+    expect(actions.duplicateItem).toHaveBeenCalledWith(item.id);
   });
 
   it('copies the item permalink to the clipboard', async () => {
@@ -254,6 +264,7 @@ describe('ItemMenu', () => {
             'Move to column',
             'Due date',
             'Assignee',
+            'Duplicate item',
             'Delete item',
           ].includes(text!),
       );

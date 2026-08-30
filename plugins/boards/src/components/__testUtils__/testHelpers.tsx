@@ -225,6 +225,7 @@ export function testActions(): jest.Mocked<BoardActions> {
     setItemDueDate: jest.fn().mockResolvedValue(undefined),
     setAssignees: jest.fn().mockResolvedValue(undefined),
     setItemPriority: jest.fn().mockResolvedValue(undefined),
+    duplicateItem: jest.fn().mockResolvedValue(undefined),
     deleteItem: jest.fn().mockResolvedValue(undefined),
   };
 }
@@ -284,6 +285,7 @@ export function testBoardsApi(
     updateItem: jest.fn(),
     moveItem: jest.fn(),
     deleteItem: jest.fn().mockResolvedValue(undefined),
+    duplicateItem: jest.fn(),
     listArchivedItems: jest.fn().mockResolvedValue([]),
     restoreItem: jest.fn(),
     setWatchItem: jest.fn().mockResolvedValue(undefined),

@@ -33,6 +33,8 @@ export interface ItemActions {
   setItemDueDate: (itemId: string, dueDate: string | null) => Promise<void>;
   setAssignees: (itemId: string, assignees: string[]) => Promise<void>;
   setItemPriority: (itemId: string, priorityId: string | null) => Promise<void>;
+  /** Copies the item on its board; absent where duplication is not offered. */
+  duplicateItem?: (itemId: string) => Promise<void>;
   deleteItem: (itemId: string) => Promise<void>;
 }
 
@@ -255,6 +257,11 @@ export function ItemMenu(props: {
           <MenuItem>Assignee</MenuItem>
           <Menu>{assigneeEntries}</Menu>
         </SubmenuTrigger>
+      )}
+      {!readonly && actions.duplicateItem && (
+        <MenuItem onAction={() => actions.duplicateItem!(item.id)}>
+          Duplicate item
+        </MenuItem>
       )}
       {!readonly && (
         <MenuItem color="danger" onAction={() => actions.deleteItem(item.id)}>

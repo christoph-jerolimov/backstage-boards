@@ -159,6 +159,8 @@ export function useBoardActions(
         guarded(() => boardsApi.updateItem(boardId, itemId, { assignees })),
       setItemPriority: (itemId, priorityId) =>
         guarded(() => boardsApi.updateItem(boardId, itemId, { priorityId })),
+      duplicateItem: itemId =>
+        guarded(() => boardsApi.duplicateItem(boardId, itemId)),
       deleteItem: itemId =>
         guarded(() => boardsApi.deleteItem(boardId, itemId)),
       openItem,

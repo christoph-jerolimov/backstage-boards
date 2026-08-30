@@ -151,6 +151,8 @@ export interface BoardsApi {
     target: { columnId: string; position?: number },
   ): Promise<BoardItem>;
   deleteItem(boardId: string, itemId: string): Promise<void>;
+  /** Copies an item on its board, landing directly after the original. */
+  duplicateItem(boardId: string, itemId: string): Promise<BoardItem>;
   listArchivedItems(boardId: string): Promise<BoardItem[]>;
   restoreItem(boardId: string, itemId: string): Promise<BoardItem>;
   setWatchItem(
@@ -521,6 +523,10 @@ export class BoardsClient implements BoardsApi {
 
   deleteItem(boardId: string, itemId: string): Promise<void> {
     return this.requestVoid('DELETE', `/boards/${boardId}/items/${itemId}`);
+  }
+
+  duplicateItem(boardId: string, itemId: string): Promise<BoardItem> {
+    return this.request('POST', `/boards/${boardId}/items/${itemId}/duplicate`);
   }
 
   listArchivedItems(boardId: string): Promise<BoardItem[]> {
