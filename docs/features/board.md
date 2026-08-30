@@ -86,6 +86,15 @@ text, carry **all** selected tags, and be assigned to **any** selected
 assignee. Active filters are reflected in the item counts, and one click
 clears them all.
 
+## Shareable views
+
+The whole view state lives in the board URL: the search text (`q`),
+tags, assignees, priorities, the overdue toggle, the grouping
+(`group`), the active view (`view`), and the table sort (`sort`, with a
+`-` prefix for descending). Set up a view and copy the address —
+whoever opens the link sees the same board the same way. Defaults are
+omitted, so an unfiltered kanban board keeps a clean URL.
+
 ## Grouping
 
 The grouping dropdown in the board header regroups both views:
