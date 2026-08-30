@@ -36,7 +36,13 @@ import {
   TableRowNode,
 } from '@lexical/table';
 import { $createHashtagNode, HashtagNode } from '@lexical/hashtag';
-import { $createParagraphNode, $isElementNode, $nodesOfType } from 'lexical';
+import { $createLinkNode, $isLinkNode, LinkNode } from '@lexical/link';
+import {
+  $createParagraphNode,
+  $createTextNode,
+  $isElementNode,
+  $nodesOfType,
+} from 'lexical';
 import {
   NON_ENTITY_KINDS,
   resolveMentionRef,
@@ -78,6 +84,40 @@ export const ENTITY_REF: TextMatchTransformer = {
   type: 'text-match',
 };
 
+/**
+ * Bare `http(s)://` URLs auto-link. The final character class keeps
+ * trailing sentence punctuation out of the URL, and requires at least
+ * one character after the scheme. Inside markdown-form links the
+ * standard LINK transformer wins on import because its match starts
+ * earlier; bare entity-ref scanning never fires inside a URL because
+ * its lookbehind rejects a preceding `:` or `/`.
+ */
+const BARE_URL_IMPORT_PATTERN = /https?:\/\/[^\s<>]*[^\s<>.,;:!?)\]}'"]/;
+
+export const BARE_URL: TextMatchTransformer = {
+  dependencies: [LinkNode],
+  // a link whose text is exactly its URL round-trips as the bare URL;
+  // every other LinkNode falls through to the standard LINK transformer
+  // (this transformer must stay ahead of LINK in the dialect for that)
+  export: node => {
+    if (!$isLinkNode(node)) {
+      return null;
+    }
+    const url = node.getURL();
+    return node.getTextContent() === url ? url : null;
+  },
+  importRegExp: BARE_URL_IMPORT_PATTERN,
+  // while typing, a completed URL converts once a space follows it
+  regExp: new RegExp(`${BARE_URL_IMPORT_PATTERN.source}$`),
+  trigger: ' ',
+  replace: (textNode, match) => {
+    const link = $createLinkNode(match[0]);
+    link.append($createTextNode(match[0]));
+    textNode.replace(link);
+  },
+  type: 'text-match',
+};
+
 /** `#tags` become highlighted hashtag text; they export as-is. */
 export const HASHTAG: TextMatchTransformer = {
   dependencies: [HashtagNode],
@@ -97,6 +137,7 @@ const CELL_TRANSFORMERS: Transformer[] = [
   ITALIC_STAR,
   ITALIC_UNDERSCORE,
   INLINE_CODE,
+  BARE_URL,
   LINK,
   MENTION,
   ENTITY_REF,

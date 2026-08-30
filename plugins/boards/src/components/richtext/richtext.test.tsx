@@ -35,6 +35,10 @@ describe('markdown round-trip', () => {
     ['any-kind mention', 'see @component:webserver-example please'],
     ['shorthand mention', 'thanks @carol'],
     ['bare entity ref', 'deployed to system:default/payments'],
+    ['bare url', 'see https://example.com/docs for details'],
+    ['bare url with port', 'at http://host:8080/path'],
+    ['bare url before punctuation', 'read https://example.com/docs.'],
+    ['url inside inline code', 'run `https://example.com` locally'],
     ['hashtag', 'work on #frontend today'],
     [
       'mixed document',
@@ -137,6 +141,37 @@ describe('RichTextViewer', () => {
     expect(container.querySelector('table th')).toHaveTextContent('Name');
     const link = await screen.findByRole('link');
     expect(link).toHaveAttribute('href', '/catalog/default/user/jane');
+  });
+
+  it('auto-links bare urls, keeping trailing punctuation out', async () => {
+    renderWithProviders(
+      <RichTextViewer markdown="read https://example.com/docs, then reply" />,
+    );
+    const link = await screen.findByRole('link', {
+      name: 'https://example.com/docs',
+    });
+    expect(link).toHaveAttribute('href', 'https://example.com/docs');
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+  });
+
+  it('does not read a url with a port as an entity ref', async () => {
+    renderWithProviders(
+      <RichTextViewer markdown="at http://host:8080/path now" />,
+    );
+    const link = await screen.findByRole('link');
+    expect(link).toHaveAttribute('href', 'http://host:8080/path');
+    expect(screen.getAllByRole('link')).toHaveLength(1);
+  });
+
+  it('keeps a url inside inline code plain', () => {
+    const { container } = renderWithProviders(
+      <RichTextViewer markdown="run `https://example.com` locally" />,
+    );
+    expect(container.querySelector('.brt-code')).toHaveTextContent(
+      'https://example.com',
+    );
+    expect(screen.queryByRole('link')).toBeNull();
   });
 
   it('highlights hashtags', () => {
