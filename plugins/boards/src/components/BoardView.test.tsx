@@ -1,8 +1,10 @@
-import { screen, waitFor } from '@testing-library/react';
+import { useState } from 'react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { identityApiRef } from '@backstage/frontend-plugin-api';
 import { catalogApiRef } from '@backstage/plugin-catalog-react';
 import { BoardView } from './BoardView';
+import type { SelectionHandle } from './useItemSelection';
 import {
   renderWithProviders,
   testActions,
@@ -58,6 +60,7 @@ function renderBoard(
     priorities?: ReturnType<typeof testPriorities>;
     canWrite?: boolean;
     groupBy?: 'none' | 'assignee' | 'priority' | 'dueDate' | 'tags';
+    selection?: SelectionHandle;
   } = {},
 ) {
   const actions = testActions();
@@ -72,6 +75,7 @@ function renderBoard(
       canWrite={over.canWrite ?? true}
       actions={actions}
       groupBy={over.groupBy ?? 'none'}
+      selection={over.selection}
     />,
     {
       apis: [
@@ -468,5 +472,280 @@ describe('BoardView insert column', () => {
     expect(
       screen.queryByRole('button', { name: /Actions for column/ }),
     ).not.toBeInTheDocument();
+  });
+});
+
+function mockSelection(
+  selectedIds: string[] = [],
+): jest.Mocked<SelectionHandle> {
+  return {
+    selected: new Set(selectedIds),
+    toggleItem: jest.fn(),
+    setMany: jest.fn(),
+    clear: jest.fn(),
+  };
+}
+
+function card(name: string | RegExp) {
+  return screen.getByRole('button', { name });
+}
+
+describe('BoardView drop zones', () => {
+  it('renders one gap zone per possible insertion point', () => {
+    renderBoard();
+    // Todo (2 cards): 3 zones; Doing (empty): 1 zone; Done (1 card): 2
+    expect(screen.getAllByTestId('gap-drop-zone')).toHaveLength(6);
+  });
+
+  it('renders the zones per group section when the lane is grouped', () => {
+    renderBoard({
+      groupBy: 'tags',
+      items: [
+        testItem({
+          id: 'item-1',
+          title: 'Tagged',
+          columnId: 'column-1',
+          tags: ['docs'],
+        }),
+        testItem({ id: 'item-2', title: 'Plain', columnId: 'column-1' }),
+      ],
+    });
+    // Todo has two sections of one card (2 zones each); Doing and Done
+    // are empty lanes with one zone each
+    expect(screen.getAllByTestId('gap-drop-zone')).toHaveLength(6);
+  });
+});
+
+describe('BoardView card selection', () => {
+  it('marks selected cards', () => {
+    renderBoard({ selection: mockSelection(['item-2']) });
+    expect(card('First, selected')).toBeInTheDocument();
+    expect(card('Second')).toBeInTheDocument();
+  });
+
+  it('shows no selected marking without a selection handle', () => {
+    renderBoard({ canWrite: false });
+    expect(
+      screen.queryByRole('button', { name: /, selected/ }),
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe('BoardView keyboard', () => {
+  it('gives exactly one card the roving tab stop', () => {
+    renderBoard();
+    // the first card of the first non-empty column
+    expect(card('First')).toHaveAttribute('tabindex', '0');
+    expect(card('Second')).toHaveAttribute('tabindex', '-1');
+    expect(card('Shipped')).toHaveAttribute('tabindex', '-1');
+  });
+
+  it('moves focus down and up within a column', async () => {
+    renderBoard();
+    card('First').focus();
+    await userEvent.keyboard('{ArrowDown}');
+    expect(card('Second')).toHaveFocus();
+    await userEvent.keyboard('{ArrowUp}');
+    expect(card('First')).toHaveFocus();
+    // the edges keep the focus in place
+    await userEvent.keyboard('{ArrowUp}');
+    expect(card('First')).toHaveFocus();
+  });
+
+  it('moves focus across columns, skipping empty ones', async () => {
+    renderBoard();
+    card('Second').focus();
+    // Doing is empty: focus jumps to Done, clamped to its last card
+    await userEvent.keyboard('{ArrowRight}');
+    expect(card('Shipped')).toHaveFocus();
+    // and back at the same visual index: Shipped is Done's first card
+    await userEvent.keyboard('{ArrowLeft}');
+    expect(card('First')).toHaveFocus();
+  });
+
+  it('moves the item one column with Ctrl+Arrow', async () => {
+    const { actions } = renderBoard();
+    card('First').focus();
+    await userEvent.keyboard('{Control>}{ArrowRight}{/Control}');
+    expect(actions.moveItem).toHaveBeenCalledWith('item-2', {
+      columnId: 'column-2',
+    });
+    (actions.moveItem as jest.Mock).mockClear();
+    await userEvent.keyboard('{Control>}{ArrowLeft}{/Control}');
+    expect(actions.moveItem).not.toHaveBeenCalled();
+  });
+
+  it('toggles the bulk selection with Space', async () => {
+    const selection = mockSelection();
+    renderBoard({ selection });
+    card('First').focus();
+    await userEvent.keyboard(' ');
+    expect(selection.toggleItem).toHaveBeenCalledWith('item-2');
+  });
+
+  it('opens the item menu with Enter and returns focus on Escape', async () => {
+    renderBoard();
+    card('Shipped').focus();
+    await userEvent.keyboard('{Enter}');
+    expect(
+      await screen.findByRole('menuitem', { name: 'Open details' }),
+    ).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(card('Shipped')).toHaveFocus());
+  });
+
+  it('opens the move picker with s and moves via its entries', async () => {
+    const { actions } = renderBoard();
+    card('First').focus();
+    await userEvent.keyboard('s');
+    const entries = await screen.findAllByRole('menuitem');
+    expect(entries.map(entry => entry.textContent)).toEqual(['Doing', 'Done']);
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Doing' }));
+    expect(actions.moveItem).toHaveBeenCalledWith('item-2', {
+      columnId: 'column-2',
+    });
+  });
+
+  it('opens the due-date picker with d', async () => {
+    renderBoard();
+    card('First').focus();
+    await userEvent.keyboard('d');
+    expect(
+      await screen.findByRole('menuitem', { name: 'Tomorrow' }),
+    ).toBeInTheDocument();
+  });
+
+  it('opens the assignee picker with a', async () => {
+    renderBoard();
+    card('First').focus();
+    await userEvent.keyboard('a');
+    expect(
+      await screen.findByRole('menuitem', { name: /Me/ }),
+    ).toBeInTheDocument();
+  });
+
+  it('opens the priority picker with p on a board with priorities', async () => {
+    renderBoard({ priorities: testPriorities() });
+    card('First').focus();
+    await userEvent.keyboard('p');
+    expect(
+      await screen.findByRole('menuitem', { name: 'critical' }),
+    ).toBeInTheDocument();
+  });
+
+  it('opens no priority picker without priorities', async () => {
+    renderBoard();
+    card('First').focus();
+    await userEvent.keyboard('p');
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
+  it('sets the priority with that order on a digit', async () => {
+    const { actions } = renderBoard({ priorities: testPriorities() });
+    card('First').focus();
+    await userEvent.keyboard('2');
+    expect(actions.setItemPriority).toHaveBeenCalledWith(
+      'item-2',
+      'priority-2',
+    );
+    (actions.setItemPriority as jest.Mock).mockClear();
+    // no priority carries order 7 on this board
+    await userEvent.keyboard('7');
+    expect(actions.setItemPriority).not.toHaveBeenCalled();
+  });
+
+  it('archives the focused card with Delete', async () => {
+    const { actions } = renderBoard();
+    card('First').focus();
+    await userEvent.keyboard('{Delete}');
+    expect(actions.deleteItem).toHaveBeenCalledWith('item-2');
+  });
+
+  it('keeps every mutation shortcut inert on read-only cards', async () => {
+    const selection = mockSelection();
+    const { actions } = renderBoard({
+      items: [
+        testItem({
+          id: 'item-9',
+          title: 'Synced',
+          columnId: 'column-1',
+          externalManager: 'jira',
+        }),
+      ],
+      selection,
+    });
+    card('Synced').focus();
+    await userEvent.keyboard(' ');
+    await userEvent.keyboard('s');
+    await userEvent.keyboard('{Delete}');
+    await userEvent.keyboard('{Control>}{ArrowRight}{/Control}');
+    expect(selection.toggleItem).not.toHaveBeenCalled();
+    expect(actions.moveItem).not.toHaveBeenCalled();
+    expect(actions.deleteItem).not.toHaveBeenCalled();
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
+  it('walks the grouped sections of a column top to bottom', async () => {
+    renderBoard({
+      groupBy: 'tags',
+      items: [
+        testItem({
+          id: 'item-1',
+          title: 'Tagged',
+          columnId: 'column-1',
+          tags: ['docs'],
+          position: 2000,
+        }),
+        testItem({
+          id: 'item-2',
+          title: 'Plain',
+          columnId: 'column-1',
+          position: 1000,
+        }),
+      ],
+    });
+    // group order: docs first, then Untagged — regardless of positions
+    card('Tagged').focus();
+    await userEvent.keyboard('{ArrowDown}');
+    expect(card('Plain')).toHaveFocus();
+  });
+});
+
+describe('BoardView focus stability', () => {
+  it('focuses a successor when the focused card is archived away', async () => {
+    const actions = testActions();
+    function Harness() {
+      const [current, setCurrent] = useState(items);
+      return (
+        <>
+          <button
+            onClick={() => setCurrent(items.filter(i => i.id !== 'item-2'))}
+          >
+            drop
+          </button>
+          <BoardView
+            board={testBoard({ columns, priorities: [] })}
+            items={current}
+            canWrite
+            actions={actions}
+            groupBy="none"
+          />
+        </>
+      );
+    }
+    renderWithProviders(<Harness />, {
+      apis: [
+        [identityApiRef, identityApi],
+        [catalogApiRef, catalogApi],
+      ],
+    });
+    card('First').focus();
+    await userEvent.keyboard('{Delete}');
+    expect(actions.deleteItem).toHaveBeenCalledWith('item-2');
+    // the server refresh removes the archived item; focus moves on to
+    // the next card of the column (fireEvent: a real click would move
+    // the focus to the button and must then be left alone)
+    fireEvent.click(screen.getByText('drop'));
+    await waitFor(() => expect(card('Second')).toHaveFocus());
   });
 });

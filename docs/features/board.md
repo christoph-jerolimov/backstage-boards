@@ -14,11 +14,13 @@ its priority, due date (colored by urgency), checklist progress, assignee
 avatars, and tags. **+ Add item** at the bottom of each column creates an
 item directly in that column.
 
-Drag a card to move it between columns or to reorder it; a drop indicator
-shows where it will land. The same move is available without a pointer: the
-item menu's **Move to column** entry is fully keyboard-operable. Moves and
-edits apply optimistically — the UI updates immediately and rolls back if
-the server rejects the change.
+Drag a card to move it between columns or to reorder it; an insertion line
+shows exactly where it will land — between two cards, after the last card
+of a column, or in an empty column — and the drop places it right there,
+also inside grouped lanes. The same moves are available without a pointer:
+`Ctrl+←`/`Ctrl+→` on a focused card, or the item menu's **Move to column**
+entry. Moves and edits apply optimistically — the UI updates immediately
+and rolls back if the server rejects the change.
 
 ## Table view
 
@@ -31,7 +33,35 @@ column and the trailing actions column always stay put.
 
 Selecting rows with the checkboxes enables bulk actions: change the assignee
 or the priority of every selected item at once (see
-[Working with items](items.md)).
+[Working with items](items.md)). The selection is shared with the kanban
+view — selected cards show a marked outline there, and switching views
+keeps the selection.
+
+## Keyboard navigation
+
+Both views are fully keyboard-operable. On the kanban view, tab to a card
+and use the arrow keys: `↑`/`↓` walk the cards of a column, `←`/`→` jump
+to the neighbouring column, and a visible focus ring follows along. In the
+table view, `↑`/`↓` move the row focus, continuing across group boundaries
+when the table is grouped; `←`/`→` do not navigate between items there.
+
+While an item (card or row) is focused:
+
+| Key                 | Action                                            |
+| ------------------- | ------------------------------------------------- |
+| `Ctrl+←` / `Ctrl+→` | Move the item one column left / right             |
+| `Space`             | Select or deselect the item for bulk actions      |
+| `Enter`             | Open the item's actions menu                      |
+| `s`, `c`, or `m`    | Open the move-to-column (status) picker           |
+| `a`                 | Open the assignee picker                          |
+| `d`                 | Open the due-date picker                          |
+| `p`                 | Open the priority picker (boards with priorities) |
+| `1`–`9`, `0`        | Set the priority with that order (`0` = 10)       |
+| `Delete`            | Archive the item                                  |
+
+The shortcuts only fire on the focused item itself — typing in an inline
+editor or an open menu is never hijacked — and they stay inert on
+externally managed items and for read-only visitors.
 
 ## Filter bar
 

@@ -7,11 +7,12 @@ frontend system. Provides:
   counts, search/entity/creator filters, and row context menus
 - `/boards/my-items` — everything assigned to you across boards, with its own
   filter bar and grouping
-- `/boards/:boardId` — kanban and table views with drag & drop (plus an
-  accessible "Move to column" menu fallback), inline editing, grouping by
-  assignee or priority, a filter bar, sortable and configurable table
-  columns, row multi-select with bulk actions, and the assignee × status and
-  status × priority matrix dialogs
+- `/boards/:boardId` — kanban and table views with drag & drop (a drop
+  indicator shows the exact insertion point), full keyboard navigation and
+  item shortcuts in both views, inline editing, grouping by assignee or
+  priority, a filter bar, sortable and configurable table columns,
+  multi-select with bulk actions shared between the views, and the
+  assignee × status and status × priority matrix dialogs
 - an item detail drawer with combined status/priority/due-date badge editors,
   description, checklist, and a unified comments + change history timeline
   with per-user drafts
@@ -63,8 +64,14 @@ the repository. The backend counterpart is
 ### Items
 
 - **Kanban and table views** — two switchable views over the same items.
-- **Drag & drop** — with a drop indicator and an accessible "Move to column"
-  menu as keyboard fallback.
+- **Drag & drop** — an insertion line shows exactly where the card will
+  land: between two cards, after the last card, or in an empty column,
+  also inside grouped lanes.
+- **Keyboard navigation** — arrow keys walk the cards (and table rows,
+  across groups) with a visible focus; shortcuts on the focused item move
+  it between columns (`Ctrl+←`/`Ctrl+→`), select it (`Space`), open the
+  item menu (`Enter`) and the status/assignee/due-date/priority pickers
+  (`s`, `a`, `d`, `p`), set a priority by digit, and archive (`Delete`).
 - **Optimistic updates** — moves and edits apply instantly and roll back on
   failure.
 - **Filter bar** — free-text search plus tag (all must match) and assignee
@@ -74,8 +81,10 @@ the repository. The backend counterpart is
 - **Configurable table columns** — choose which columns the table shows.
 - **Utility columns** — the table's leading selection and trailing actions
   columns stay put regardless of configuration.
-- **Row selection and bulk actions** — multi-select table rows and change
-  assignee or priority for all of them at once.
+- **Selection and bulk actions** — multi-select items with the table's
+  checkboxes or `Space` in either view; the selection is shared between
+  the kanban and table views, with bulk status, priority, assignee,
+  due-date, and archive actions.
 - **Archived items** — a table of archived items with who archived them and
   when, and a restore action.
 - **Externally managed items** — items owned by an integration render

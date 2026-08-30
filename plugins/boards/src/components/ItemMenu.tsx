@@ -14,6 +14,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '../queries';
 import { useProfiles } from './useProfiles';
+import type { ItemSubmenuKind } from './RowMenu';
 import { RefLabel } from './common';
 
 /**
@@ -50,6 +51,11 @@ export function ItemMenu(props: {
   extraItems?: ReactNode;
   /** The drawer already shows the details, so it drops the entry. */
   showOpenDetails?: boolean;
+  /**
+   * Render only this submenu's entries as a flat menu — the keyboard
+   * shortcuts (s/c/m, a, d, p) open the pickers directly.
+   */
+  submenu?: ItemSubmenuKind;
 }) {
   const {
     item,
@@ -60,6 +66,7 @@ export function ItemMenu(props: {
     assigneePool,
     extraItems,
     showOpenDetails = true,
+    submenu,
   } = props;
   const identityApi = useApi(identityApiRef);
   const { data: identity } = useQuery({
@@ -83,6 +90,110 @@ export function ItemMenu(props: {
   };
   const mark = (ref: string, label: string) =>
     item.assignees.includes(ref) ? `✓ ${label}` : label;
+
+  // the submenus' entries, shared between the nested item menu and the
+  // flat pickers the keyboard shortcuts open directly
+  const moveEntries = columns
+    .filter(column => column.id !== item.columnId)
+    .map(column => (
+      <MenuItem
+        key={column.id}
+        onAction={() => actions.moveItem(item.id, { columnId: column.id })}
+      >
+        {column.title}
+      </MenuItem>
+    ));
+  const dueEntries = [
+    <MenuItem
+      key="today"
+      onAction={() => actions.setItemDueDate(item.id, todayISO())}
+    >
+      Today
+    </MenuItem>,
+    <MenuItem
+      key="tomorrow"
+      onAction={() => actions.setItemDueDate(item.id, tomorrowISO())}
+    >
+      Tomorrow
+    </MenuItem>,
+    <MenuItem
+      key="friday"
+      onAction={() => actions.setItemDueDate(item.id, fridayISO())}
+    >
+      This week (Fri)
+    </MenuItem>,
+    ...(item.dueDate
+      ? [
+          <MenuItem
+            key="remove"
+            color="danger"
+            onAction={() => actions.setItemDueDate(item.id, null)}
+          >
+            Remove due date
+          </MenuItem>,
+        ]
+      : []),
+  ];
+  const priorityEntries = [
+    ...[...priorities]
+      .sort((a, b) => a.order - b.order)
+      .map(priority => (
+        <MenuItem
+          key={priority.id}
+          onAction={() => actions.setItemPriority(item.id, priority.id)}
+        >
+          {item.priorityId === priority.id
+            ? `✓ ${priority.name}`
+            : priority.name}
+        </MenuItem>
+      )),
+    ...(item.priorityId
+      ? [
+          <MenuItem
+            key="remove"
+            color="danger"
+            onAction={() => actions.setItemPriority(item.id, null)}
+          >
+            Remove priority
+          </MenuItem>,
+        ]
+      : []),
+  ];
+  const assigneeEntries = [
+    ...(meRef
+      ? [
+          <MenuItem key={meRef} onAction={() => toggle(meRef)}>
+            {/* "Me" names a ref too: the tooltip says which account */}
+            <RefLabel entityRef={meRef}>{mark(meRef, 'Me')}</RefLabel>
+          </MenuItem>,
+        ]
+      : []),
+    ...others.map(ref => (
+      <MenuItem key={ref} onAction={() => toggle(ref)}>
+        <RefLabel entityRef={ref}>{mark(ref, nameOf(ref))}</RefLabel>
+      </MenuItem>
+    )),
+  ];
+
+  if (submenu) {
+    // the shortcut guards already keep read-only items out; render
+    // nothing rather than an empty picker if one slips through
+    if (readonly || (submenu === 'priority' && priorities.length === 0)) {
+      return null;
+    }
+    const flat = {
+      move: { label: 'Move to column', entries: moveEntries },
+      due: { label: 'Due date', entries: dueEntries },
+      priority: { label: 'Priority', entries: priorityEntries },
+      assignee: { label: 'Assignee', entries: assigneeEntries },
+    }[submenu];
+    return (
+      <Menu placement="right top" aria-label={flat.label}>
+        {flat.entries}
+      </Menu>
+    );
+  }
+
   return (
     <Menu placement="right top">
       {showOpenDetails && (
@@ -94,95 +205,25 @@ export function ItemMenu(props: {
       {!readonly && (
         <SubmenuTrigger>
           <MenuItem>Move to column</MenuItem>
-          <Menu>
-            {columns
-              .filter(column => column.id !== item.columnId)
-              .map(column => (
-                <MenuItem
-                  key={column.id}
-                  onAction={() =>
-                    actions.moveItem(item.id, { columnId: column.id })
-                  }
-                >
-                  {column.title}
-                </MenuItem>
-              ))}
-          </Menu>
+          <Menu>{moveEntries}</Menu>
         </SubmenuTrigger>
       )}
       {!readonly && (
         <SubmenuTrigger>
           <MenuItem>Due date</MenuItem>
-          <Menu>
-            <MenuItem
-              onAction={() => actions.setItemDueDate(item.id, todayISO())}
-            >
-              Today
-            </MenuItem>
-            <MenuItem
-              onAction={() => actions.setItemDueDate(item.id, tomorrowISO())}
-            >
-              Tomorrow
-            </MenuItem>
-            <MenuItem
-              onAction={() => actions.setItemDueDate(item.id, fridayISO())}
-            >
-              This week (Fri)
-            </MenuItem>
-            {item.dueDate && (
-              <MenuItem
-                color="danger"
-                onAction={() => actions.setItemDueDate(item.id, null)}
-              >
-                Remove due date
-              </MenuItem>
-            )}
-          </Menu>
+          <Menu>{dueEntries}</Menu>
         </SubmenuTrigger>
       )}
       {!readonly && priorities.length > 0 && (
         <SubmenuTrigger>
           <MenuItem>Priority</MenuItem>
-          <Menu>
-            {[...priorities]
-              .sort((a, b) => a.order - b.order)
-              .map(priority => (
-                <MenuItem
-                  key={priority.id}
-                  onAction={() => actions.setItemPriority(item.id, priority.id)}
-                >
-                  {item.priorityId === priority.id
-                    ? `✓ ${priority.name}`
-                    : priority.name}
-                </MenuItem>
-              ))}
-            {item.priorityId && (
-              <MenuItem
-                color="danger"
-                onAction={() => actions.setItemPriority(item.id, null)}
-              >
-                Remove priority
-              </MenuItem>
-            )}
-          </Menu>
+          <Menu>{priorityEntries}</Menu>
         </SubmenuTrigger>
       )}
       {!readonly && (
         <SubmenuTrigger>
           <MenuItem>Assignee</MenuItem>
-          <Menu>
-            {meRef && (
-              <MenuItem onAction={() => toggle(meRef)}>
-                {/* "Me" names a ref too: the tooltip says which account */}
-                <RefLabel entityRef={meRef}>{mark(meRef, 'Me')}</RefLabel>
-              </MenuItem>
-            )}
-            {others.map(ref => (
-              <MenuItem key={ref} onAction={() => toggle(ref)}>
-                <RefLabel entityRef={ref}>{mark(ref, nameOf(ref))}</RefLabel>
-              </MenuItem>
-            ))}
-          </Menu>
+          <Menu>{assigneeEntries}</Menu>
         </SubmenuTrigger>
       )}
       {!readonly && (

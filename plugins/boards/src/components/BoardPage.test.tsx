@@ -226,6 +226,29 @@ describe('BoardPage views', () => {
     );
     expect(await screen.findByText('Untagged')).toBeInTheDocument();
   });
+
+  it('keeps the selection and its bulk bar across a view switch', async () => {
+    renderBoard();
+    // select a card on the board view via the keyboard
+    const card = await screen.findByRole('button', { name: 'Ship the docs' });
+    card.focus();
+    await userEvent.keyboard(' ');
+    expect(screen.getByText('1 selected')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Ship the docs, selected' }),
+    ).toBeInTheDocument();
+    // the same selection shows as a checked row in the table view
+    await userEvent.click(screen.getByRole('radio', { name: 'Table view' }));
+    expect(
+      await screen.findByRole('checkbox', { name: 'Select Ship the docs' }),
+    ).toBeChecked();
+    expect(screen.getByText('1 selected')).toBeInTheDocument();
+    // and going back, the card is still marked
+    await userEvent.click(screen.getByRole('radio', { name: 'Board view' }));
+    expect(
+      await screen.findByRole('button', { name: 'Ship the docs, selected' }),
+    ).toBeInTheDocument();
+  });
 });
 
 describe('BoardPage filtering', () => {

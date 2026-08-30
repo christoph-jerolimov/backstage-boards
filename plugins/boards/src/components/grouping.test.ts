@@ -122,6 +122,16 @@ describe('positionBefore', () => {
     expect(positionBefore(sorted, 2)).toBe(3000);
     expect(positionBefore([], 0)).toBe(1000);
   });
+
+  it('ranks against a grouped section, not the whole lane', () => {
+    // a lane 1000..4000 grouped into a section holding only the items
+    // at 1000 and 4000: dropping between them must land between those
+    // two neighbours' ranks, whatever else the lane holds
+    const section = [{ position: 1000 }, { position: 4000 }];
+    expect(positionBefore(section, 1)).toBe(2500);
+    // ...and appending after the section's last item goes past it
+    expect(positionBefore(section, 2)).toBe(5000);
+  });
 });
 
 describe('groupItems', () => {
