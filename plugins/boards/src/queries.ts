@@ -14,7 +14,7 @@ import {
   BoardWithContext,
   errorMessage,
 } from '@internal/plugin-boards-common';
-import { BoardListQuery, boardsApiRef } from './api';
+import { BoardListQuery, boardsApiRef, BoardsRequestError } from './api';
 
 /**
  * Plugin-scoped query client. Provided by the boards pages themselves so
@@ -25,7 +25,11 @@ export const boardsQueryClient = new QueryClient({
     queries: {
       staleTime: 15_000,
       refetchOnWindowFocus: false,
-      retry: 1,
+      // a 404 is a stable answer (gone, or no access): retrying only
+      // delays the not-found page
+      retry: (failureCount, error) =>
+        !(error instanceof BoardsRequestError && error.status === 404) &&
+        failureCount < 1,
     },
   },
 });

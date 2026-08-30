@@ -24,7 +24,11 @@ import {
   Text,
   TextField,
 } from '@backstage/ui';
-import { RiArrowRightLine } from '@remixicon/react';
+import {
+  RiArrowRightLine,
+  RiDashboardLine,
+  RiStarLine,
+} from '@remixicon/react';
 import {
   BoardListEntry,
   BoardListFilter,
@@ -38,6 +42,7 @@ import {
   useBoardsPageQuery,
   useBoardsSignal,
 } from '../queries';
+import { EmptyState } from './EmptyState';
 import { BoardsFilterBar, useBoardFilter } from './BoardsFilterBar';
 import { MyItemsList } from './MyItemsPage';
 import { ActionsCellContent, useRowMenu, utilityColumnStyle } from './RowMenu';
@@ -300,13 +305,16 @@ export function BoardListPage() {
               favoritesFilter.active ? (
                 // the bar right above holds the clear action; a second
                 // one here would be two controls doing one thing
-                <Text color="secondary">
-                  No favorite boards match your filters.
-                </Text>
+                <EmptyState
+                  icon={<RiStarLine size={28} />}
+                  title="No favorite boards match your filters"
+                />
               ) : (
-                <Text color="secondary">
-                  No favorite boards yet — star a board in the All tab.
-                </Text>
+                <EmptyState
+                  icon={<RiStarLine size={28} />}
+                  title="No favorite boards yet"
+                  description="Star a board in the All tab to pin it here."
+                />
               )
             }
           >
@@ -326,11 +334,16 @@ export function BoardListPage() {
               filter.active ? (
                 // the bar right above holds the clear action; a second
                 // one here would be two controls doing one thing
-                <Text color="secondary">No boards match your filters.</Text>
+                <EmptyState
+                  icon={<RiDashboardLine size={28} />}
+                  title="No boards match your filters"
+                />
               ) : (
-                <Text color="secondary">
-                  No boards are accessible to you yet. Create one!
-                </Text>
+                <EmptyState
+                  icon={<RiDashboardLine size={28} />}
+                  title="No boards are accessible to you yet"
+                  description="Create a board with the button above to get started."
+                />
               )
             }
           >

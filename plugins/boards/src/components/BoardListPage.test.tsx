@@ -127,9 +127,7 @@ describe('BoardListPage', () => {
   it('points at the All tab when nothing is starred', async () => {
     renderPage({ boards: [{ ...boards[1] }] });
     expect(
-      await screen.findByText(
-        'No favorite boards yet — star a board in the All tab.',
-      ),
+      await screen.findByText('No favorite boards yet'),
     ).toBeInTheDocument();
   });
 
@@ -137,7 +135,7 @@ describe('BoardListPage', () => {
     renderPage({ boards: [] });
     await userEvent.click(await screen.findByRole('tab', { name: 'All (0)' }));
     expect(
-      screen.getByText('No boards are accessible to you yet. Create one!'),
+      screen.getByText('No boards are accessible to you yet'),
     ).toBeInTheDocument();
   });
 
@@ -358,11 +356,11 @@ describe('BoardListPage', () => {
         'nothing here',
       );
       expect(
-        await screen.findByText('No boards match your filters.'),
+        await screen.findByText('No boards match your filters'),
       ).toBeInTheDocument();
       // and not the message for a user who has no boards at all
       expect(
-        screen.queryByText('No boards are accessible to you yet. Create one!'),
+        screen.queryByText('No boards are accessible to you yet'),
       ).not.toBeInTheDocument();
 
       await userEvent.click(
@@ -532,7 +530,7 @@ describe('BoardListPage', () => {
         'nothing here',
       );
       expect(
-        await screen.findByText('No favorite boards match your filters.'),
+        await screen.findByText('No favorite boards match your filters'),
       ).toBeInTheDocument();
       expect(
         screen.queryByText(/No favorite boards yet/),

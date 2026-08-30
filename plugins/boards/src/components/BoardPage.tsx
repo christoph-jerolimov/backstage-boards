@@ -1,15 +1,18 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { BreadcrumbEntry } from '@backstage/frontend-plugin-api';
-import { Flex, Text } from '@backstage/ui';
+import { Button, Flex, Text } from '@backstage/ui';
+import { RiQuestionLine, RiErrorWarningLine } from '@remixicon/react';
 import {
   errorMessage,
   levelIncludes,
   wipState,
 } from '@internal/plugin-boards-common';
+import { BoardsRequestError } from '../api';
 import { useBoardsBasePath } from '../routes';
 import {
   invalidateBoard,
+  queryKeys,
   useBoardQuery,
   useBoardsSignal,
   useItemsQuery,
@@ -24,6 +27,7 @@ import { ItemFilterBar, useItemFilter } from './ItemFilterBar';
 import { BulkActionsBar } from './BulkActionsBar';
 import { BoardDescription } from './BoardDescription';
 import { ErrorText } from './common';
+import { EmptyState } from './EmptyState';
 import { useBoardActions, useOpenItemParam } from './useBoardActions';
 import { useItemSelection } from './useItemSelection';
 import { assigneePool, GroupByMode } from './grouping';
@@ -88,11 +92,37 @@ export function BoardPageContent(props: {
     return <Text style={{ padding: 16 }}>Loading board…</Text>;
   }
   if (boardError || !board) {
+    const notFound =
+      boardError instanceof BoardsRequestError && boardError.status === 404;
+    if (notFound || !boardError) {
+      return (
+        <EmptyState
+          icon={<RiQuestionLine size={28} />}
+          title="Board not found"
+          description="The board may have been deleted, its link may be wrong, or you may not have access to it."
+          actions={
+            <Button onPress={() => navigate(basePath)}>Back to boards</Button>
+          }
+        />
+      );
+    }
     return (
-      <Text style={{ padding: 16 }}>
-        Board could not be loaded:{' '}
-        {boardError ? errorMessage(boardError) : 'not found'}
-      </Text>
+      <EmptyState
+        icon={<RiErrorWarningLine size={28} />}
+        title="The board could not be loaded"
+        description={errorMessage(boardError)}
+        actions={
+          <Button
+            onPress={() =>
+              queryClient.invalidateQueries({
+                queryKey: queryKeys.board(boardId),
+              })
+            }
+          >
+            Retry
+          </Button>
+        }
+      />
     );
   }
 

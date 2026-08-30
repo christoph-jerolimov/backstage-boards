@@ -31,6 +31,9 @@ board-specific lives in `plugins/`.
 - **Duplicate a board** — optionally copying items and entity references; the
   copy belongs to the duplicator and keeps the description, column colors,
   and WIP limits.
+- **Friendly dead ends** — a proper "Board not found" page for stale
+  links (with a way back), retryable load errors, and consistent empty
+  states across the board list and empty boards.
 - **Board archival** — deleting archives the board for 30 days, read-only and
   reachable only by direct link, with "Unarchive" and "Delete now" actions.
 - **Entity assignment** — a board can reference any number of catalog
