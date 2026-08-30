@@ -211,6 +211,7 @@ export function testActions(): jest.Mocked<BoardActions> {
     reorderColumn: jest.fn().mockResolvedValue(undefined),
     addColumn: jest.fn().mockResolvedValue(undefined),
     setColumnColor: jest.fn().mockResolvedValue(undefined),
+    setColumnWipLimits: jest.fn().mockResolvedValue(undefined),
     deleteColumn: jest.fn().mockResolvedValue(undefined),
     openItem: jest.fn(),
     renameItem: jest.fn().mockResolvedValue(undefined),

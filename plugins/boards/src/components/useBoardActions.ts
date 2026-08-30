@@ -147,6 +147,8 @@ export function useBoardActions(
         guarded(() => boardsApi.addColumn(boardId, { title, position })),
       setColumnColor: (columnId, color) =>
         guarded(() => boardsApi.updateColumn(boardId, columnId, { color })),
+      setColumnWipLimits: (columnId, limits) =>
+        guarded(() => boardsApi.updateColumn(boardId, columnId, limits)),
       deleteColumn: (columnId, moveItemsTo) =>
         guarded(() =>
           boardsApi.deleteColumn(boardId, columnId, { moveItemsTo }),

@@ -40,6 +40,8 @@ export interface ColumnRow {
   title: string;
   position: number;
   color: ColumnColor | null;
+  wip_soft_limit: number | null;
+  wip_hard_limit: number | null;
 }
 
 export interface PriorityRow {

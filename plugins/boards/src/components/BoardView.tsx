@@ -17,6 +17,7 @@ import {
   Select,
   SubmenuTrigger,
   Text,
+  TextField,
 } from '@backstage/ui';
 import {
   BoardColumn,
@@ -25,6 +26,7 @@ import {
   BoardWithContext,
   ALL_COLUMN_COLORS,
   ColumnColor,
+  wipState,
 } from '@internal/plugin-boards-common';
 import {
   assigneePool,
@@ -54,6 +56,10 @@ export interface BoardActions extends ItemActions {
   setColumnColor: (
     columnId: string,
     color: ColumnColor | null,
+  ) => Promise<void>;
+  setColumnWipLimits: (
+    columnId: string,
+    limits: { wipSoftLimit: number | null; wipHardLimit: number | null },
   ) => Promise<void>;
   deleteColumn: (columnId: string, moveItemsTo?: string) => Promise<void>;
   renameItem: (itemId: string, title: string) => Promise<void>;
@@ -268,17 +274,23 @@ function ItemCard(props: {
   );
 }
 
-function AddItemRow(props: { columnId: string; actions: BoardActions }) {
+function AddItemRow(props: {
+  columnId: string;
+  actions: BoardActions;
+  /** The column is at its hard WIP limit: nothing more fits. */
+  disabled?: boolean;
+}) {
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState('');
   const fieldRef = useRef<HTMLDivElement>(null);
-  if (!adding) {
+  if (!adding || props.disabled) {
     return (
       <Button
         variant="tertiary"
         size="small"
         onPress={() => setAdding(true)}
         aria-label="Add item"
+        isDisabled={props.disabled}
       >
         + Add item
       </Button>
@@ -329,18 +341,25 @@ function ColumnLane(props: {
   onRequestDelete: (column: BoardColumn, hasItems: boolean) => void;
   onInsertBefore: () => void;
   onInsertAfter: () => void;
+  onEditWipLimits: () => void;
   rowMenu: RowMenuHandle<BoardItem>;
   nav: CardNav;
+  /** The column's non-archived item count, ignoring active filters. */
+  wipCount: number;
+  /** Whether the dragged item may land in this column. */
+  acceptsItem: (itemId: string) => boolean;
 }) {
   const { board, column, items, canWrite, actions, groupBy, nav } = props;
   const laneRef = useRef<HTMLDivElement>(null);
   const sorted = [...items].sort((a, b) => a.position - b.position);
+  const wip = wipState(column, props.wipCount);
+  const wipLimit = column.wipHardLimit ?? column.wipSoftLimit;
 
   const { dropProps, isDropTarget } = useDrop({
     ref: laneRef,
     onDrop: async event => {
       const itemId = await droppedItemId(event);
-      if (itemId) {
+      if (itemId && props.acceptsItem(itemId)) {
         await actions.moveItem(itemId, { columnId: column.id });
       }
     },
@@ -353,6 +372,9 @@ function ColumnLane(props: {
   // the whole lane otherwise — so the card lands exactly where the
   // insertion line showed it.
   const dropAt = (itemId: string, section: BoardItem[], at: number) => {
+    if (!props.acceptsItem(itemId)) {
+      return;
+    }
     if (section[at]?.id === itemId || section[at - 1]?.id === itemId) {
       // dropped right where it already sits
       return;
@@ -415,7 +437,24 @@ function ColumnLane(props: {
         gap: 8,
       }}
     >
-      <Flex align="center" justify="between" gap="2">
+      <Flex
+        align="center"
+        justify="between"
+        gap="2"
+        style={
+          wip === 'ok'
+            ? undefined
+            : {
+                background:
+                  wip === 'hard'
+                    ? 'var(--bui-bg-danger)'
+                    : 'var(--bui-bg-warning)',
+                borderRadius: 6,
+                padding: '2px 6px',
+                margin: '-2px -6px',
+              }
+        }
+      >
         <Flex align="center" gap="2">
           <ColumnDot column={column} />
           <InlineEdit
@@ -425,7 +464,11 @@ function ColumnLane(props: {
             onCommit={title => actions.renameColumn(column.id, title)}
             display={
               <Text variant="body-medium" weight="bold">
-                {column.title} ({items.length})
+                {column.title} (
+                {wipLimit !== undefined
+                  ? `${props.wipCount}/${wipLimit}`
+                  : items.length}
+                )
               </Text>
             }
           />
@@ -498,6 +541,7 @@ function ColumnLane(props: {
                   </MenuItem>
                 </Menu>
               </SubmenuTrigger>
+              <MenuItem onAction={props.onEditWipLimits}>WIP limits</MenuItem>
               <MenuItem
                 onAction={() => props.onRequestDelete(column, items.length > 0)}
               >
@@ -524,8 +568,96 @@ function ColumnLane(props: {
             </div>
           ))
         : renderSection(sorted)}
-      {canWrite && <AddItemRow columnId={column.id} actions={actions} />}
+      {canWrite && (
+        <AddItemRow
+          columnId={column.id}
+          actions={actions}
+          disabled={wip === 'hard'}
+        />
+      )}
     </div>
+  );
+}
+
+/**
+ * Small dialog editing one column's optional soft/hard WIP limits.
+ * Empty fields clear a limit; validation mirrors the backend's rules.
+ */
+function WipLimitsDialog(props: {
+  column: BoardColumn;
+  onClose: () => void;
+  onSave: (limits: {
+    wipSoftLimit: number | null;
+    wipHardLimit: number | null;
+  }) => Promise<void>;
+}) {
+  const { column, onClose, onSave } = props;
+  const [soft, setSoft] = useState(
+    column.wipSoftLimit !== undefined ? String(column.wipSoftLimit) : '',
+  );
+  const [hard, setHard] = useState(
+    column.wipHardLimit !== undefined ? String(column.wipHardLimit) : '',
+  );
+  const parse = (value: string): number | null | undefined => {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+    const parsed = Number(trimmed);
+    return Number.isInteger(parsed) && parsed >= 1 ? parsed : undefined;
+  };
+  const softLimit = parse(soft);
+  const hardLimit = parse(hard);
+  const valid =
+    softLimit !== undefined &&
+    hardLimit !== undefined &&
+    (softLimit === null || hardLimit === null || softLimit <= hardLimit);
+  return (
+    <Dialog isOpen onOpenChange={open => !open && onClose()}>
+      <DialogHeader>WIP limits for “{column.title}”</DialogHeader>
+      <DialogBody>
+        <Flex direction="column" gap="3">
+          <Text variant="body-small" color="secondary">
+            The soft limit turns the column header into a warning; the hard
+            limit blocks adding or moving more items into the column. Leave a
+            field empty for no limit.
+          </Text>
+          <TextField
+            label="Soft limit"
+            value={soft}
+            onChange={setSoft}
+            placeholder="No soft limit"
+          />
+          <TextField
+            label="Hard limit"
+            value={hard}
+            onChange={setHard}
+            placeholder="No hard limit"
+          />
+        </Flex>
+      </DialogBody>
+      <DialogFooter>
+        <Flex gap="2">
+          <Button variant="secondary" onPress={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            isDisabled={!valid}
+            onPress={async () => {
+              if (valid) {
+                await onSave({
+                  wipSoftLimit: softLimit,
+                  wipHardLimit: hardLimit,
+                });
+              }
+            }}
+          >
+            Save limits
+          </Button>
+        </Flex>
+      </DialogFooter>
+    </Dialog>
   );
 }
 
@@ -537,8 +669,34 @@ export function BoardView(props: {
   groupBy: GroupByMode;
   /** The page's shared bulk selection; absent for readers. */
   selection?: SelectionHandle;
+  /**
+   * Every non-archived item of the board, ignoring active filters —
+   * the basis for WIP counts and drop guards. Defaults to `items`.
+   */
+  allItems?: BoardItem[];
 }) {
   const { board, items, canWrite, actions, groupBy, selection } = props;
+  const wipItems = props.allItems ?? items;
+  const wipCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const item of wipItems) {
+      counts.set(item.columnId, (counts.get(item.columnId) ?? 0) + 1);
+    }
+    return counts;
+  }, [wipItems]);
+  const fullColumnIds = useMemo(
+    () =>
+      new Set(
+        board.columns
+          .filter(
+            column =>
+              wipState(column, wipCounts.get(column.id) ?? 0) === 'hard',
+          )
+          .map(column => column.id),
+      ),
+    [board.columns, wipCounts],
+  );
+  const [limitsTarget, setLimitsTarget] = useState<BoardColumn | undefined>();
   const pool = assigneePool(items);
   const rowMenu = useRowMenu<BoardItem>({
     name: item => item.title,
@@ -550,6 +708,7 @@ export function BoardView(props: {
         readonly={!canWrite || !!item.externalManager}
         actions={actions}
         assigneePool={pool}
+        fullColumnIds={fullColumnIds}
         submenu={submenu}
       />
     ),
@@ -666,6 +825,7 @@ export function BoardView(props: {
       readonly: !canWrite || !!item.externalManager,
       actions,
       selection,
+      fullColumnIds,
       openMenu: kind => {
         pendingRefocus.current = true;
         rowMenu.openForRow(item, cardEl, kind === 'menu' ? undefined : kind);
@@ -809,6 +969,14 @@ export function BoardView(props: {
             nav={nav}
             onInsertBefore={() => setInsertAt(index)}
             onInsertAfter={() => setInsertAt(index + 1)}
+            onEditWipLimits={() => setLimitsTarget(column)}
+            wipCount={wipCounts.get(column.id) ?? 0}
+            acceptsItem={itemId =>
+              !fullColumnIds.has(column.id) ||
+              wipItems.some(
+                entry => entry.id === itemId && entry.columnId === column.id,
+              )
+            }
             onRequestDelete={(target, hasItems) => {
               if (hasItems) {
                 setDeleteTarget(target);
@@ -831,6 +999,16 @@ export function BoardView(props: {
         </Button>
       )}
       {rowMenu.contextMenu}
+      {limitsTarget && (
+        <WipLimitsDialog
+          column={limitsTarget}
+          onClose={() => setLimitsTarget(undefined)}
+          onSave={async limits => {
+            await actions.setColumnWipLimits(limitsTarget.id, limits);
+            setLimitsTarget(undefined);
+          }}
+        />
+      )}
       <Dialog
         isOpen={deleteTarget !== undefined}
         onOpenChange={open => {

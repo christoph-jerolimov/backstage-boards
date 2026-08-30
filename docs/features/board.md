@@ -63,6 +63,18 @@ The shortcuts only fire on the focused item itself — typing in an inline
 editor or an open menu is never hijacked — and they stay inert on
 externally managed items and for read-only visitors.
 
+## WIP limits
+
+Each column can carry an optional **soft** and **hard** WIP limit
+(column menu → **WIP limits**). Once the column's item count — counted
+over all items, regardless of filters — reaches the soft limit, the
+column header takes a warning background and shows the count against the
+limit (for example `Doing (3/5)`). At the hard limit the header turns
+red and the column stops accepting items: its add-item row and the
+move/status entries into it disable, drops from other columns are
+ignored, and the backend rejects create or move requests into the full
+column. Reordering inside the column and moving items out stay possible.
+
 ## Filter bar
 
 Both views share the filter bar: free-text search over titles and

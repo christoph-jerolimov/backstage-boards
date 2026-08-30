@@ -1,8 +1,12 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { BreadcrumbEntry } from '@backstage/frontend-plugin-api';
 import { Flex, Text } from '@backstage/ui';
-import { errorMessage, levelIncludes } from '@internal/plugin-boards-common';
+import {
+  errorMessage,
+  levelIncludes,
+  wipState,
+} from '@internal/plugin-boards-common';
 import { useBoardsBasePath } from '../routes';
 import {
   invalidateBoard,
@@ -58,6 +62,21 @@ export function BoardPageContent(props: {
     openItem,
   );
   const filter = useItemFilter(items ?? [], board?.priorities);
+  // columns whose unfiltered item count reached the hard WIP limit:
+  // move/status entries into them disable across the page's surfaces
+  const fullColumnIds = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const item of items ?? []) {
+      counts.set(item.columnId, (counts.get(item.columnId) ?? 0) + 1);
+    }
+    return new Set(
+      (board?.columns ?? [])
+        .filter(
+          column => wipState(column, counts.get(column.id) ?? 0) === 'hard',
+        )
+        .map(column => column.id),
+    );
+  }, [board?.columns, items]);
   // one id-based selection shared by the board and table views, so it
   // survives switching between them
   const selection = useItemSelection();
@@ -126,6 +145,7 @@ export function BoardPageContent(props: {
         <BoardView
           board={board}
           items={filter.filteredItems}
+          allItems={items ?? []}
           canWrite={canWrite}
           actions={actions}
           groupBy={groupBy}
@@ -140,6 +160,7 @@ export function BoardPageContent(props: {
           groupBy={groupBy}
           openItem={actions.openItem}
           selection={canWrite ? selection : undefined}
+          fullColumnIds={fullColumnIds}
         />
       )}
 
@@ -148,6 +169,7 @@ export function BoardPageContent(props: {
           board={board}
           item={openDrawerItem}
           canWrite={canWrite}
+          fullColumnIds={fullColumnIds}
           tagSuggestions={filter.allTags}
           onClose={closeItem}
           onChanged={refreshAll}

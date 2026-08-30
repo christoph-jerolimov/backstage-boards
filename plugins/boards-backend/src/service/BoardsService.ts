@@ -139,6 +139,8 @@ function toColumn(row: ColumnRow): BoardColumn {
     title: row.title,
     position: row.position,
     color: row.color ?? undefined,
+    wipSoftLimit: row.wip_soft_limit ?? undefined,
+    wipHardLimit: row.wip_hard_limit ?? undefined,
   };
 }
 
@@ -147,6 +149,19 @@ function isColumnColor(value: string): value is ColumnColor {
 }
 
 /** Narrows a caller-supplied colour name to the fixed palette. */
+function parseWipLimit(value: number, label: string): number {
+  if (!Number.isInteger(value) || value < 1) {
+    throw new InputError(`${label} must be a positive integer`);
+  }
+  return value;
+}
+
+function requireSoftAtMostHard(soft: number | null, hard: number | null): void {
+  if (soft !== null && hard !== null && soft > hard) {
+    throw new InputError('Soft WIP limit must not exceed the hard WIP limit');
+  }
+}
+
 function parseColumnColor(color: string): ColumnColor {
   if (!isColumnColor(color)) {
     throw new InputError(`Invalid column color '${color}'`);
@@ -1254,7 +1269,13 @@ export class BoardsService {
   async addColumn(
     principal: BoardsPrincipal,
     boardId: string,
-    options: { title: string; position?: number; color?: string },
+    options: {
+      title: string;
+      position?: number;
+      color?: string;
+      wipSoftLimit?: number;
+      wipHardLimit?: number;
+    },
   ): Promise<BoardColumn> {
     await this.requireBoard(principal, boardId, 'write');
     const title = options.title?.trim();
@@ -1262,6 +1283,15 @@ export class BoardsService {
       throw new InputError('Column title must not be empty');
     }
     const color = options.color ? parseColumnColor(options.color) : null;
+    const wipSoftLimit =
+      options.wipSoftLimit !== undefined
+        ? parseWipLimit(options.wipSoftLimit, 'Soft WIP limit')
+        : null;
+    const wipHardLimit =
+      options.wipHardLimit !== undefined
+        ? parseWipLimit(options.wipHardLimit, 'Hard WIP limit')
+        : null;
+    requireSoftAtMostHard(wipSoftLimit, wipHardLimit);
     let position = options.position;
     if (position === undefined) {
       const max = await this.knex('board_columns')
@@ -1276,6 +1306,8 @@ export class BoardsService {
       title,
       position,
       color,
+      wip_soft_limit: wipSoftLimit,
+      wip_hard_limit: wipHardLimit,
     };
     await this.knex('board_columns').insert(row);
     await this.emitBoardSignal(boardId);
@@ -1286,7 +1318,13 @@ export class BoardsService {
     principal: BoardsPrincipal,
     boardId: string,
     columnId: string,
-    update: { title?: string; position?: number; color?: string | null },
+    update: {
+      title?: string;
+      position?: number;
+      color?: string | null;
+      wipSoftLimit?: number | null;
+      wipHardLimit?: number | null;
+    },
   ): Promise<BoardColumn> {
     await this.requireBoard(principal, boardId, 'write');
     const row = await this.knex('board_columns')
@@ -1309,6 +1347,26 @@ export class BoardsService {
     if (update.color !== undefined) {
       patch.color = update.color ? parseColumnColor(update.color) : null;
     }
+    if (update.wipSoftLimit !== undefined) {
+      patch.wip_soft_limit =
+        update.wipSoftLimit === null
+          ? null
+          : parseWipLimit(update.wipSoftLimit, 'Soft WIP limit');
+    }
+    if (update.wipHardLimit !== undefined) {
+      patch.wip_hard_limit =
+        update.wipHardLimit === null
+          ? null
+          : parseWipLimit(update.wipHardLimit, 'Hard WIP limit');
+    }
+    requireSoftAtMostHard(
+      patch.wip_soft_limit !== undefined
+        ? patch.wip_soft_limit
+        : row.wip_soft_limit,
+      patch.wip_hard_limit !== undefined
+        ? patch.wip_hard_limit
+        : row.wip_hard_limit,
+    );
     if (Object.keys(patch).length > 0) {
       await this.knex('board_columns').where('id', columnId).update(patch);
       await this.emitBoardSignal(boardId);
@@ -1757,6 +1815,30 @@ export class BoardsService {
     }
   }
 
+  /**
+   * Rejects putting one more item into a column whose non-archived item
+   * count has reached its hard WIP limit.
+   */
+  private async requireWipCapacity(column: ColumnRow): Promise<void> {
+    if (column.wip_hard_limit === null) {
+      return;
+    }
+    const count = Number(
+      (
+        await this.knex('items')
+          .where('column_id', column.id)
+          .whereNull('archived_at')
+          .count({ count: '*' })
+          .first()
+      )?.count ?? 0,
+    );
+    if (count >= column.wip_hard_limit) {
+      throw new ConflictError(
+        `Column "${column.title}" is at its WIP limit of ${column.wip_hard_limit}`,
+      );
+    }
+  }
+
   async createItem(
     principal: BoardsPrincipal,
     boardId: string,
@@ -1778,6 +1860,7 @@ export class BoardsService {
     if (!column) {
       throw new NotFoundError(`Column ${item.columnId} not found`);
     }
+    await this.requireWipCapacity(column);
     this.validateActorRefs([
       ...(item.creatorRef ? [item.creatorRef] : []),
       ...(item.assignees ?? []),
@@ -2107,6 +2190,9 @@ export class BoardsService {
       .first();
     if (!targetColumn) {
       throw new NotFoundError(`Column ${target.columnId} not found`);
+    }
+    if (row.column_id !== target.columnId) {
+      await this.requireWipCapacity(targetColumn);
     }
     let position = target.position;
     if (position === undefined) {

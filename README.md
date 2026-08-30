@@ -21,6 +21,10 @@ board-specific lives in `plugins/`.
   board, and insert a column at any position.
 - **Column colors** — an optional color per column, shown as a dot in the
   kanban header and as the status badge color everywhere else.
+- **WIP limits** — optional soft and hard limits per column: the header
+  warns at the soft limit and turns red at the hard limit, which the
+  backend also enforces — full columns accept no new or moved-in items,
+  and the UI disables those affordances.
 - **Duplicate a board** — optionally copying items and entity references; the
   copy belongs to the duplicator.
 - **Board archival** — deleting archives the board for 30 days, read-only and

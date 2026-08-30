@@ -49,6 +49,8 @@ export function ItemMenu(props: {
   assigneePool: string[];
   /** Extra entries for one surface only, rendered after "Open details". */
   extraItems?: ReactNode;
+  /** Columns at their hard WIP limit: their move entries disable. */
+  fullColumnIds?: Set<string>;
   /** The drawer already shows the details, so it drops the entry. */
   showOpenDetails?: boolean;
   /**
@@ -98,6 +100,7 @@ export function ItemMenu(props: {
     .map(column => (
       <MenuItem
         key={column.id}
+        isDisabled={props.fullColumnIds?.has(column.id)}
         onAction={() => actions.moveItem(item.id, { columnId: column.id })}
       >
         {column.title}

@@ -1001,6 +1001,115 @@ describe('BoardsService', () => {
     });
   });
 
+  describe('column WIP limits', () => {
+    it('stores, updates, and clears the limits', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const col = await service.addColumn(alice, board.id, {
+        title: 'Doing',
+        wipSoftLimit: 2,
+        wipHardLimit: 4,
+      });
+      expect(col.wipSoftLimit).toBe(2);
+      expect(col.wipHardLimit).toBe(4);
+      const updated = await service.updateColumn(alice, board.id, col.id, {
+        wipSoftLimit: 3,
+      });
+      expect(updated.wipSoftLimit).toBe(3);
+      expect(updated.wipHardLimit).toBe(4);
+      const cleared = await service.updateColumn(alice, board.id, col.id, {
+        wipSoftLimit: null,
+        wipHardLimit: null,
+      });
+      expect(cleared.wipSoftLimit).toBeUndefined();
+      expect(cleared.wipHardLimit).toBeUndefined();
+    });
+
+    it('rejects invalid limits', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const col = board.columns[0];
+      await expect(
+        service.updateColumn(alice, board.id, col.id, { wipSoftLimit: 0 }),
+      ).rejects.toThrow('Soft WIP limit must be a positive integer');
+      await expect(
+        service.updateColumn(alice, board.id, col.id, {
+          wipSoftLimit: 5,
+          wipHardLimit: 3,
+        }),
+      ).rejects.toThrow('Soft WIP limit must not exceed the hard WIP limit');
+      // soft above the stored hard limit is caught too
+      await service.updateColumn(alice, board.id, col.id, {
+        wipHardLimit: 3,
+      });
+      await expect(
+        service.updateColumn(alice, board.id, col.id, { wipSoftLimit: 4 }),
+      ).rejects.toThrow('Soft WIP limit must not exceed the hard WIP limit');
+    });
+
+    it('blocks creating into and moving into a hard-full column', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const [colA, colB] = board.columns;
+      await service.updateColumn(alice, board.id, colB.id, {
+        wipHardLimit: 1,
+      });
+      await service.createItem(alice, board.id, {
+        columnId: colB.id,
+        title: 'Occupant',
+      });
+      await expect(
+        service.createItem(alice, board.id, { columnId: colB.id, title: 'X' }),
+      ).rejects.toThrow('at its WIP limit of 1');
+      const outsider = await service.createItem(alice, board.id, {
+        columnId: colA.id,
+        title: 'Outsider',
+      });
+      await expect(
+        service.moveItem(alice, board.id, outsider.id, { columnId: colB.id }),
+      ).rejects.toThrow('at its WIP limit of 1');
+    });
+
+    it('allows reordering within and moving out of a full column', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const [colA, colB] = board.columns;
+      await service.updateColumn(alice, board.id, colB.id, {
+        wipHardLimit: 2,
+      });
+      const one = await service.createItem(alice, board.id, {
+        columnId: colB.id,
+        title: 'One',
+      });
+      await service.createItem(alice, board.id, {
+        columnId: colB.id,
+        title: 'Two',
+      });
+      // reorder inside the full column
+      await service.moveItem(alice, board.id, one.id, {
+        columnId: colB.id,
+        position: 99999,
+      });
+      // and leave it
+      const moved = await service.moveItem(alice, board.id, one.id, {
+        columnId: colA.id,
+      });
+      expect(moved.columnId).toBe(colA.id);
+    });
+
+    it('archived items do not count against the limit', async () => {
+      const board = await service.createBoard(alice, { name: 'B' });
+      const col = board.columns[0];
+      await service.updateColumn(alice, board.id, col.id, {
+        wipHardLimit: 1,
+      });
+      const item = await service.createItem(alice, board.id, {
+        columnId: col.id,
+        title: 'Occupant',
+      });
+      await service.deleteItem(alice, board.id, item.id);
+      await expect(
+        service.createItem(alice, board.id, { columnId: col.id, title: 'Y' }),
+      ).resolves.toMatchObject({ title: 'Y' });
+    });
+  });
+
   describe('priorities', () => {
     it('seeds new boards with the default priorities', async () => {
       const board = await service.createBoard(alice, { name: 'B' });
