@@ -33,8 +33,14 @@ board-specific lives in `plugins/`.
 ### Items
 
 - **Kanban and table views** — two switchable views over the same items.
-- **Drag & drop** — with a drop indicator and an accessible "Move to column"
-  menu as keyboard fallback.
+- **Drag & drop** — an insertion line shows exactly where the card will
+  land: between two cards, after the last card, or in an empty column,
+  also inside grouped lanes.
+- **Keyboard navigation** — arrow keys walk the cards (and table rows,
+  across groups) with a visible focus; shortcuts on the focused item move
+  it between columns (`Ctrl+←`/`Ctrl+→`), select it (`Space`), open the
+  item menu (`Enter`) and the status/assignee/due-date/priority pickers
+  (`s`, `a`, `d`, `p`), set a priority by digit, and archive (`Delete`).
 - **Optimistic updates** — moves and edits apply instantly and roll back on
   failure.
 - **Item fields** — title, description, tags, creator, and multiple
@@ -46,8 +52,10 @@ board-specific lives in `plugins/`.
 - **Configurable table columns** — choose which columns the table shows.
 - **Utility columns** — the table's leading selection and trailing actions
   columns stay put regardless of configuration.
-- **Row selection and bulk actions** — multi-select table rows and change
-  assignee or priority for all of them at once.
+- **Selection and bulk actions** — multi-select items with the table's
+  checkboxes or `Space` in either view; the selection is shared between
+  the kanban and table views, with bulk status, priority, assignee,
+  due-date, and archive actions.
 - **Item archival** — deleted items are archived, listed with who archived
   them and when, restorable for 30 days before purge.
 - **Externally managed items** — items owned by an integration are read-only

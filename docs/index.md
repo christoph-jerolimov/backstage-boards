@@ -9,7 +9,9 @@ notifications system.
 
 ## What you can do with it
 
-- Organize work as **items on boards**, in a kanban view or a table view.
+- Organize work as **items on boards**, in a kanban view or a table view —
+  by drag & drop with a precise drop indicator, or entirely from the
+  **keyboard** with arrow navigation and item shortcuts.
 - **Share** each board with exactly the people and groups that need it, from
   fully private to fully public.
 - Track **due dates, priorities, checklists, tags, and assignees** on every
