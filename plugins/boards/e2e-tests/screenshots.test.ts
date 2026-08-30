@@ -369,6 +369,10 @@ test('the keyboard shortcut dialog', async ({ page }) => {
   await expect(
     dialog.getByRole('heading', { name: 'Keyboard shortcuts' }),
   ).toBeVisible();
+  // let the dialog's enter transition finish, or the shot is mid-fade
+  await page.evaluate(() =>
+    Promise.all(document.getAnimations().map(entry => entry.finished)),
+  );
   await expect(page).toHaveScreenshot('keyboard-shortcuts.png');
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();

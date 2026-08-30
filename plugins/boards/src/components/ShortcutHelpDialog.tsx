@@ -4,6 +4,13 @@ import { Dialog, DialogBody, DialogHeader, Text } from '@backstage/ui';
 /** One line of the cheat sheet: its key badges and what they do. */
 export interface ShortcutRow {
   keys: string[];
+  /**
+   * How multiple keys read between their badges: 'or' for strict
+   * alternatives ("s, c or m"), 'slash' for directional pairs
+   * ("← / →"). Every key of a row triggers the same action on its own —
+   * never a chord.
+   */
+  conjunction?: 'or' | 'slash';
   description: string;
   /** Hidden for read-only visitors. */
   needsWrite?: boolean;
@@ -52,6 +59,7 @@ export const ITEM_SHORTCUT_ROWS: ShortcutRow[] = [
   },
   {
     keys: ['s', 'c', 'm'],
+    conjunction: 'or',
     description: 'Move to another column (status picker)',
     needsWrite: true,
     covers: ['s', 'c', 'm'],
@@ -77,6 +85,7 @@ export const ITEM_SHORTCUT_ROWS: ShortcutRow[] = [
   },
   {
     keys: ['1–9', '0'],
+    conjunction: 'or',
     description: 'Set the priority with that order (0 = 10)',
     needsWrite: true,
     needsPriorities: true,
@@ -145,7 +154,12 @@ function RowList(props: { title: string; rows: ShortcutRow[] }) {
             <span style={{ whiteSpace: 'nowrap' }}>
               {row.keys.map((key, index) => (
                 <Fragment key={key}>
-                  {index > 0 && ' '}
+                  {/* spell the relation out so several badges never
+                      read as a chord: "s, c or m", "← / →" */}
+                  {index > 0 &&
+                    (row.conjunction === 'or'
+                      ? `${index === row.keys.length - 1 ? ' or ' : ', '}`
+                      : ' / ')}
                   <KeyBadge label={key} />
                 </Fragment>
               ))}

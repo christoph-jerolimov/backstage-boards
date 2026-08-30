@@ -27,18 +27,20 @@ follows the item, or falls to a neighbouring one.
 
 ## Acting on the focused item
 
-While a card or row is focused:
+While a card or row is focused — where a row lists several keys, each
+one triggers the action on its own (`s`, `c` or `m` are three ways to
+open the same picker, never a combination):
 
 | Key                 | Action                                            |
 | ------------------- | ------------------------------------------------- |
 | `Ctrl+←` / `Ctrl+→` | Move the item one column left / right             |
 | `Space`             | Select or deselect the item for bulk actions      |
 | `Enter`             | Open the item's actions menu                      |
-| `s`, `c`, or `m`    | Open the move-to-column (status) picker           |
+| `s`, `c` or `m`     | Open the move-to-column (status) picker           |
 | `a`                 | Open the assignee picker                          |
 | `d`                 | Open the due-date picker                          |
 | `p`                 | Open the priority picker (boards with priorities) |
-| `1`–`9`, `0`        | Set the priority with that order (`0` = 10)       |
+| `1`–`9` or `0`      | Set the priority with that order (`0` = 10)       |
 | `Delete`            | Archive the item                                  |
 | `?`                 | Open the shortcut overview                        |
 
