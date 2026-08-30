@@ -280,6 +280,7 @@ describe('MyItemsList', () => {
       screen.getAllByRole('menuitem').map(entry => entry.textContent),
     ).toEqual([
       'Open details',
+      'Copy link',
       'Open board',
       'Move to column',
       'Due date',
@@ -386,7 +387,7 @@ describe('MyItemsList', () => {
     await openRowMenu('Ship the docs');
     expect(
       screen.getAllByRole('menuitem').map(entry => entry.textContent),
-    ).toEqual(['Open details', 'Open board']);
+    ).toEqual(['Open details', 'Copy link', 'Open board']);
   });
 
   it('offers navigation only on an externally managed item', async () => {
@@ -407,7 +408,7 @@ describe('MyItemsList', () => {
     await openRowMenu('Synced issue');
     expect(
       screen.getAllByRole('menuitem').map(entry => entry.textContent),
-    ).toEqual(['Open details', 'Open board']);
+    ).toEqual(['Open details', 'Copy link', 'Open board']);
   });
 
   it('reports a failed row action', async () => {
@@ -431,6 +432,7 @@ describe('MyItemsList', () => {
       (await screen.findAllByRole('menuitem')).map(entry => entry.textContent),
     ).toEqual([
       'Open details',
+      'Copy link',
       'Open board',
       'Move to column',
       'Due date',
@@ -493,7 +495,7 @@ describe('MyItemsList', () => {
     await openRowMenu('Answer the ticket');
     expect(
       screen.getAllByRole('menuitem').map(entry => entry.textContent),
-    ).toEqual(['Open details', 'Open board']);
+    ).toEqual(['Open details', 'Copy link', 'Open board']);
   });
 });
 

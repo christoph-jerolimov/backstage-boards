@@ -80,6 +80,8 @@ board-specific lives in `plugins/`.
   checkboxes or `Space` in either view; the selection is shared between
   the kanban and table views, with bulk status, priority, assignee,
   due-date, tag, and archive actions.
+- **Item permalinks** — a Copy link entry in every item menu puts a
+  direct link to the item (board URL + `?item=`) on the clipboard.
 - **Item archival** — deleted items are archived, listed with who archived
   them and when, restorable for 30 days before purge.
 - **Externally managed items** — items owned by an integration are read-only

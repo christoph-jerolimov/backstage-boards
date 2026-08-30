@@ -316,7 +316,7 @@ describe('TableView', () => {
     );
     expect(
       (await screen.findAllByRole('menuitem')).map(entry => entry.textContent),
-    ).toEqual(['Open details']);
+    ).toEqual(['Open details', 'Copy link']);
   });
 
   it('opens the context menu at the pointer on right-click', async () => {
