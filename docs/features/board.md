@@ -39,29 +39,11 @@ keeps the selection.
 
 ## Keyboard navigation
 
-Both views are fully keyboard-operable. On the kanban view, tab to a card
-and use the arrow keys: `↑`/`↓` walk the cards of a column, `←`/`→` jump
-to the neighbouring column, and a visible focus ring follows along. In the
-table view, `↑`/`↓` move the row focus, continuing across group boundaries
-when the table is grouped; `←`/`→` do not navigate between items there.
-
-While an item (card or row) is focused:
-
-| Key                 | Action                                            |
-| ------------------- | ------------------------------------------------- |
-| `Ctrl+←` / `Ctrl+→` | Move the item one column left / right             |
-| `Space`             | Select or deselect the item for bulk actions      |
-| `Enter`             | Open the item's actions menu                      |
-| `s`, `c`, or `m`    | Open the move-to-column (status) picker           |
-| `a`                 | Open the assignee picker                          |
-| `d`                 | Open the due-date picker                          |
-| `p`                 | Open the priority picker (boards with priorities) |
-| `1`–`9`, `0`        | Set the priority with that order (`0` = 10)       |
-| `Delete`            | Archive the item                                  |
-
-The shortcuts only fire on the focused item itself — typing in an inline
-editor or an open menu is never hijacked — and they stay inert on
-externally managed items and for read-only visitors.
+Both views are fully keyboard-operable: the arrow keys move a visible
+focus between cards and rows, and shortcuts on the focused item move,
+select, edit, and archive it. Press `?` on the board page for the
+in-app overview, or see the full reference under
+[Keyboard shortcuts](keyboard.md).
 
 ## WIP limits
 

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { BreadcrumbEntry } from '@backstage/frontend-plugin-api';
 import { Button, Flex, Text } from '@backstage/ui';
@@ -33,6 +33,7 @@ import { BulkActionsBar } from './BulkActionsBar';
 import { BoardDescription } from './BoardDescription';
 import { InsightsView } from './InsightsView';
 import { MoveItemDialog } from './MoveItemDialog';
+import { ShortcutHelpDialog } from './ShortcutHelpDialog';
 import { ErrorText } from './common';
 import { EmptyState } from './EmptyState';
 import { useBoardActions, useOpenItemParam } from './useBoardActions';
@@ -180,6 +181,7 @@ export function BoardPageContent(props: {
   // one id-based selection shared by the board and table views, so it
   // survives switching between them
   const selection = useItemSelection();
+  const [shortcutHelp, setShortcutHelp] = useState(false);
 
   // the order the drawer's prev/next walks: exactly what the active
   // view shows — the kanban's lanes left to right, or the table's
@@ -227,6 +229,34 @@ export function BoardPageContent(props: {
   }, [board, filter.filteredItems, view, groupBy, tableSort]);
 
   useBoardsSignal(() => invalidateBoard(queryClient, boardId), { boardId });
+
+  // `?` opens the shortcut cheat sheet from anywhere on the page —
+  // except while typing or while an overlay (menu, dialog, the item
+  // drawer) has the keys. Same document-listener pattern as the
+  // drawer's Escape handling.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== '?' || event.ctrlKey || event.metaKey || event.altKey) {
+        return;
+      }
+      if (event.defaultPrevented) {
+        return;
+      }
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        target.closest(
+          'input, textarea, select, [contenteditable="true"], [role="dialog"], [role="menu"], [role="listbox"]',
+        )
+      ) {
+        return;
+      }
+      event.preventDefault();
+      setShortcutHelp(true);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   if (boardLoading) {
     return <Text style={{ padding: 16 }}>Loading board…</Text>;
@@ -345,6 +375,13 @@ export function BoardPageContent(props: {
           onSortChange={setTableSort}
         />
       )}
+
+      <ShortcutHelpDialog
+        open={shortcutHelp}
+        onClose={() => setShortcutHelp(false)}
+        canWrite={canWrite}
+        hasPriorities={board.priorities.length > 0}
+      />
 
       {openDrawerItem && (
         <ItemDrawer

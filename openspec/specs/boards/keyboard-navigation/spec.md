@@ -19,7 +19,9 @@ grouped); at the first/last card of a column, focus SHALL stay put.
 Arrow Left/Right SHALL move focus into the neighbouring column —
 skipping empty columns — to the card at the same visible position, or
 the last card when that column has fewer cards; when no column in that
-direction has cards, focus SHALL stay put.
+direction has cards, focus SHALL stay put. The keys `j`/`k` SHALL act
+as Arrow Down/Up and `h`/`l` as Arrow Left/Right. Home/End SHALL move
+focus to the first/last card of the current column.
 
 #### Scenario: Arrow down moves to the next card
 - **WHEN** a user focuses the first card of the "Todo" column and
@@ -31,6 +33,16 @@ direction has cards, focus SHALL stay put.
 - **WHEN** the third card of "Todo" is focused and the user presses
   Arrow Right, and the next non-empty column "Doing" has two cards
 - **THEN** focus moves to the last card of "Doing"
+
+#### Scenario: Vim-style aliases
+- **WHEN** a user focuses a card and presses `j`, then `k`, then `l`
+- **THEN** focus moves down, back up, and into the next non-empty
+  column — exactly as Arrow Down, Arrow Up, and Arrow Right would
+
+#### Scenario: Home and End jump within the column
+- **WHEN** a user focuses a middle card of a column with five cards
+  and presses End, then Home
+- **THEN** focus jumps to the column's last card, then to its first
 
 #### Scenario: Edges keep focus in place
 - **WHEN** the last card of the rightmost non-empty column is focused
@@ -47,8 +59,10 @@ direction has cards, focus SHALL stay put.
 Table view rows SHALL be focusable as complete rows with a visible
 focus indicator. Arrow Up/Down SHALL move focus to the previous/next
 row; when the table is grouped, focus SHALL continue from the last row
-of a group to the first row of the next group and vice versa. Arrow
-Left/Right SHALL NOT move focus between items in the table view. Row
+of a group to the first row of the next group and vice versa. The keys
+`j`/`k` SHALL act as Arrow Down/Up. Home/End SHALL move focus to the
+first/last row across all groups. Arrow Left/Right — and their aliases
+`h`/`l` — SHALL NOT move focus between items in the table view. Row
 focus alone SHALL NOT open the item drawer.
 
 #### Scenario: Arrow down crosses a group boundary
@@ -56,37 +70,16 @@ focus alone SHALL NOT open the item drawer.
   first group is focused and the user presses Arrow Down
 - **THEN** focus moves to the first row of the next group
 
+#### Scenario: Aliases and Home/End in the table
+- **WHEN** a middle row is focused and the user presses `j`, then
+  Home, then End
+- **THEN** focus moves one row down, then to the very first row, then
+  to the very last row
+
 #### Scenario: Left and right do not navigate items
-- **WHEN** a table row is focused and the user presses Arrow Left or
-  Arrow Right
+- **WHEN** a table row is focused and the user presses Arrow Left,
+  Arrow Right, `h`, or `l`
 - **THEN** the focused row does not change
-
-### Requirement: Move the focused item with Ctrl+Arrow
-For a user with write access, pressing Ctrl+Right / Ctrl+Left while an
-item (board card or table row) is focused SHALL move that item one
-column to the right / left in the board's column order — in the table
-view this means the item's status changes to the neighbouring column.
-The moved item SHALL keep the keyboard focus. When there is no column
-in that direction, the shortcut SHALL do nothing. Keyboard moves SHALL
-behave like any other move (optimistic update, history entry). On
-externally managed items and for read-only users the shortcut SHALL
-have no effect.
-
-#### Scenario: Move card one column right
-- **WHEN** a writer focuses a card in "Todo" and presses Ctrl+Right
-- **THEN** the item moves to the next column, its status updates, and
-  the card in its new column keeps the keyboard focus
-
-#### Scenario: Move from a table row
-- **WHEN** a writer focuses a table row of an item in "Doing" and
-  presses Ctrl+Left
-- **THEN** the item's status becomes the previous column and the row
-  stays focused
-
-#### Scenario: No column in that direction
-- **WHEN** a writer focuses an item in the leftmost column and presses
-  Ctrl+Left
-- **THEN** nothing changes
 
 ### Requirement: Select the focused item with Space
 Pressing Space while an item is focused SHALL toggle that item's
@@ -172,7 +165,7 @@ in a text input or inline editor, while a menu, drawer, or dialog is
 open, or when an additional modifier is held beyond the defined
 combinations. Handled keys SHALL not additionally trigger their
 default behaviour (no page scroll on Space/arrows, no browser history
-navigation on Ctrl+Arrow while an item is focused).
+navigation on Alt+Arrow while an item is focused).
 
 #### Scenario: Typing is never hijacked
 - **WHEN** a user types the letter `a` or a digit into an item title
@@ -184,3 +177,89 @@ navigation on Ctrl+Arrow while an item is focused).
 - **WHEN** an item's menu is open and the user presses `d`
 - **THEN** no due-date menu opens for the item; the key goes to the
   menu (e.g. typeahead) as usual
+
+### Requirement: Shortcut help dialog
+Pressing `?` on the board page — in the kanban view or the table view,
+including the embedded catalog-entity tab — SHALL open a compact dialog
+listing the available keyboard shortcuts with their keys and a short
+description, grouped into navigation and focused-item actions. The
+dialog SHALL close via `Escape` and via its close control. `?` SHALL
+NOT open the dialog while the user is typing in a text input or inline
+editor, or while a menu, another dialog, or the item drawer is open.
+Entries that do not apply SHALL be omitted: the priority picker and
+priority digit entries on boards without priorities, and the mutating
+actions (move, select, pickers, archive) for users without write
+access.
+
+#### Scenario: Open and close the help
+- **WHEN** a user presses `?` while viewing a board and then presses
+  `Escape`
+- **THEN** a dialog listing the keyboard shortcuts opens, and closes
+  again
+
+#### Scenario: Works with an item focused
+- **WHEN** a board card or table row has the keyboard focus and the
+  user presses `?`
+- **THEN** the shortcut dialog opens (the key is not treated as an item
+  shortcut)
+
+#### Scenario: Typing is never hijacked
+- **WHEN** a user types `?` into the item search field or an inline
+  title editor
+- **THEN** no dialog opens — the character is simply typed
+
+#### Scenario: Irrelevant entries are omitted
+- **WHEN** a user opens the shortcut help on a board without
+  priorities, or as a read-only visitor
+- **THEN** the priority picker and digit entries are missing in the
+  first case, and the mutating actions are missing in the second,
+  while the navigation entries always remain
+
+### Requirement: Move the focused item with Alt+Arrow
+For a user with write access, pressing Alt+Right / Alt+Left while an
+item (board card or table row) is focused SHALL move that item one
+column to the right / left in the board's column order — in the table
+view this means the item's status changes to the neighbouring column.
+A target column at its hard WIP limit SHALL NOT be entered. The moved
+item SHALL keep the keyboard focus. When there is no column in that
+direction, the shortcut SHALL do nothing. Keyboard moves SHALL behave
+like any other move (optimistic update, history entry). On externally
+managed items and for read-only users the shortcut SHALL have no
+effect.
+
+#### Scenario: Move card one column right
+- **WHEN** a writer focuses a card in "Todo" and presses Alt+Right
+- **THEN** the item moves to the next column, its status updates, and
+  the card in its new column keeps the keyboard focus
+
+#### Scenario: Move from a table row
+- **WHEN** a writer focuses a table row of an item in "Doing" and
+  presses Alt+Left
+- **THEN** the item's status becomes the previous column and the row
+  stays focused
+
+#### Scenario: No column in that direction
+- **WHEN** a writer focuses an item in the leftmost column and presses
+  Alt+Left
+- **THEN** nothing changes
+
+### Requirement: Reorder the focused card with Alt+Up/Down
+For a user with write access, pressing Alt+Up / Alt+Down while a board
+card is focused SHALL move that item one place up / down within its
+column's position order, persisting the position like a drag would;
+the card SHALL keep the keyboard focus. At the first/last position the
+shortcut SHALL do nothing. In the table view — whose row order is
+determined by sorting and grouping — Alt+Up/Down SHALL NOT reorder and
+SHALL NOT trigger any browser default. On externally managed items and
+for read-only users the shortcut SHALL have no effect.
+
+#### Scenario: Move a card up
+- **WHEN** a writer focuses the second card of a column and presses
+  Alt+Up
+- **THEN** the card becomes the column's first card, keeps the focus,
+  and the new order survives a reload
+
+#### Scenario: Edges do nothing
+- **WHEN** a writer focuses the last card of a column and presses
+  Alt+Down
+- **THEN** the order is unchanged

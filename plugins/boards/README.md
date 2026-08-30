@@ -69,9 +69,11 @@ the repository. The backend counterpart is
   also inside grouped lanes.
 - **Keyboard navigation** — arrow keys walk the cards (and table rows,
   across groups) with a visible focus; shortcuts on the focused item move
-  it between columns (`Ctrl+←`/`Ctrl+→`), select it (`Space`), open the
+  it between columns (`Alt+←`/`Alt+→`) and within its column
+  (`Alt+↑`/`Alt+↓`), select it (`Space`), open the
   item menu (`Enter`) and the status/assignee/due-date/priority pickers
-  (`s`, `a`, `d`, `p`), set a priority by digit, and archive (`Delete`).
+  (`s`, `a`, `d`, `p`), set a priority by digit, and archive (`Delete`);
+  `?` opens the in-app shortcut overview.
 - **Optimistic updates** — moves and edits apply instantly and roll back on
   failure.
 - **Filter bar** — free-text search plus tag (all must match) and assignee

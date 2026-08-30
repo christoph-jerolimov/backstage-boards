@@ -359,6 +359,25 @@ test('every board dialog', async ({ page }) => {
   );
 });
 
+test('the keyboard shortcut dialog', async ({ page }) => {
+  const boardId = await seedShowcaseBoard();
+  await openBoard(page, boardId);
+
+  // the cheat sheet opens on `?`, not from a menu
+  await page.keyboard.press('?');
+  const dialog = page.getByRole('dialog');
+  await expect(
+    dialog.getByRole('heading', { name: 'Keyboard shortcuts' }),
+  ).toBeVisible();
+  // let the dialog's enter transition finish, or the shot is mid-fade
+  await page.evaluate(() =>
+    Promise.all(document.getAnimations().map(entry => entry.finished)),
+  );
+  await expect(page).toHaveScreenshot('keyboard-shortcuts.png');
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+});
+
 test('the my-items table', async ({ page }) => {
   await seedShowcaseBoard();
   await freezeTime(page);

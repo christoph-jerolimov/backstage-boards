@@ -319,19 +319,34 @@ export function TableView(props: {
     if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) {
       return;
     }
+    // j/k alias the arrows; Home/End jump across all groups
     switch (event.key) {
       case 'ArrowDown':
+      case 'j':
         event.preventDefault();
         event.stopPropagation();
         focusRowAt(index + 1);
         break;
       case 'ArrowUp':
+      case 'k':
         event.preventDefault();
         event.stopPropagation();
         focusRowAt(index - 1);
         break;
+      case 'Home':
+        event.preventDefault();
+        event.stopPropagation();
+        focusRowAt(0);
+        break;
+      case 'End':
+        event.preventDefault();
+        event.stopPropagation();
+        focusRowAt(flatItems.length - 1);
+        break;
       case 'ArrowLeft':
       case 'ArrowRight':
+      case 'h':
+      case 'l':
         // no item navigation sideways in the table view
         event.preventDefault();
         event.stopPropagation();

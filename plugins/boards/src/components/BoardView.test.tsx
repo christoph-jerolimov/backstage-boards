@@ -565,15 +565,15 @@ describe('BoardView keyboard', () => {
     expect(card('First')).toHaveFocus();
   });
 
-  it('moves the item one column with Ctrl+Arrow', async () => {
+  it('moves the item one column with Alt+Arrow', async () => {
     const { actions } = renderBoard();
     card('First').focus();
-    await userEvent.keyboard('{Control>}{ArrowRight}{/Control}');
+    await userEvent.keyboard('{Alt>}{ArrowRight}{/Alt}');
     expect(actions.moveItem).toHaveBeenCalledWith('item-2', {
       columnId: 'column-2',
     });
     (actions.moveItem as jest.Mock).mockClear();
-    await userEvent.keyboard('{Control>}{ArrowLeft}{/Control}');
+    await userEvent.keyboard('{Alt>}{ArrowLeft}{/Alt}');
     expect(actions.moveItem).not.toHaveBeenCalled();
   });
 
@@ -680,11 +680,50 @@ describe('BoardView keyboard', () => {
     await userEvent.keyboard(' ');
     await userEvent.keyboard('s');
     await userEvent.keyboard('{Delete}');
-    await userEvent.keyboard('{Control>}{ArrowRight}{/Control}');
+    await userEvent.keyboard('{Alt>}{ArrowRight}{/Alt}');
     expect(selection.toggleItem).not.toHaveBeenCalled();
     expect(actions.moveItem).not.toHaveBeenCalled();
     expect(actions.deleteItem).not.toHaveBeenCalled();
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+  });
+
+  it('aliases j/k/h/l to the arrows', async () => {
+    renderBoard();
+    card('First').focus();
+    await userEvent.keyboard('j');
+    expect(card('Second')).toHaveFocus();
+    await userEvent.keyboard('k');
+    expect(card('First')).toHaveFocus();
+    // Doing is empty, so l jumps to Done and h returns
+    await userEvent.keyboard('l');
+    expect(card('Shipped')).toHaveFocus();
+    await userEvent.keyboard('h');
+    expect(card('First')).toHaveFocus();
+  });
+
+  it('jumps to the first and last card of the column with Home/End', async () => {
+    renderBoard();
+    card('First').focus();
+    await userEvent.keyboard('{End}');
+    expect(card('Second')).toHaveFocus();
+    await userEvent.keyboard('{Home}');
+    expect(card('First')).toHaveFocus();
+  });
+
+  it('reorders the card within its column with Alt+Up/Down', async () => {
+    const { actions } = renderBoard();
+    // 'First' (item-2, position 1000) sits above 'Second' (item-1, 2000)
+    card('First').focus();
+    await userEvent.keyboard('{Alt>}{ArrowDown}{/Alt}');
+    expect(actions.moveItem).toHaveBeenCalledWith('item-2', {
+      columnId: 'column-1',
+      // after 'Second': past the last position
+      position: 3000,
+    });
+    (actions.moveItem as jest.Mock).mockClear();
+    // already the first card: Alt+Up does nothing
+    await userEvent.keyboard('{Alt>}{ArrowUp}{/Alt}');
+    expect(actions.moveItem).not.toHaveBeenCalled();
   });
 
   it('walks the grouped sections of a column top to bottom', async () => {
