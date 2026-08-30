@@ -475,6 +475,7 @@ describe('BoardPage actions menu', () => {
       'Archived items…',
       'Assignee matrix…',
       'Duplicate board…',
+      'Export board…',
       'Board settings…',
       'Share…',
       'Archive board…',
@@ -491,6 +492,7 @@ describe('BoardPage actions menu', () => {
       'Archived items…',
       'Assignee matrix…',
       'Duplicate board…',
+      'Export board…',
     ]);
   });
 

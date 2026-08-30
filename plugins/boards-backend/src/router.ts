@@ -387,6 +387,25 @@ export async function createRouter(
     );
   });
 
+  router.get('/boards/:boardId/export', async (req, res) => {
+    const principal = await principalOf(req);
+    if (req.query.format === 'csv') {
+      const csv = await service.exportBoardCsv(principal, req.params.boardId);
+      res.type('text/csv').send(csv);
+      return;
+    }
+    res.json(await service.exportBoard(principal, req.params.boardId));
+  });
+
+  router.post('/boards/import', async (req, res) => {
+    const principal = await principalOf(req);
+    res.status(201).json(
+      await service.importBoard(principal, req.body.document, {
+        name: typeof req.body.name === 'string' ? req.body.name : undefined,
+      }),
+    );
+  });
+
   router.get('/boards/:boardId/insights', async (req, res) => {
     const principal = await principalOf(req);
     res.json(await service.getBoardInsights(principal, req.params.boardId));

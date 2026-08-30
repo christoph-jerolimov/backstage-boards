@@ -11,6 +11,7 @@ import {
   Board,
   BoardChangeEntry,
   BoardColumn,
+  BoardDocument,
   BoardInsights,
   BoardPriority,
   COLUMN_COLORS,
@@ -3064,6 +3065,196 @@ export class BoardsService {
       throughput,
       moveCount: moves.length,
     };
+  }
+
+  /** The board as a portable document; see BoardDocument. */
+  async exportBoard(
+    principal: BoardsPrincipal,
+    boardId: string,
+  ): Promise<BoardDocument> {
+    const board = await this.getBoard(principal, boardId);
+    const items = await this.listItems(principal, boardId);
+    const columnTitle = new Map(
+      board.columns.map(column => [column.id, column.title]),
+    );
+    const priorityName = new Map(
+      board.priorities.map(priority => [priority.id, priority.name]),
+    );
+    return {
+      format: 'backstage-boards',
+      version: 1,
+      board: {
+        name: board.name,
+        description: board.description,
+        columns: [...board.columns]
+          .sort((a, b) => a.position - b.position)
+          .map(column => ({
+            title: column.title,
+            color: column.color,
+            wipSoftLimit: column.wipSoftLimit,
+            wipHardLimit: column.wipHardLimit,
+          })),
+        priorities: [...board.priorities]
+          .sort((a, b) => a.order - b.order)
+          .map(priority => ({ name: priority.name, color: priority.color })),
+      },
+      items: [...items]
+        .sort((a, b) => a.position - b.position)
+        .map(item => ({
+          title: item.title,
+          status: columnTitle.get(item.columnId) ?? '',
+          description: item.description,
+          tags: item.tags.length > 0 ? item.tags : undefined,
+          assignees: item.assignees.length > 0 ? item.assignees : undefined,
+          dueDate: item.dueDate,
+          priority: item.priorityId
+            ? priorityName.get(item.priorityId)
+            : undefined,
+          checklist:
+            item.checklist && item.checklist.length > 0
+              ? item.checklist
+              : undefined,
+        })),
+    };
+  }
+
+  /** The board's items as a CSV, one row per non-archived item. */
+  async exportBoardCsv(
+    principal: BoardsPrincipal,
+    boardId: string,
+  ): Promise<string> {
+    const document = await this.exportBoard(principal, boardId);
+    const escape = (value: string): string =>
+      /[",\n\r]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
+    const rows = [
+      [
+        'title',
+        'status',
+        'priority',
+        'dueDate',
+        'assignees',
+        'tags',
+        'description',
+      ],
+      ...document.items.map(item => [
+        item.title,
+        item.status,
+        item.priority ?? '',
+        item.dueDate ?? '',
+        (item.assignees ?? []).join(';'),
+        (item.tags ?? []).join(';'),
+        item.description ?? '',
+      ]),
+    ];
+    return `${rows.map(row => row.map(escape).join(',')).join('\n')}\n`;
+  }
+
+  /**
+   * Creates a new board owned by the caller from an exported document.
+   * The whole document is validated before anything is created.
+   */
+  async importBoard(
+    principal: BoardsPrincipal,
+    document: BoardDocument,
+    options?: { name?: string },
+  ): Promise<BoardWithContext> {
+    if (
+      !document ||
+      document.format !== 'backstage-boards' ||
+      document.version !== 1
+    ) {
+      throw new InputError(
+        'Not a backstage-boards document of a supported version',
+      );
+    }
+    const name = options?.name?.trim() || document.board?.name?.trim();
+    if (!name) {
+      throw new InputError('The document carries no board name');
+    }
+    const columns = Array.isArray(document.board.columns)
+      ? document.board.columns
+      : [];
+    if (columns.some(column => !column.title?.trim())) {
+      throw new InputError('Every column needs a title');
+    }
+    const columnTitles = new Set(columns.map(column => column.title));
+    const priorities = Array.isArray(document.board.priorities)
+      ? document.board.priorities
+      : [];
+    const priorityNames = new Set(priorities.map(priority => priority.name));
+    const items = Array.isArray(document.items) ? document.items : [];
+    for (const item of items) {
+      if (!item.title?.trim()) {
+        throw new InputError('Every item needs a title');
+      }
+      if (!columnTitles.has(item.status)) {
+        throw new InputError(
+          `Item "${item.title}" references unknown status "${item.status}"`,
+        );
+      }
+      if (item.priority && !priorityNames.has(item.priority)) {
+        throw new InputError(
+          `Item "${item.title}" references unknown priority "${item.priority}"`,
+        );
+      }
+    }
+
+    const board = await this.createBoard(principal, {
+      name,
+      columns: columns.map(column => column.title),
+      priorities: priorities.map(priority => ({
+        name: priority.name,
+        color: priority.color,
+      })),
+    });
+    if (document.board.description) {
+      await this.updateBoardDescription(
+        principal,
+        board.id,
+        document.board.description,
+      );
+    }
+    const fresh = await this.getBoard(principal, board.id);
+    const columnId = new Map(
+      fresh.columns.map(column => [column.title, column.id]),
+    );
+    const priorityId = new Map(
+      fresh.priorities.map(priority => [priority.name, priority.id]),
+    );
+    for (const item of items) {
+      const created = await this.createItem(principal, board.id, {
+        columnId: columnId.get(item.status)!,
+        title: item.title,
+        tags: item.tags,
+        assignees: item.assignees,
+        priorityId: item.priority ? priorityId.get(item.priority) : undefined,
+        checklist: item.checklist,
+      });
+      if (item.description || item.dueDate) {
+        await this.updateItem(principal, board.id, created.id, {
+          description: item.description,
+          dueDate: item.dueDate,
+        });
+      }
+    }
+    // colors and WIP limits go on last, so a document whose column
+    // already holds more items than its own hard limit still imports
+    for (const column of columns) {
+      const created = fresh.columns.find(entry => entry.title === column.title);
+      if (
+        created &&
+        (column.color ||
+          column.wipSoftLimit !== undefined ||
+          column.wipHardLimit !== undefined)
+      ) {
+        await this.updateColumn(principal, board.id, created.id, {
+          color: column.color,
+          wipSoftLimit: column.wipSoftLimit,
+          wipHardLimit: column.wipHardLimit,
+        });
+      }
+    }
+    return this.getBoard(principal, board.id);
   }
 
   async getBoardChanges(

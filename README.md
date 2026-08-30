@@ -34,6 +34,9 @@ board-specific lives in `plugins/`.
 - **Friendly dead ends** — a proper "Board not found" page for stale
   links (with a way back), retryable load errors, and consistent empty
   states across the board list and empty boards.
+- **Import and export** — a board exports as a portable JSON document
+  (re-importable as a new board, and the integration point for
+  converters from other tools) or as a CSV of its items.
 - **Board archival** — deleting archives the board for 30 days, read-only and
   reachable only by direct link, with "Unarchive" and "Delete now" actions.
 - **Entity assignment** — a board can reference any number of catalog

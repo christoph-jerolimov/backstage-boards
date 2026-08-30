@@ -18,6 +18,7 @@ import { ArchivedItemsDialog } from './ArchivedItemsDialog';
 import { AssigneeMatrixDialog } from './AssigneeMatrixDialog';
 import { BoardSettingsDialog } from './BoardSettingsDialog';
 import { DuplicateBoardDialog } from './DuplicateBoardDialog';
+import { ExportBoardDialog } from './ExportBoardDialog';
 import { PriorityMatrixDialog } from './PriorityMatrixDialog';
 import { RecentChangesDialog } from './RecentChangesDialog';
 import { ShareDialog } from './ShareDialog';
@@ -31,6 +32,7 @@ export type BoardDialogKind =
   | 'duplicate'
   | 'priorityMatrix'
   | 'assigneeMatrix'
+  | 'export'
   | 'delete';
 
 /**
@@ -92,6 +94,12 @@ export function BoardDialogs(props: {
       <DuplicateBoardDialog
         board={board}
         isOpen={open === 'duplicate'}
+        onOpenChange={openChange}
+      />
+
+      <ExportBoardDialog
+        board={board}
+        isOpen={open === 'export'}
         onOpenChange={openChange}
       />
 

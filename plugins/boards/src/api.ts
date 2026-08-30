@@ -2,6 +2,7 @@ import { createApiRef, DiscoveryApi } from '@backstage/frontend-plugin-api';
 import {
   Board,
   BoardChangeEntry,
+  BoardDocument,
   BoardInsights,
   BoardFilterOptions,
   BoardListFilter,
@@ -162,6 +163,15 @@ export interface BoardsApi {
     itemId: string,
     target: { targetBoardId: string; targetColumnId: string },
   ): Promise<BoardItem>;
+  /** The board as a portable JSON document. */
+  exportBoard(boardId: string): Promise<BoardDocument>;
+  /** The board's items as CSV text. */
+  exportBoardCsv(boardId: string): Promise<string>;
+  /** Creates a new board owned by the caller from a document. */
+  importBoard(
+    document: BoardDocument,
+    options?: { name?: string },
+  ): Promise<BoardWithContext>;
   listArchivedItems(boardId: string): Promise<BoardItem[]>;
   restoreItem(boardId: string, itemId: string): Promise<BoardItem>;
   setWatchItem(
@@ -215,7 +225,10 @@ export const boardsApiRef = createApiRef<BoardsApi>({
 export type BoardsFetchResponse = Pick<
   Response,
   'ok' | 'status' | 'statusText' | 'json'
->;
+> & {
+  /** Present on real responses; the CSV export reads it. */
+  text?: () => Promise<string>;
+};
 
 /** The discovery and fetch this client needs; the app's own APIs satisfy it. */
 export interface BoardsClientOptions {
@@ -548,6 +561,28 @@ export class BoardsClient implements BoardsApi {
       `/boards/${boardId}/items/${itemId}/move-to-board`,
       target,
     );
+  }
+
+  exportBoard(boardId: string): Promise<BoardDocument> {
+    return this.request('GET', `/boards/${boardId}/export`);
+  }
+
+  async exportBoardCsv(boardId: string): Promise<string> {
+    const response = await this.fetch(
+      'GET',
+      `/boards/${boardId}/export?format=csv`,
+    );
+    return response.text ? response.text() : String(await response.json());
+  }
+
+  importBoard(
+    document: BoardDocument,
+    options?: { name?: string },
+  ): Promise<BoardWithContext> {
+    return this.request('POST', '/boards/import', {
+      document,
+      name: options?.name,
+    });
   }
 
   listArchivedItems(boardId: string): Promise<BoardItem[]> {
