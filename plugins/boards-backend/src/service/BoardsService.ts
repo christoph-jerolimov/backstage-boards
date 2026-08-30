@@ -2338,6 +2338,149 @@ export class BoardsService {
     return this.getItem(principal, boardId, copy.id);
   }
 
+  /**
+   * Moves an item to another board: a new item is created in the
+   * chosen target column carrying the fields, tags, assignees,
+   * checklist, description history, comments, and change history; the
+   * original is archived on the source board. Priority carries over
+   * by name only; watches stay behind. Requires write access on both
+   * boards.
+   */
+  async moveItemToBoard(
+    principal: BoardsPrincipal,
+    boardId: string,
+    itemId: string,
+    target: { targetBoardId: string; targetColumnId: string },
+  ): Promise<BoardItem> {
+    if (target.targetBoardId === boardId) {
+      throw new InputError('The item is already on this board');
+    }
+    const row = await this.requireMutableItem(principal, boardId, itemId);
+    const { board: sourceBoard } = await this.requireBoard(
+      principal,
+      boardId,
+      'write',
+    );
+    const { board: targetBoard } = await this.requireBoard(
+      principal,
+      target.targetBoardId,
+      'write',
+    );
+    const targetColumn = await this.knex('board_columns')
+      .where({ id: target.targetColumnId, board_id: target.targetBoardId })
+      .first();
+    if (!targetColumn) {
+      throw new NotFoundError(`Column ${target.targetColumnId} not found`);
+    }
+    await this.requireWipCapacity(targetColumn);
+
+    // priority carries over by name only
+    let priorityId: string | null = null;
+    if (row.priority_id) {
+      const sourcePriority = await this.knex('board_priorities')
+        .where('id', row.priority_id)
+        .first();
+      if (sourcePriority) {
+        const match = await this.knex('board_priorities')
+          .where({
+            board_id: target.targetBoardId,
+            name: sourcePriority.name,
+          })
+          .first();
+        priorityId = match?.id ?? null;
+      }
+    }
+
+    const max = await this.knex('items')
+      .where('column_id', target.targetColumnId)
+      .max({ max: 'position' })
+      .first();
+    const position = Number(max?.max ?? 0) + POSITION_STEP;
+
+    const [tags, assignees, checklist] = await Promise.all([
+      this.knex('item_tags').where('item_id', itemId),
+      this.knex('item_assignees').where('item_id', itemId),
+      this.knex('item_checklist_entries')
+        .where('item_id', itemId)
+        .orderBy('position'),
+    ]);
+
+    const timestamp = now();
+    const actor = actorRef(principal);
+    const newId = uuid();
+    await this.knex.transaction(async trx => {
+      await trx('items').insert({
+        id: newId,
+        board_id: target.targetBoardId,
+        column_id: target.targetColumnId,
+        position,
+        title: row.title,
+        created_by: row.created_by,
+        created_at: row.created_at,
+        updated_by: actor,
+        updated_at: timestamp,
+        creator_ref: row.creator_ref,
+        external_manager: null,
+        description: row.description,
+        archived_at: null,
+        archived_by: null,
+        due_date: row.due_date,
+        priority_id: priorityId,
+      });
+      // fields the archived original keeps are copied…
+      if (tags.length > 0) {
+        await trx('item_tags').insert(
+          tags.map(entry => ({ item_id: newId, tag: entry.tag })),
+        );
+      }
+      if (assignees.length > 0) {
+        await trx('item_assignees').insert(
+          assignees.map(entry => ({
+            item_id: newId,
+            assignee_ref: entry.assignee_ref,
+          })),
+        );
+      }
+      if (checklist.length > 0) {
+        await trx('item_checklist_entries').insert(
+          checklist.map(entry => ({
+            item_id: newId,
+            position: entry.position,
+            text: entry.text,
+            checked: entry.checked,
+          })),
+        );
+      }
+      // …while the item's record — description history, comments, and
+      // change history — travels with it
+      await trx('item_description_versions')
+        .where('item_id', itemId)
+        .update({ item_id: newId });
+      await trx('comments').where('item_id', itemId).update({ item_id: newId });
+      await trx('changes')
+        .where('item_id', itemId)
+        .update({ item_id: newId, board_id: target.targetBoardId });
+      await this.recordChange(trx, {
+        itemId: newId,
+        boardId: target.targetBoardId,
+        actor,
+        type: 'moved',
+        field: 'board',
+        oldValue: sourceBoard.name,
+        newValue: targetBoard.name,
+      });
+      await trx('items').where('id', itemId).update({
+        archived_at: timestamp,
+        archived_by: actor,
+        updated_by: actor,
+        updated_at: timestamp,
+      });
+    });
+    await this.emitBoardSignal(boardId, itemId);
+    await this.emitBoardSignal(target.targetBoardId, newId);
+    return this.getItem(principal, target.targetBoardId, newId);
+  }
+
   async moveItem(
     principal: BoardsPrincipal,
     boardId: string,

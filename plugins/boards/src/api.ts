@@ -153,6 +153,15 @@ export interface BoardsApi {
   deleteItem(boardId: string, itemId: string): Promise<void>;
   /** Copies an item on its board, landing directly after the original. */
   duplicateItem(boardId: string, itemId: string): Promise<BoardItem>;
+  /**
+   * Moves the item to another board's column: a new item carrying the
+   * fields and full history, the original archived on this board.
+   */
+  moveItemToBoard(
+    boardId: string,
+    itemId: string,
+    target: { targetBoardId: string; targetColumnId: string },
+  ): Promise<BoardItem>;
   listArchivedItems(boardId: string): Promise<BoardItem[]>;
   restoreItem(boardId: string, itemId: string): Promise<BoardItem>;
   setWatchItem(
@@ -527,6 +536,18 @@ export class BoardsClient implements BoardsApi {
 
   duplicateItem(boardId: string, itemId: string): Promise<BoardItem> {
     return this.request('POST', `/boards/${boardId}/items/${itemId}/duplicate`);
+  }
+
+  moveItemToBoard(
+    boardId: string,
+    itemId: string,
+    target: { targetBoardId: string; targetColumnId: string },
+  ): Promise<BoardItem> {
+    return this.request(
+      'POST',
+      `/boards/${boardId}/items/${itemId}/move-to-board`,
+      target,
+    );
   }
 
   listArchivedItems(boardId: string): Promise<BoardItem[]> {
