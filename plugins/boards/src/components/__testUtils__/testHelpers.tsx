@@ -59,7 +59,10 @@ export function testPermissionApi(
 
 export function renderWithProviders(
   ui: ReactElement,
-  options?: Pick<TestAppOptions, 'apis' | 'mountedRoutes'>,
+  options?: Pick<
+    TestAppOptions,
+    'apis' | 'mountedRoutes' | 'initialRouteEntries'
+  >,
 ) {
   let apis = options?.apis ?? [];
   if (!apis.some(([ref]) => ref === catalogApiRef)) {
@@ -89,6 +92,9 @@ export function renderWithProviders(
         '/catalog/:namespace/:kind/:name': entityRouteRef,
         ...options?.mountedRoutes,
       },
+      ...(options?.initialRouteEntries
+        ? { initialRouteEntries: options.initialRouteEntries }
+        : {}),
     },
   );
 }

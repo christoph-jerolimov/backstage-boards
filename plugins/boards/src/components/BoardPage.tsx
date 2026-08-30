@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { BreadcrumbEntry } from '@backstage/frontend-plugin-api';
 import { Button, Flex, Text } from '@backstage/ui';
 import { RiQuestionLine, RiErrorWarningLine } from '@remixicon/react';
@@ -21,7 +21,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { BoardView } from './BoardView';
 import { TableView } from './TableView';
 import { ItemDrawer } from './ItemDrawer';
-import { ArchivedBoardAlert, BoardHeader, BoardViewMode } from './BoardHeader';
+import {
+  ALL_BOARD_VIEW_MODES,
+  ArchivedBoardAlert,
+  BoardHeader,
+  BoardViewMode,
+} from './BoardHeader';
 import { BoardDialogKind, BoardDialogs } from './BoardDialogs';
 import { ItemFilterBar, useItemFilter } from './ItemFilterBar';
 import { BulkActionsBar } from './BulkActionsBar';
@@ -32,9 +37,11 @@ import { EmptyState } from './EmptyState';
 import { useBoardActions, useOpenItemParam } from './useBoardActions';
 import { useItemSelection } from './useItemSelection';
 import {
+  ALL_GROUP_BY_MODES,
   assigneePool,
   GroupByMode,
   groupItems,
+  ITEM_SORT_COLUMNS,
   ItemSortDescriptor,
   sortItems,
 } from './grouping';
@@ -49,6 +56,75 @@ export function BoardPage() {
  * catalog entity tab) the breadcrumb wrapper is skipped and archiving
  * stays in place instead of navigating away.
  */
+/**
+ * The board page's view state — view mode, grouping, table sort — kept
+ * in the URL (`view`, `group`, `sort`), so a board view is shareable
+ * as a link. Defaults are omitted, invalid values ignored, and writes
+ * replace the history entry.
+ */
+function useBoardViewParams() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const write = (mutate: (params: URLSearchParams) => void) =>
+    setSearchParams(
+      params => {
+        const next = new URLSearchParams(params);
+        mutate(next);
+        return next;
+      },
+      { replace: true },
+    );
+
+  const view =
+    ALL_BOARD_VIEW_MODES.find(mode => mode === searchParams.get('view')) ??
+    'board';
+  const groupBy =
+    ALL_GROUP_BY_MODES.find(mode => mode === searchParams.get('group')) ??
+    'none';
+  const rawSort = searchParams.get('sort') ?? '';
+  const sortColumn = ITEM_SORT_COLUMNS.find(
+    column => column === rawSort.replace(/^-/, ''),
+  );
+  const tableSort: ItemSortDescriptor | undefined = sortColumn
+    ? {
+        column: sortColumn,
+        direction: rawSort.startsWith('-') ? 'descending' : 'ascending',
+      }
+    : undefined;
+
+  return {
+    view,
+    setView: (next: BoardViewMode) =>
+      write(params => {
+        if (next === 'board') {
+          params.delete('view');
+        } else {
+          params.set('view', next);
+        }
+      }),
+    groupBy,
+    setGroupBy: (next: GroupByMode) =>
+      write(params => {
+        if (next === 'none') {
+          params.delete('group');
+        } else {
+          params.set('group', next);
+        }
+      }),
+    tableSort,
+    setTableSort: (next: ItemSortDescriptor | undefined) =>
+      write(params => {
+        if (!next) {
+          params.delete('sort');
+        } else {
+          params.set(
+            'sort',
+            `${next.direction === 'descending' ? '-' : ''}${next.column}`,
+          );
+        }
+      }),
+  };
+}
+
 export function BoardPageContent(props: {
   boardId: string;
   embedded?: boolean;
@@ -57,8 +133,8 @@ export function BoardPageContent(props: {
   const navigate = useNavigate();
   const basePath = useBoardsBasePath();
   const queryClient = useQueryClient();
-  const [view, setView] = useState<BoardViewMode>('board');
-  const [groupBy, setGroupBy] = useState<GroupByMode>('none');
+  const { view, setView, groupBy, setGroupBy, tableSort, setTableSort } =
+    useBoardViewParams();
   const [dialog, setDialog] = useState<BoardDialogKind | undefined>();
 
   const {
@@ -73,10 +149,9 @@ export function BoardPageContent(props: {
     boardId,
     openItem,
   );
-  const filter = useItemFilter(items ?? [], board?.priorities);
-  const [tableSort, setTableSort] = useState<ItemSortDescriptor | undefined>(
-    undefined,
-  );
+  const filter = useItemFilter(items ?? [], board?.priorities, {
+    inUrl: true,
+  });
   // columns whose unfiltered item count reached the hard WIP limit:
   // move/status entries into them disable across the page's surfaces
   const fullColumnIds = useMemo(() => {

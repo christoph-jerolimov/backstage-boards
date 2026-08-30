@@ -69,6 +69,9 @@ board-specific lives in `plugins/`.
   (any must match) filters, applied to both views and the API alike, and
   an "Overdue (n)" quick-filter toggle for items due before today.
 - **Grouping** — group the board by assignee or by priority.
+- **Shareable views** — filters, grouping, sorting, and the active view
+  are encoded in the board URL, so any filtered view can be sent as a
+  link.
 - **Table sorting.**
 - **Configurable table columns** — choose which columns the table shows.
 - **Utility columns** — the table's leading selection and trailing actions

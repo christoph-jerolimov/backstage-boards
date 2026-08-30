@@ -94,6 +94,7 @@ function renderBoard(
     boardError?: Error;
     embedded?: boolean;
     catalogApi?: unknown;
+    initialRouteEntries?: string[];
   } = {},
 ) {
   const boardsApi =
@@ -113,6 +114,7 @@ function renderBoard(
         [catalogApiRef, over.catalogApi ?? catalogApi],
       ],
       mountedRoutes: { '/boards': rootRouteRef },
+      initialRouteEntries: over.initialRouteEntries,
     },
   );
   return { boardsApi };
@@ -599,6 +601,49 @@ describe('BoardPage archived state', () => {
     expect(
       screen.queryByRole('button', { name: 'Edit board name' }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe('BoardPage shareable view state', () => {
+  it('restores view, grouping, and filters from the URL', async () => {
+    renderBoard({
+      initialRouteEntries: ['/?view=table&group=assignee&tag=docs'],
+    });
+    // the table view is active and filtered to the tagged item
+    expect(await screen.findByText('1 of 2 items')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Tags (1)' })).toBeVisible();
+    expect(
+      await screen.findByRole('row', { name: /Ship the docs/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('row', { name: /Fix the build/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('ignores invalid view and group values', async () => {
+    renderBoard({ initialRouteEntries: ['/?view=bogus&group=nope'] });
+    // falls back to the kanban view: cards render as buttons, not rows
+    expect(
+      await screen.findByRole('button', { name: 'Ship the docs' }),
+    ).toBeInTheDocument();
+  });
+
+  it('applies and clears URL-backed filters through the bar', async () => {
+    // the state behind the bar is the URL (see the restore test); the
+    // controls keep working through it
+    renderBoard();
+    await userEvent.click(await screen.findByRole('button', { name: 'Tags' }));
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'docs' }),
+    );
+    expect(await screen.findByText('1 of 2 items')).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Clear filters' }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByText('1 of 2 items')).not.toBeInTheDocument(),
+    );
+    expect(screen.getByRole('button', { name: 'Tags' })).toBeVisible();
   });
 });
 

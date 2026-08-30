@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Button,
   Flex,
@@ -78,12 +79,70 @@ const toggled = (current: string[], entry: string) =>
 export function useItemFilter(
   items: BoardItem[],
   boardPriorities: BoardPriority[] = [],
+  options: {
+    /**
+     * Keep the filter in the URL's query parameters (`q`, `tag`,
+     * `assignee`, `priority`, `overdue`) instead of component state,
+     * so the filtered view is shareable. Writes replace the history
+     * entry, so typing does not grow the browser history.
+     */
+    inUrl?: boolean;
+  } = {},
 ): ItemFilterHandle {
-  const [text, setText] = useState('');
-  const [tags, setTags] = useState<string[]>([]);
-  const [assignees, setAssignees] = useState<string[]>([]);
-  const [priorities, setPriorities] = useState<string[]>([]);
-  const [overdue, setOverdue] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [ownText, setOwnText] = useState('');
+  const [ownTags, setOwnTags] = useState<string[]>([]);
+  const [ownAssignees, setOwnAssignees] = useState<string[]>([]);
+  const [ownPriorities, setOwnPriorities] = useState<string[]>([]);
+  const [ownOverdue, setOwnOverdue] = useState(false);
+
+  const inUrl = options.inUrl ?? false;
+  const text = inUrl ? searchParams.get('q') ?? '' : ownText;
+  const tags = inUrl ? searchParams.getAll('tag') : ownTags;
+  const assignees = inUrl ? searchParams.getAll('assignee') : ownAssignees;
+  const priorities = inUrl ? searchParams.getAll('priority') : ownPriorities;
+  const overdue = inUrl ? searchParams.get('overdue') === '1' : ownOverdue;
+
+  /** Rewrites one parameter in place; empty/default values drop out. */
+  const writeParams = useCallback(
+    (mutate: (params: URLSearchParams) => void): void => {
+      setSearchParams(
+        params => {
+          const next = new URLSearchParams(params);
+          mutate(next);
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+  const setText = useCallback(
+    (value: string) => {
+      if (!inUrl) {
+        setOwnText(value);
+        return;
+      }
+      writeParams(params => {
+        if (value) {
+          params.set('q', value);
+        } else {
+          params.delete('q');
+        }
+      });
+    },
+    [inUrl, writeParams],
+  );
+  const setList = useCallback(
+    (name: string, values: string[]) =>
+      writeParams(params => {
+        params.delete(name);
+        for (const value of values) {
+          params.append(name, value);
+        }
+      }),
+    [writeParams],
+  );
 
   const allAssignees = useMemo(
     () => [...new Set(items.flatMap(item => item.assignees))],
@@ -136,18 +195,48 @@ export function useItemFilter(
       totalCount: items.length,
       active: !isEmptyFilter(filter),
       setText,
-      toggleTag: (tag: string) => setTags(current => toggled(current, tag)),
+      toggleTag: (tag: string) =>
+        inUrl
+          ? setList('tag', toggled(tags, tag))
+          : setOwnTags(current => toggled(current, tag)),
       toggleAssignee: (ref: string) =>
-        setAssignees(current => toggled(current, ref)),
+        inUrl
+          ? setList('assignee', toggled(assignees, ref))
+          : setOwnAssignees(current => toggled(current, ref)),
       togglePriority: (priorityId: string) =>
-        setPriorities(current => toggled(current, priorityId)),
-      toggleOverdue: () => setOverdue(current => !current),
+        inUrl
+          ? setList('priority', toggled(priorities, priorityId))
+          : setOwnPriorities(current => toggled(current, priorityId)),
+      toggleOverdue: () =>
+        inUrl
+          ? writeParams(params => {
+              if (overdue) {
+                params.delete('overdue');
+              } else {
+                params.set('overdue', '1');
+              }
+            })
+          : setOwnOverdue(current => !current),
       clear: () => {
-        setText('');
-        setTags([]);
-        setAssignees([]);
-        setPriorities([]);
-        setOverdue(false);
+        if (inUrl) {
+          writeParams(params => {
+            for (const name of [
+              'q',
+              'tag',
+              'assignee',
+              'priority',
+              'overdue',
+            ]) {
+              params.delete(name);
+            }
+          });
+        } else {
+          setOwnText('');
+          setOwnTags([]);
+          setOwnAssignees([]);
+          setOwnPriorities([]);
+          setOwnOverdue(false);
+        }
       },
     };
   }, [
@@ -157,6 +246,10 @@ export function useItemFilter(
     assignees,
     priorities,
     overdue,
+    inUrl,
+    setText,
+    setList,
+    writeParams,
     assigneeOptions,
     priorityOptions,
   ]);
