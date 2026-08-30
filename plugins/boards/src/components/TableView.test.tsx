@@ -87,6 +87,7 @@ function TableHarness(props: {
           board={props.board}
           selectedItems={selectedItems}
           assigneePool={assigneePool(props.items)}
+          tagPool={[...new Set(props.items.flatMap(item => item.tags))]}
           bulk={props.bulk}
           onClear={selection.clear}
         />
@@ -617,6 +618,74 @@ describe('TableView', () => {
       await chooseFromMenu('Due date', /Remove due date/);
       expect(bulk.updateItems).toHaveBeenCalledWith([
         { itemId: 'item-2', update: { dueDate: null } },
+      ]);
+    });
+
+    it('marks tags and adds a partially present tag to the items missing it', async () => {
+      const { bulk } = renderTable({
+        items: [
+          testItem({ id: 'item-1', title: 'One', tags: ['docs', 'infra'] }),
+          testItem({ id: 'item-2', title: 'Two', tags: ['docs'] }),
+        ],
+      });
+      await selectRows('One', 'Two');
+      await userEvent.click(screen.getByRole('button', { name: 'Tags' }));
+      const entries = await screen.findAllByRole('menuitem');
+      expect(entries.map(entry => entry.textContent)).toEqual([
+        '✓ docs',
+        '– infra',
+        'Add tag…',
+        'Remove all tags',
+      ]);
+      await userEvent.click(screen.getByRole('menuitem', { name: '– infra' }));
+      expect(bulk.updateItems).toHaveBeenCalledWith([
+        { itemId: 'item-2', update: { tags: ['docs', 'infra'] } },
+      ]);
+    });
+
+    it('removes a tag every selected item has', async () => {
+      const { bulk } = renderTable({
+        items: [
+          testItem({ id: 'item-1', title: 'One', tags: ['docs'] }),
+          testItem({ id: 'item-2', title: 'Two', tags: ['docs', 'infra'] }),
+        ],
+      });
+      await selectRows('One', 'Two');
+      await chooseFromMenu('Tags', /✓ docs/);
+      expect(bulk.updateItems).toHaveBeenCalledWith([
+        { itemId: 'item-1', update: { tags: [] } },
+        { itemId: 'item-2', update: { tags: ['infra'] } },
+      ]);
+    });
+
+    it('adds a typed new tag to every selected item', async () => {
+      const { bulk } = renderTable({
+        items: [
+          testItem({ id: 'item-1', title: 'One', tags: ['docs'] }),
+          testItem({ id: 'item-2', title: 'Two' }),
+        ],
+      });
+      await selectRows('One', 'Two');
+      await chooseFromMenu('Tags', /Add tag…/);
+      const input = await screen.findByRole('searchbox', { name: 'Add tag' });
+      await userEvent.type(input, '#q3-carryover {Enter}');
+      expect(bulk.updateItems).toHaveBeenCalledWith([
+        { itemId: 'item-1', update: { tags: ['docs', 'q3-carryover'] } },
+        { itemId: 'item-2', update: { tags: ['q3-carryover'] } },
+      ]);
+    });
+
+    it('clears all tags via "Remove all tags"', async () => {
+      const { bulk } = renderTable({
+        items: [
+          testItem({ id: 'item-1', title: 'One', tags: ['docs'] }),
+          testItem({ id: 'item-2', title: 'Two' }),
+        ],
+      });
+      await selectRows('One', 'Two');
+      await chooseFromMenu('Tags', /Remove all tags/);
+      expect(bulk.updateItems).toHaveBeenCalledWith([
+        { itemId: 'item-1', update: { tags: [] } },
       ]);
     });
   });

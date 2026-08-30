@@ -1,10 +1,21 @@
-import { Button, Flex, Menu, MenuItem, MenuTrigger, Text } from '@backstage/ui';
+import { useState } from 'react';
+import {
+  Button,
+  Flex,
+  Menu,
+  MenuItem,
+  MenuTrigger,
+  SearchAutocomplete,
+  SearchAutocompleteItem,
+  Text,
+} from '@backstage/ui';
 import { useApi, identityApiRef } from '@backstage/frontend-plugin-api';
 import {
   BoardItem,
   BoardWithContext,
   fridayISO,
   isTextRef,
+  normalizeTags,
   refDisplayName,
   todayISO,
   tomorrowISO,
@@ -28,18 +39,22 @@ const mark = (state: MatchState) => {
 
 /**
  * The toolbar the table view shows while items are selected: status,
- * priority, assignee and due-date dropdowns plus Archive, all applied
- * to every selected item through the bulk fan-out actions.
+ * priority, assignee, due-date and tags dropdowns plus Archive, all
+ * applied to every selected item through the bulk fan-out actions.
  */
 export function BulkActionsBar(props: {
   board: BoardWithContext;
   selectedItems: BoardItem[];
   /** Assignees seen on the board's items, offered for quick assign. */
   assigneePool: string[];
+  /** Tags seen on the board's items, offered for quick tagging. */
+  tagPool?: string[];
   bulk: BulkActions;
   onClear: () => void;
 }) {
-  const { board, selectedItems, assigneePool, bulk, onClear } = props;
+  const { board, selectedItems, assigneePool, tagPool, bulk, onClear } = props;
+  const [addingTag, setAddingTag] = useState(false);
+  const [tagInput, setTagInput] = useState('');
   const identityApi = useApi(identityApiRef);
   const { data: identity } = useQuery({
     queryKey: queryKeys.identity,
@@ -119,6 +134,56 @@ export function BulkActionsBar(props: {
 
   const assigneeState = (ref: string) =>
     stateOf(item => item.assignees.includes(ref));
+
+  const tags = [...new Set(tagPool ?? [])].sort();
+
+  // adds the tag to the items missing it; removes it everywhere once
+  // the whole selection has it (same toggle as the assignee menu)
+  const toggleTag = (tag: string) => {
+    const allHave = selectedItems.every(item => item.tags.includes(tag));
+    const entries = allHave
+      ? selectedItems.map(item => ({
+          itemId: item.id,
+          update: { tags: item.tags.filter(entry => entry !== tag) },
+        }))
+      : selectedItems
+          .filter(item => !item.tags.includes(tag))
+          .map(item => ({
+            itemId: item.id,
+            update: { tags: [...item.tags, tag] },
+          }));
+    if (entries.length > 0) {
+      bulk.updateItems(entries);
+    }
+  };
+
+  const addTag = (value: string) => {
+    const [tag] = normalizeTags([value]);
+    if (tag) {
+      const entries = selectedItems
+        .filter(item => !item.tags.includes(tag))
+        .map(item => ({
+          itemId: item.id,
+          update: { tags: [...item.tags, tag] },
+        }));
+      if (entries.length > 0) {
+        bulk.updateItems(entries);
+      }
+    }
+    setAddingTag(false);
+    setTagInput('');
+  };
+
+  const clearTags = () => {
+    const entries = selectedItems
+      .filter(item => item.tags.length > 0)
+      .map(item => ({ itemId: item.id, update: { tags: [] } }));
+    if (entries.length > 0) {
+      bulk.updateItems(entries);
+    }
+  };
+
+  const tagState = (tag: string) => stateOf(item => item.tags.includes(tag));
 
   return (
     <Flex align="center" gap="2" style={{ flexWrap: 'wrap' }}>
@@ -206,6 +271,70 @@ export function BulkActionsBar(props: {
           </MenuItem>
         </Menu>
       </MenuTrigger>
+      <MenuTrigger>
+        <Button variant="tertiary" size="small">
+          Tags
+        </Button>
+        <Menu aria-label="Change tags">
+          {tags.map(tag => (
+            <MenuItem key={tag} onAction={() => toggleTag(tag)}>
+              {mark(tagState(tag))}
+              {tag}
+            </MenuItem>
+          ))}
+          <MenuItem onAction={() => setAddingTag(true)}>Add tag…</MenuItem>
+          <MenuItem color="danger" onAction={clearTags}>
+            {mark(stateOf(item => item.tags.length === 0))}Remove all tags
+          </MenuItem>
+        </Menu>
+      </MenuTrigger>
+      {addingTag && (
+        // Enter applies the typed tag to the whole selection; Escape
+        // closes the input again. Capture phase so the autocomplete's
+        // own key handling cannot swallow them.
+        // eslint-disable-next-line jsx-a11y/no-static-element-interactions
+        <div
+          onKeyDownCapture={event => {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              event.stopPropagation();
+              addTag(tagInput);
+            } else if (event.key === 'Escape') {
+              event.preventDefault();
+              event.stopPropagation();
+              setAddingTag(false);
+              setTagInput('');
+            }
+          }}
+        >
+          <SearchAutocomplete
+            aria-label="Add tag"
+            placeholder="Add tag…"
+            inputValue={tagInput}
+            onInputChange={setTagInput}
+            defaultOpen={false}
+          >
+            {tags
+              .filter(tag => tagState(tag) !== 'all')
+              .filter(
+                tag =>
+                  !tagInput ||
+                  tag
+                    .toLocaleLowerCase('en-US')
+                    .includes(tagInput.toLocaleLowerCase('en-US')),
+              )
+              .map(tag => (
+                <SearchAutocompleteItem
+                  key={tag}
+                  id={tag}
+                  onAction={() => addTag(tag)}
+                >
+                  {tag}
+                </SearchAutocompleteItem>
+              ))}
+          </SearchAutocomplete>
+        </div>
+      )}
       <Button
         variant="secondary"
         destructive

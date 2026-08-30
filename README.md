@@ -55,7 +55,7 @@ board-specific lives in `plugins/`.
 - **Selection and bulk actions** — multi-select items with the table's
   checkboxes or `Space` in either view; the selection is shared between
   the kanban and table views, with bulk status, priority, assignee,
-  due-date, and archive actions.
+  due-date, tag, and archive actions.
 - **Item archival** — deleted items are archived, listed with who archived
   them and when, restorable for 30 days before purge.
 - **Externally managed items** — items owned by an integration are read-only
