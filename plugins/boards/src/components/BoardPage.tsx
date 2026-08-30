@@ -31,7 +31,13 @@ import { ErrorText } from './common';
 import { EmptyState } from './EmptyState';
 import { useBoardActions, useOpenItemParam } from './useBoardActions';
 import { useItemSelection } from './useItemSelection';
-import { assigneePool, GroupByMode } from './grouping';
+import {
+  assigneePool,
+  GroupByMode,
+  groupItems,
+  ItemSortDescriptor,
+  sortItems,
+} from './grouping';
 
 export function BoardPage() {
   const { boardId = '' } = useParams();
@@ -68,6 +74,9 @@ export function BoardPageContent(props: {
     openItem,
   );
   const filter = useItemFilter(items ?? [], board?.priorities);
+  const [tableSort, setTableSort] = useState<ItemSortDescriptor | undefined>(
+    undefined,
+  );
   // columns whose unfiltered item count reached the hard WIP limit:
   // move/status entries into them disable across the page's surfaces
   const fullColumnIds = useMemo(() => {
@@ -86,6 +95,51 @@ export function BoardPageContent(props: {
   // one id-based selection shared by the board and table views, so it
   // survives switching between them
   const selection = useItemSelection();
+
+  // the order the drawer's prev/next walks: exactly what the active
+  // view shows — the kanban's lanes left to right, or the table's
+  // grouped and sorted rows (the insights view keeps the board order)
+  const drawerOrder = useMemo(() => {
+    if (!board) {
+      return [];
+    }
+    const visible = filter.filteredItems;
+    const dedup = (list: typeof visible) => {
+      const seen = new Set<string>();
+      return list.filter(item => {
+        if (seen.has(item.id)) {
+          return false;
+        }
+        seen.add(item.id);
+        return true;
+      });
+    };
+    if (view === 'table') {
+      const groups =
+        groupBy === 'none'
+          ? [{ key: 'all', items: visible }]
+          : groupItems(visible, groupBy, board.priorities);
+      return dedup(
+        groups.flatMap(group =>
+          sortItems(group.items, tableSort, board.columns),
+        ),
+      );
+    }
+    return dedup(
+      [...board.columns]
+        .sort((a, b) => a.position - b.position)
+        .flatMap(column => {
+          const lane = visible
+            .filter(item => item.columnId === column.id)
+            .sort((a, b) => a.position - b.position);
+          return groupBy === 'none'
+            ? lane
+            : groupItems(lane, groupBy, board.priorities).flatMap(
+                group => group.items,
+              );
+        }),
+    );
+  }, [board, filter.filteredItems, view, groupBy, tableSort]);
 
   useBoardsSignal(() => invalidateBoard(queryClient, boardId), { boardId });
 
@@ -131,6 +185,7 @@ export function BoardPageContent(props: {
   const canWrite = levelIncludes(board.access, 'write') && !archived;
   const isAdmin = levelIncludes(board.access, 'admin') && !archived;
   const openDrawerItem = (items ?? []).find(item => item.id === openItemId);
+
   const selectedItems = canWrite
     ? filter.filteredItems.filter(item => selection.selected.has(item.id))
     : [];
@@ -201,6 +256,8 @@ export function BoardPageContent(props: {
           openItem={actions.openItem}
           selection={canWrite ? selection : undefined}
           fullColumnIds={fullColumnIds}
+          sort={tableSort}
+          onSortChange={setTableSort}
         />
       )}
 
@@ -210,6 +267,21 @@ export function BoardPageContent(props: {
           item={openDrawerItem}
           canWrite={canWrite}
           fullColumnIds={fullColumnIds}
+          nav={(() => {
+            const index = drawerOrder.findIndex(
+              entry => entry.id === openDrawerItem.id,
+            );
+            if (index < 0) {
+              return undefined;
+            }
+            return {
+              prevId: drawerOrder[index - 1]?.id,
+              nextId: drawerOrder[index + 1]?.id,
+              position: index + 1,
+              total: drawerOrder.length,
+              onNavigate: actions.openItem,
+            };
+          })()}
           tagSuggestions={filter.allTags}
           onClose={closeItem}
           onChanged={refreshAll}

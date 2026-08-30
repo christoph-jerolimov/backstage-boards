@@ -9,6 +9,15 @@ The drawer is structured into clearly separated sections: the item's fields,
 the description, the checklist, and the activity timeline. The watch control
 and the item menu sit in the drawer header.
 
+## Previous and next
+
+On the board page the drawer header carries previous/next arrows and an
+"n of m" position, walking exactly the order the active view shows —
+the kanban's lanes left to right, or the table's grouped and sorted
+rows, both after the active filters. The `j` and `k` keys do the same
+while the drawer is open (never while typing). The arrows disable at
+the ends of the list.
+
 ## Status, priority, and due date badges
 
 The three badges at the top are not just displays — for users with write

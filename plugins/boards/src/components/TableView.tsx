@@ -208,11 +208,19 @@ export function TableView(props: {
   selection?: SelectionHandle;
   /** Columns at their hard WIP limit: move entries into them disable. */
   fullColumnIds?: Set<string>;
+  /** Controlled sort state; the page owns it so the drawer nav can
+   * mirror the table's order. Uncontrolled when omitted. */
+  sort?: ItemSortDescriptor;
+  onSortChange?: (descriptor: ItemSortDescriptor | undefined) => void;
 }) {
   const { board, items, canWrite, actions, groupBy, openItem, selection } =
     props;
   const pool = assigneePool(items);
-  const [sort, setSort] = useState<ItemSortDescriptor | undefined>(undefined);
+  const [ownSort, setOwnSort] = useState<ItemSortDescriptor | undefined>(
+    undefined,
+  );
+  const sort = props.onSortChange ? props.sort : ownSort;
+  const setSort = props.onSortChange ?? setOwnSort;
   const rowMenu = useRowMenu<BoardItem>({
     name: item => item.title,
     children: (item, submenu) => (
