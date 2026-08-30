@@ -12,6 +12,7 @@ nav:
   - Features:
       - The boards list: features/boards.md
       - Board views: features/board.md
+      - Keyboard shortcuts: features/keyboard.md
       - Working with items: features/items.md
       - The item details drawer: features/item-details.md
       - Priorities: features/priorities.md
