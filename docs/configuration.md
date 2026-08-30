@@ -64,6 +64,27 @@ one of their groups, on readable, non-archived boards, excluding archived
 items, then applies the configured scope; users with no matching items get
 no message.
 
+## Audit logging
+
+The backend can emit audit events for its API through Backstage's core
+[auditor service](https://backstage.io/docs/backend-system/core-services/auditor):
+
+```yaml
+boards:
+  audit: writes # none (default) | writes | all
+```
+
+- `none` — no audit events (the default).
+- `writes` — every mutating request (POST, PUT, PATCH, DELETE) is
+  audited.
+- `all` — read requests are audited as well.
+
+Each event carries the acting principal (derived from the request's
+credentials by the auditor), the HTTP method and path, and resolves as
+success or failure with the response status. Where the events end up —
+the backend log by default, or an external sink — is configured on the
+auditor service itself. An invalid `boards.audit` value fails startup.
+
 ## The entity "Boards" tab
 
 By default the tab appears only on entities that at least one board

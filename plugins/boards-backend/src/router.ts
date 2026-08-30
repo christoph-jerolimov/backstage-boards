@@ -5,6 +5,7 @@ import {
   UserInfoService,
 } from '@backstage/backend-plugin-api';
 import { InputError } from '@backstage/errors';
+import type { AuditorService } from '@backstage/backend-plugin-api';
 import { MAX_BOARD_PAGE_SIZE } from '@internal/plugin-boards-common';
 import express from 'express';
 import Router from 'express-promise-router';
@@ -30,6 +31,11 @@ export type RouterHttpAuth = {
   ): Promise<BackstageCredentials>;
 };
 
+/** Which API requests are audited; `none` disables auditing. */
+export type AuditMode = 'none' | 'writes' | 'all';
+
+export const ALL_AUDIT_MODES: AuditMode[] = ['none', 'writes', 'all'];
+
 export interface RouterOptions {
   service: BoardsService;
   httpAuth: RouterHttpAuth;
@@ -37,6 +43,11 @@ export interface RouterOptions {
   userInfo: Pick<UserInfoService, 'getUserInfo'>;
   logger: LoggerService;
   permissionGuard: BoardsPermissionGuard;
+  /** Audit logging through the core auditor service; absent = none. */
+  audit?: {
+    mode: AuditMode;
+    auditor: Pick<AuditorService, 'createEvent'>;
+  };
 }
 
 /** A query parameter as a string, or undefined when it is absent or repeated. */
@@ -96,6 +107,39 @@ export async function createRouter(
   const { service, permissionGuard } = options;
   const router = Router();
   router.use(express.json());
+
+  const audit = options.audit;
+  if (audit && audit.mode !== 'none') {
+    // one event per audited request: created before the handler runs,
+    // resolved by the response status; the auditor derives the actor
+    // from the request's credentials
+    router.use((req, res, next) => {
+      const isWrite = req.method !== 'GET' && req.method !== 'HEAD';
+      if (!isWrite && audit.mode !== 'all') {
+        next();
+        return;
+      }
+      audit.auditor
+        .createEvent({
+          eventId: isWrite ? 'write' : 'read',
+          request: req,
+          meta: { method: req.method, path: req.path },
+        })
+        .then(event => {
+          res.on('finish', () => {
+            if (res.statusCode < 400) {
+              void event.success({ meta: { status: res.statusCode } });
+            } else {
+              void event.fail({
+                meta: { status: res.statusCode },
+                error: new Error(`Request failed with ${res.statusCode}`),
+              });
+            }
+          });
+          next();
+        }, next);
+    });
+  }
 
   const principalOf = (req: Request) => resolvePrincipal(req, options);
   const credentialsOf = (req: Request) =>

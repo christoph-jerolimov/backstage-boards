@@ -957,3 +957,110 @@ describe('framework permissions', () => {
     expect(response.body).toEqual({ referenced: true });
   });
 });
+
+describe('audit logging', () => {
+  /** A recording auditor: events land in `events` with their outcome. */
+  function recordingAuditor() {
+    const events: Array<{
+      eventId: string;
+      meta: Record<string, unknown>;
+      outcome?: string;
+      status?: number;
+    }> = [];
+    return {
+      events,
+      createEvent: jest.fn(async (options: any) => {
+        const entry: (typeof events)[number] = {
+          eventId: options.eventId,
+          meta: options.meta,
+        };
+        events.push(entry);
+        return {
+          success: async (result?: any) => {
+            entry.outcome = 'success';
+            entry.status = result?.meta?.status;
+          },
+          fail: async (result: any) => {
+            entry.outcome = 'fail';
+            entry.status = result?.meta?.status;
+          },
+        };
+      }),
+    };
+  }
+
+  async function auditedApp(mode: 'none' | 'writes' | 'all') {
+    const testService = await createTestService();
+    const auditor = recordingAuditor();
+    const app = express();
+    app.use(
+      await createRouter({
+        service: testService.service,
+        httpAuth,
+        auth,
+        userInfo,
+        logger: testLogger,
+        permissionGuard: testPermissionGuard(),
+        audit: { mode, auditor },
+      }),
+    );
+    app.use(errorMiddleware());
+    return { app, auditor, knex: testService.knex };
+  }
+
+  it('audits writes but not reads in writes mode', async () => {
+    const { app, auditor, knex } = await auditedApp('writes');
+    await request(app)
+      .post('/boards')
+      .set('x-test-user', 'alice')
+      .send({ name: 'B' })
+      .expect(201);
+    await request(app).get('/boards').set('x-test-user', 'alice').expect(200);
+    expect(auditor.events).toHaveLength(1);
+    expect(auditor.events[0]).toMatchObject({
+      eventId: 'write',
+      meta: { method: 'POST', path: '/boards' },
+      outcome: 'success',
+      status: 201,
+    });
+    await knex.destroy();
+  });
+
+  it('audits reads too in all mode', async () => {
+    const { app, auditor, knex } = await auditedApp('all');
+    await request(app).get('/boards').set('x-test-user', 'alice').expect(200);
+    expect(auditor.events).toHaveLength(1);
+    expect(auditor.events[0]).toMatchObject({
+      eventId: 'read',
+      outcome: 'success',
+      status: 200,
+    });
+    await knex.destroy();
+  });
+
+  it('emits nothing in none mode', async () => {
+    const { app, auditor, knex } = await auditedApp('none');
+    await request(app)
+      .post('/boards')
+      .set('x-test-user', 'alice')
+      .send({ name: 'B' })
+      .expect(201);
+    expect(auditor.events).toHaveLength(0);
+    await knex.destroy();
+  });
+
+  it('resolves failed requests as failures', async () => {
+    const { app, auditor, knex } = await auditedApp('writes');
+    await request(app)
+      .post('/boards')
+      .set('x-test-user', 'alice')
+      .send({})
+      .expect(400);
+    expect(auditor.events[0]).toMatchObject({
+      eventId: 'write',
+      outcome: 'fail',
+      status: 400,
+    });
+    await knex.destroy();
+  });
+});

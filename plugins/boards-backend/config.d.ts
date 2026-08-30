@@ -1,6 +1,14 @@
 export interface Config {
   boards?: {
     /**
+     * Audit logging of the boards API through the core auditor
+     * service: `none` (default) emits nothing, `writes` audits every
+     * mutating request, `all` audits reads as well.
+     * @visibility backend
+     */
+    audit?: 'none' | 'writes' | 'all';
+
+    /**
      * Scheduled reminder notifications about board items.
      * @visibility backend
      */
