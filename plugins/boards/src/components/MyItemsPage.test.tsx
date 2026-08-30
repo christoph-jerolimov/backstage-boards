@@ -208,16 +208,17 @@ describe('MyItemsList', () => {
   it('shows and hides columns from the configure menu, stored for the listing', async () => {
     const { storage } = renderList();
     await screen.findByText('Ship the docs');
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Configure columns' }),
-    );
+    // each grouped table carries the menu in its actions column header;
+    // they all drive the same stored choice
+    const configureButton = () =>
+      screen.getAllByRole('button', { name: 'Configure columns' })[0];
+    expect(configureButton().closest('th')).not.toBeNull();
+    await userEvent.click(configureButton());
     await userEvent.click(screen.getByRole('menuitem', { name: 'Updated' }));
     expect(
       screen.getAllByRole('columnheader').map(cell => cell.textContent),
     ).toContain('Updated');
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Configure columns' }),
-    );
+    await userEvent.click(configureButton());
     await userEvent.click(screen.getByRole('menuitem', { name: '✓ Tags' }));
     expect(
       screen.getAllByRole('columnheader').map(cell => cell.textContent),

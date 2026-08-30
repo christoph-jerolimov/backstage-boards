@@ -179,6 +179,10 @@ describe('TableView', () => {
 
   it('shows and hides columns from the configure menu, stored per board', async () => {
     const { storage } = renderTable();
+    // the menu lives in the actions column header, not above the table
+    expect(
+      screen.getByRole('button', { name: 'Configure columns' }).closest('th'),
+    ).not.toBeNull();
     await userEvent.click(
       screen.getByRole('button', { name: 'Configure columns' }),
     );

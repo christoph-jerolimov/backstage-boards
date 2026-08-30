@@ -57,6 +57,8 @@ function ItemsTable(props: {
   onSortChange: (descriptor: ItemSortDescriptor) => void;
   /** Row selection; absent for readers, who get no checkbox column. */
   selection?: SelectionHandle;
+  /** The column show/hide menu, rendered in the actions column header. */
+  columnsMenu: React.ReactNode;
 }) {
   const {
     board,
@@ -67,6 +69,7 @@ function ItemsTable(props: {
     sort,
     onSortChange,
     selection,
+    columnsMenu,
   } = props;
   const columnOf = (columnId: string) =>
     board.columns.find(column => column.id === columnId);
@@ -160,6 +163,7 @@ function ItemsTable(props: {
         ))}
         <Column style={utilityColumnStyle}>
           <VisuallyHidden>Actions</VisuallyHidden>
+          <ActionsCellContent>{columnsMenu}</ActionsCellContent>
         </Column>
       </TableHeader>
       <TableBody>
@@ -242,14 +246,13 @@ export function TableView(props: {
   const visibleColumns = TABLE_COLUMNS.filter(column =>
     visible.has(column.id),
   ).filter(column => column.id !== 'priority' || showPriority);
+  // rendered inside each table's actions column header
   const columnsMenu = (
-    <Flex justify="end">
-      <ColumnsMenu
-        visible={visible}
-        onToggle={toggleColumn}
-        showPriority={showPriority}
-      />
-    </Flex>
+    <ColumnsMenu
+      visible={visible}
+      onToggle={toggleColumn}
+      showPriority={showPriority}
+    />
   );
 
   const groups =
@@ -386,7 +389,6 @@ export function TableView(props: {
         }
       `}</style>
       <Flex direction="column" gap="2">
-        {columnsMenu}
         {groups.map(group => (
           <Fragment key={group.key}>
             {groupBy !== 'none' && (
@@ -410,6 +412,7 @@ export function TableView(props: {
               sort={sort}
               onSortChange={setSort}
               selection={selection}
+              columnsMenu={columnsMenu}
             />
           </Fragment>
         ))}

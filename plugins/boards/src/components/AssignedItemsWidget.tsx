@@ -141,7 +141,9 @@ export function AssignedItemsContent(props: AssignedItemsContentProps) {
         {found => (
           <Flex direction="column" gap="3">
             {found.map(group => (
-              <Flex direction="column" gap="1" key={group.key}>
+              // `align="start"` keeps each row button at its content
+              // width — stretched, it would center the item across the card
+              <Flex direction="column" gap="1" align="start" key={group.key}>
                 <GroupHeading
                   group={group}
                   groupBy={groupBy}

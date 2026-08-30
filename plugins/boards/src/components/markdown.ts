@@ -3,10 +3,10 @@
  * never emitted; the renderer builds React elements from these tokens.
  *
  * Supported: **bold**, *italic* / _italic_, `inline code`, fenced code
- * blocks, [links](https://...), unordered/ordered lists, ATX headings,
- * GitHub pipe tables, paragraphs, and automatic linking of catalog entity
- * refs such as `system:default/example` or `user:christoph`. Refs with
- * the `text:` prefix are never linked.
+ * blocks, [links](https://...), bare `http(s)://` URLs, unordered/ordered
+ * lists, ATX headings, GitHub pipe tables, paragraphs, and automatic
+ * linking of catalog entity refs such as `system:default/example` or
+ * `user:christoph`. Refs with the `text:` prefix are never linked.
  */
 
 export type InlineToken =
@@ -51,26 +51,56 @@ function autolinkBareRefs(text: string): InlineToken[] {
   return tokens;
 }
 
+const BARE_URL_PATTERN = /https?:\/\/[^\s<>]+/g;
+
+// Characters that read as sentence punctuation after a URL rather than as
+// part of it.
+const TRAILING_URL_PUNCTUATION = /[.,;:!?)\]}'"]+$/;
+
+// Must run before the entity-ref scan: a URL such as
+// `https://host:8080/path` contains `host:8080/path`, which the entity
+// pattern would otherwise claim.
+function autolinkBareUrls(text: string): InlineToken[] {
+  const tokens: InlineToken[] = [];
+  let last = 0;
+  for (const match of text.matchAll(BARE_URL_PATTERN)) {
+    const url = match[0].replace(TRAILING_URL_PUNCTUATION, '');
+    if (match.index! > last) {
+      tokens.push(...autolinkBareRefs(text.slice(last, match.index)));
+    }
+    tokens.push({
+      type: 'link',
+      href: url,
+      children: [{ type: 'text', value: url }],
+    });
+    last = match.index! + url.length;
+  }
+  if (last < text.length) {
+    tokens.push(...autolinkBareRefs(text.slice(last)));
+  }
+  return tokens;
+}
+
 /**
- * Splits plain text into text tokens, @-mention links, and auto-linked
- * bare entity refs.
+ * Splits plain text into text tokens, @-mention links, auto-linked bare
+ * web URLs, and auto-linked bare entity refs.
  */
 export function autolinkEntities(text: string): InlineToken[] {
   const mentions = findMentions(text);
   if (mentions.length === 0) {
-    return autolinkBareRefs(text);
+    return autolinkBareUrls(text);
   }
   const tokens: InlineToken[] = [];
   let last = 0;
   for (const mention of mentions) {
     if (mention.start > last) {
-      tokens.push(...autolinkBareRefs(text.slice(last, mention.start)));
+      tokens.push(...autolinkBareUrls(text.slice(last, mention.start)));
     }
     tokens.push({ type: 'entity', entityRef: mention.entityRef });
     last = mention.end;
   }
   if (last < text.length) {
-    tokens.push(...autolinkBareRefs(text.slice(last)));
+    tokens.push(...autolinkBareUrls(text.slice(last)));
   }
   return tokens;
 }

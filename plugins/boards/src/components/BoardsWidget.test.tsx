@@ -56,12 +56,12 @@ describe('BoardsContent', () => {
     expect(
       await screen.findByRole('button', { name: 'Open board Roadmap' }),
     ).toBeInTheDocument();
-    // default scope "favorites", default showCounts off
+    // default scope "favorites", default showCounts on
     expect(boardsApi.listBoards).toHaveBeenCalledWith({
       favoritesOnly: true,
-      withCounts: false,
+      withCounts: true,
     });
-    expect(screen.queryByText(/Todo 3/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Todo 3/)).toBeInTheDocument();
   });
 
   it('shows a loading state while the boards are in flight', () => {
@@ -83,17 +83,18 @@ describe('BoardsContent', () => {
     ).toBeInTheDocument();
     expect(boardsApi.listBoards).toHaveBeenCalledWith({
       favoritesOnly: false,
-      withCounts: false,
+      withCounts: true,
     });
   });
 
-  it('requests counts only when the setting is on', async () => {
-    const { boardsApi } = renderWidget({ showCounts: true });
+  it('neither requests nor shows counts when the setting is off', async () => {
+    const { boardsApi } = renderWidget({ showCounts: false });
     await screen.findByRole('button', { name: 'Open board Roadmap' });
     expect(boardsApi.listBoards).toHaveBeenCalledWith({
       favoritesOnly: true,
-      withCounts: true,
+      withCounts: false,
     });
+    expect(screen.queryByText(/Todo 3/)).not.toBeInTheDocument();
   });
 
   it('shows a count per status, including a zero', async () => {

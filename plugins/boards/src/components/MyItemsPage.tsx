@@ -90,6 +90,8 @@ function MyItemsTable(props: {
   onError: (message?: string) => void;
   /** Opens the entry's detail drawer in place. */
   onOpenItem: (entry: MyBoardItem) => void;
+  /** The column show/hide menu, rendered in the actions column header. */
+  columnsMenu: React.ReactNode;
 }) {
   const {
     label,
@@ -101,6 +103,7 @@ function MyItemsTable(props: {
     visibleColumns,
     onError,
     onOpenItem,
+    columnsMenu,
   } = props;
   const navigate = useNavigate();
   const boardsApi = useApi(boardsApiRef);
@@ -223,6 +226,7 @@ function MyItemsTable(props: {
           ))}
           <Column style={utilityColumnStyle}>
             <VisuallyHidden>Actions</VisuallyHidden>
+            <ActionsCellContent>{columnsMenu}</ActionsCellContent>
           </Column>
         </TableHeader>
         <TableBody>
@@ -376,11 +380,6 @@ export function MyItemsList() {
           {/* every listed item is already the viewer's, so a single
               assignee would match every row */}
           <ItemFilterBar filter={filter} minAssigneeOptions={2} />
-          <ColumnsMenu
-            visible={visible}
-            onToggle={toggleColumn}
-            showPriority={showPriority}
-          />
           {/* the select grows into whatever the flex row leaves it */}
           <div style={{ width: 160, flexShrink: 0 }}>
             <Select
@@ -434,6 +433,13 @@ export function MyItemsList() {
                 visibleColumns={visibleColumns}
                 onError={setActionError}
                 onOpenItem={setOpenEntry}
+                columnsMenu={
+                  <ColumnsMenu
+                    visible={visible}
+                    onToggle={toggleColumn}
+                    showPriority={showPriority}
+                  />
+                }
               />
             </div>
           ))

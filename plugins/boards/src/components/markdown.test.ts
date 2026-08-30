@@ -71,9 +71,38 @@ describe('autolinkEntities', () => {
     ]);
   });
 
-  it('never links urls', () => {
-    expect(autolinkEntities('see https://example.com/a')).toEqual([
-      { type: 'text', value: 'see https://example.com/a' },
+  it('links bare urls', () => {
+    expect(autolinkEntities('see https://example.com/a for details')).toEqual([
+      { type: 'text', value: 'see ' },
+      {
+        type: 'link',
+        href: 'https://example.com/a',
+        children: [{ type: 'text', value: 'https://example.com/a' }],
+      },
+      { type: 'text', value: ' for details' },
+    ]);
+  });
+
+  it('keeps sentence punctuation out of a bare url', () => {
+    expect(autolinkEntities('read https://example.com/docs.')).toEqual([
+      { type: 'text', value: 'read ' },
+      {
+        type: 'link',
+        href: 'https://example.com/docs',
+        children: [{ type: 'text', value: 'https://example.com/docs' }],
+      },
+      { type: 'text', value: '.' },
+    ]);
+  });
+
+  it('does not read a url with a port as an entity ref', () => {
+    expect(autolinkEntities('at http://host:8080/path')).toEqual([
+      { type: 'text', value: 'at ' },
+      {
+        type: 'link',
+        href: 'http://host:8080/path',
+        children: [{ type: 'text', value: 'http://host:8080/path' }],
+      },
     ]);
   });
 });
@@ -110,6 +139,15 @@ describe('parseMarkdown', () => {
     expect(
       paragraphChildren(nonLink).some(token => token.type === 'link'),
     ).toBe(false);
+  });
+
+  it('keeps a url inside inline code as code', () => {
+    const [block] = parseMarkdown('run `https://example.com` locally');
+    expect(paragraphChildren(block)).toEqual([
+      { type: 'text', value: 'run ' },
+      { type: 'code', value: 'https://example.com' },
+      { type: 'text', value: ' locally' },
+    ]);
   });
 
   it('parses code blocks verbatim without linking', () => {

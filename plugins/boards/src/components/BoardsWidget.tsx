@@ -39,8 +39,10 @@ function BoardRow(props: {
   onOpen: (board: BoardListEntry) => void;
 }) {
   const { board, showCounts, onOpen } = props;
+  // `align="start"` keeps the row button at its content width — stretched,
+  // it would center the board name across the card
   return (
-    <Flex direction="column" gap="1">
+    <Flex direction="column" gap="1" align="start">
       <Button
         variant="tertiary"
         size="small"
@@ -65,7 +67,7 @@ function BoardRow(props: {
  * with the number of items per status.
  */
 export function BoardsContent(props: BoardsContentProps) {
-  const { scope = 'favorites', showCounts = false } = props;
+  const { scope = 'favorites', showCounts = true } = props;
   const navigate = useNavigate();
   const basePath = useBoardsBasePath();
 

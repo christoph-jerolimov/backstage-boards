@@ -139,7 +139,7 @@ const boardsWidget = HomePageWidgetBlueprint.make({
           showCounts: {
             title: 'Show the number of items per status',
             type: 'boolean',
-            default: false,
+            default: true,
           },
         },
       },
