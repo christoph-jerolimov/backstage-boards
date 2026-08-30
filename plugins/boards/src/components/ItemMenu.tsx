@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { Menu, MenuItem, SubmenuTrigger } from '@backstage/ui';
 import { useApi, identityApiRef } from '@backstage/frontend-plugin-api';
@@ -16,6 +17,7 @@ import { queryKeys } from '../queries';
 import { useProfiles } from './useProfiles';
 import type { ItemSubmenuKind } from './RowMenu';
 import { RefLabel } from './common';
+import { useBoardsBasePath } from '../routes';
 
 /**
  * The item mutations the item menu needs. Kept separate from the board
@@ -77,6 +79,28 @@ export function ItemMenu(props: {
     queryFn: () => identityApi.getBackstageIdentity(),
   });
   const meRef = identity?.userEntityRef;
+  const basePath = useBoardsBasePath();
+  const [linkCopied, setLinkCopied] = useState(false);
+  const copyPermalink = async () => {
+    const url = `${window.location.origin}${basePath}/${item.boardId}?item=${item.id}`;
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        // non-secure contexts (plain-HTTP dev): the legacy path
+        const field = document.createElement('textarea');
+        field.value = url;
+        document.body.appendChild(field);
+        field.select();
+        document.execCommand('copy');
+        field.remove();
+      }
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch {
+      // no confirmation is the only failure signal
+    }
+  };
   const pool = [...new Set(assigneePool)].filter(ref => ref !== meRef);
   // the same sorted ref list the cards already resolve, so this is served
   // from cache; until it is, entries read by their ref name
@@ -204,6 +228,9 @@ export function ItemMenu(props: {
           Open details
         </MenuItem>
       )}
+      <MenuItem onAction={copyPermalink}>
+        {linkCopied ? 'Link copied' : 'Copy link'}
+      </MenuItem>
       {extraItems}
       {!readonly && (
         <SubmenuTrigger>

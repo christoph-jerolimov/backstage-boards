@@ -44,6 +44,13 @@ bulk-actions bar are shared between the board and table views, so switching
 views keeps it. Each bulk change is recorded in every affected item's
 history like any other edit.
 
+## Permalinks
+
+Every item menu offers **Copy link**: the item's permalink — the board
+URL with `?item=<id>` — lands on the clipboard as an absolute URL.
+Opening it shows the board with that item's details drawer on top.
+Readers can copy links too.
+
 ## Deleting and restoring items
 
 Deleting an item archives it: it disappears from the board, table, and

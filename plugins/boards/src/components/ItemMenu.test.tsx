@@ -92,6 +92,7 @@ describe('ItemMenu', () => {
       screen.getAllByRole('menuitem').map(entry => entry.textContent),
     ).toEqual([
       'Open details',
+      'Copy link',
       'Move to column',
       'Due date',
       'Assignee',
@@ -103,14 +104,30 @@ describe('ItemMenu', () => {
     await openMenu({ showOpenDetails: false });
     expect(
       screen.getAllByRole('menuitem').map(entry => entry.textContent),
-    ).toEqual(['Move to column', 'Due date', 'Assignee', 'Delete item']);
+    ).toEqual([
+      'Copy link',
+      'Move to column',
+      'Due date',
+      'Assignee',
+      'Delete item',
+    ]);
   });
 
-  it('offers only Open details on read-only items', async () => {
+  it('offers only Open details and Copy link on read-only items', async () => {
     await openMenu({ readonly: true });
     expect(
       screen.getAllByRole('menuitem').map(entry => entry.textContent),
-    ).toEqual(['Open details']);
+    ).toEqual(['Open details', 'Copy link']);
+  });
+
+  it('copies the item permalink to the clipboard', async () => {
+    const writeText = jest.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    const { item } = await openMenu({ readonly: true });
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Copy link' }));
+    expect(writeText).toHaveBeenCalledWith(
+      `${window.location.origin}/boards/${item.boardId}?item=${item.id}`,
+    );
   });
 
   it('renders a surface\u2019s extra entries after Open details', async () => {
@@ -121,7 +138,7 @@ describe('ItemMenu', () => {
     });
     expect(
       screen.getAllByRole('menuitem').map(entry => entry.textContent),
-    ).toEqual(['Open details', 'Open board']);
+    ).toEqual(['Open details', 'Copy link', 'Open board']);
     await userEvent.click(screen.getByRole('menuitem', { name: 'Open board' }));
     expect(onAction).toHaveBeenCalled();
   });
@@ -233,6 +250,7 @@ describe('ItemMenu', () => {
         text =>
           ![
             'Open details',
+            'Copy link',
             'Move to column',
             'Due date',
             'Assignee',

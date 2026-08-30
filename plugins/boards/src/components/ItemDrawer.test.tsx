@@ -395,6 +395,7 @@ describe('ItemDrawer', () => {
     expect(
       (await screen.findAllByRole('menuitem')).map(entry => entry.textContent),
     ).toEqual([
+      'Copy link',
       'Move to column',
       'Due date',
       'Priority',
