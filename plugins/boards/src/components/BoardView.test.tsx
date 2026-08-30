@@ -313,6 +313,7 @@ describe('BoardView column menu', () => {
       'Insert column after',
       'Move right',
       'Color',
+      'WIP limits',
       'Delete column',
     ]);
   });
@@ -328,6 +329,7 @@ describe('BoardView column menu', () => {
       'Move left',
       'Move right',
       'Color',
+      'WIP limits',
       'Delete column',
     ]);
   });
@@ -747,5 +749,95 @@ describe('BoardView focus stability', () => {
     // the focus to the button and must then be left alone)
     fireEvent.click(screen.getByText('drop'));
     await waitFor(() => expect(card('Second')).toHaveFocus());
+  });
+});
+
+describe('BoardView WIP limits', () => {
+  const limited = [
+    testColumn({ id: 'column-1', title: 'Todo', position: 1000 }),
+    testColumn({
+      id: 'column-2',
+      title: 'Doing',
+      position: 2000,
+      wipSoftLimit: 1,
+      wipHardLimit: 2,
+    }),
+  ];
+  const doingFull = [
+    testItem({ id: 'item-1', title: 'One', columnId: 'column-1' }),
+    testItem({ id: 'item-2', title: 'Two', columnId: 'column-2' }),
+    testItem({
+      id: 'item-3',
+      title: 'Three',
+      columnId: 'column-2',
+      position: 2000,
+    }),
+  ];
+
+  it('shows the count against the limit and the ok state without one', () => {
+    renderBoard({
+      columns: limited,
+      items: [testItem({ id: 'item-1', title: 'One', columnId: 'column-2' })],
+    });
+    expect(screen.getByText('Todo (0)')).toBeInTheDocument();
+    expect(screen.getByText('Doing (1/2)')).toBeInTheDocument();
+  });
+
+  it('marks the soft state with a warning background', () => {
+    renderBoard({
+      columns: limited,
+      items: [testItem({ id: 'item-1', title: 'One', columnId: 'column-2' })],
+    });
+    // the wrapping header flex carries the warning background
+    expect(document.body.innerHTML.includes('--bui-bg-warning')).toBe(true);
+    expect(document.body.innerHTML.includes('--bui-bg-danger')).toBe(false);
+  });
+
+  it('marks the hard state, disables the add row, and disables move entries', async () => {
+    renderBoard({ columns: limited, items: doingFull });
+    expect(document.body.innerHTML.includes('--bui-bg-danger')).toBe(true);
+    // the full column's add row disables, the other stays usable
+    const addButtons = screen.getAllByRole('button', { name: 'Add item' });
+    expect(addButtons[0]).toBeEnabled();
+    expect(addButtons[1]).toBeDisabled();
+    // move entries into the full column disable in the item menu
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Actions for One' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'Move to column' }),
+    );
+    const entry = await screen.findByRole('menuitem', { name: 'Doing' });
+    expect(entry).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('saves limits from the WIP limits dialog', async () => {
+    const { actions } = renderBoard();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Actions for column Doing' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'WIP limits' }),
+    );
+    await userEvent.type(screen.getByLabelText('Soft limit'), '3');
+    await userEvent.type(screen.getByLabelText('Hard limit'), '5');
+    await userEvent.click(screen.getByRole('button', { name: 'Save limits' }));
+    expect(actions.setColumnWipLimits).toHaveBeenCalledWith('column-2', {
+      wipSoftLimit: 3,
+      wipHardLimit: 5,
+    });
+  });
+
+  it('keeps Save disabled while the limits are invalid', async () => {
+    renderBoard();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Actions for column Doing' }),
+    );
+    await userEvent.click(
+      await screen.findByRole('menuitem', { name: 'WIP limits' }),
+    );
+    await userEvent.type(screen.getByLabelText('Soft limit'), '5');
+    await userEvent.type(screen.getByLabelText('Hard limit'), '3');
+    expect(screen.getByRole('button', { name: 'Save limits' })).toBeDisabled();
   });
 });

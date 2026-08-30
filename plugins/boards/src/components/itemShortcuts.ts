@@ -24,6 +24,8 @@ export interface ItemShortcutContext {
   readonly: boolean;
   actions: ItemActions;
   selection?: SelectionHandle;
+  /** Columns at their hard WIP limit: Ctrl+Arrow will not enter them. */
+  fullColumnIds?: Set<string>;
   openMenu: (kind: ItemMenuRequest) => void;
   /** Runs before Delete archives, so the view can pick a focus successor. */
   onBeforeArchive?: () => void;
@@ -66,7 +68,7 @@ export function handleItemShortcut(
         column => column.id === item.columnId,
       );
       const target = index >= 0 ? ctx.columns[index + delta] : undefined;
-      if (target) {
+      if (target && !ctx.fullColumnIds?.has(target.id)) {
         // no position: the item lands at the end of the target column
         ctx.actions.moveItem(item.id, { columnId: target.id });
         ctx.onAfterMove?.();

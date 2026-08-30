@@ -323,6 +323,8 @@ export async function createRouter(
         title: req.body.title,
         position: req.body.position,
         color: req.body.color,
+        wipSoftLimit: req.body.wipSoftLimit,
+        wipHardLimit: req.body.wipHardLimit,
       }),
     );
   });
@@ -338,6 +340,8 @@ export async function createRouter(
           title: req.body.title,
           position: req.body.position,
           color: req.body.color,
+          wipSoftLimit: req.body.wipSoftLimit,
+          wipHardLimit: req.body.wipHardLimit,
         },
       ),
     );

@@ -38,6 +38,8 @@ export function ItemDrawer(props: {
   board: BoardWithContext;
   item: BoardItem;
   canWrite: boolean;
+  /** Columns at their hard WIP limit: status entries into them disable. */
+  fullColumnIds?: Set<string>;
   /** Tags used on the board, offered as suggestions when adding. */
   tagSuggestions?: string[];
   onClose: () => void;
@@ -196,6 +198,7 @@ export function ItemDrawer(props: {
                     readonly={readonly}
                     actions={itemActions}
                     assigneePool={pool}
+                    fullColumnIds={props.fullColumnIds}
                     showOpenDetails={false}
                   />
                 </RowActionsMenu>
@@ -223,6 +226,7 @@ export function ItemDrawer(props: {
                 columns={board.columns}
                 columnId={item.columnId}
                 readonly={readonly}
+                fullColumnIds={props.fullColumnIds}
                 onSelect={moveTo}
               />
               {board.priorities.length > 0 && (

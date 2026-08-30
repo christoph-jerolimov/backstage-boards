@@ -21,6 +21,30 @@ export interface BoardColumn {
   position: number;
   /** Named palette color (see COLUMN_COLORS); undefined = neutral. */
   color?: ColumnColor;
+  /** Item count that turns the column header to a warning. */
+  wipSoftLimit?: number;
+  /** Item count at which the column stops accepting items. */
+  wipHardLimit?: number;
+}
+
+/** How a column's item count relates to its WIP limits. */
+export type WipState = 'ok' | 'soft' | 'hard';
+
+/**
+ * Classifies a column's item count against its optional WIP limits.
+ * Both limits trigger once the count reaches them; hard wins.
+ */
+export function wipState(
+  column: Pick<BoardColumn, 'wipSoftLimit' | 'wipHardLimit'>,
+  count: number,
+): WipState {
+  if (column.wipHardLimit !== undefined && count >= column.wipHardLimit) {
+    return 'hard';
+  }
+  if (column.wipSoftLimit !== undefined && count >= column.wipSoftLimit) {
+    return 'soft';
+  }
+  return 'ok';
 }
 
 /** Every column colour, in palette order. */

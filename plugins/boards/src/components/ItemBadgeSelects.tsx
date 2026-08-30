@@ -75,6 +75,8 @@ export function StatusBadgeSelect(props: {
   columns: BoardColumn[];
   columnId: string;
   readonly: boolean;
+  /** Columns at their hard WIP limit: their entries disable. */
+  fullColumnIds?: Set<string>;
   onSelect: (columnId: string) => void;
 }) {
   const current = props.columns.find(column => column.id === props.columnId);
@@ -93,6 +95,10 @@ export function StatusBadgeSelect(props: {
         {props.columns.map(column => (
           <MenuItem
             key={column.id}
+            isDisabled={
+              column.id !== props.columnId &&
+              props.fullColumnIds?.has(column.id)
+            }
             onAction={() => {
               if (column.id !== props.columnId) {
                 props.onSelect(column.id);

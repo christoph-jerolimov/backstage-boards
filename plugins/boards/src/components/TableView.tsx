@@ -206,6 +206,8 @@ export function TableView(props: {
   openItem: (itemId: string) => void;
   /** The page's shared bulk selection; absent for readers. */
   selection?: SelectionHandle;
+  /** Columns at their hard WIP limit: move entries into them disable. */
+  fullColumnIds?: Set<string>;
 }) {
   const { board, items, canWrite, actions, groupBy, openItem, selection } =
     props;
@@ -218,6 +220,7 @@ export function TableView(props: {
         item={item}
         columns={board.columns}
         priorities={board.priorities}
+        fullColumnIds={props.fullColumnIds}
         readonly={!canWrite || !!item.externalManager}
         actions={actions}
         assigneePool={pool}
@@ -288,6 +291,7 @@ export function TableView(props: {
       readonly: !canWrite || !!item.externalManager,
       actions,
       selection,
+      fullColumnIds: props.fullColumnIds,
       openMenu: kind => {
         rowMenu.openForRow(item, target, kind === 'menu' ? undefined : kind);
       },

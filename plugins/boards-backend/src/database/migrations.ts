@@ -406,6 +406,22 @@ const itemChecklists: Migration = {
   },
 };
 
+const columnWipLimits: Migration = {
+  name: '20260830_01_column_wip_limits',
+  async up(knex) {
+    await knex.schema.alterTable('board_columns', table => {
+      table.integer('wip_soft_limit').nullable();
+      table.integer('wip_hard_limit').nullable();
+    });
+  },
+  async down(knex) {
+    await knex.schema.alterTable('board_columns', table => {
+      table.dropColumn('wip_soft_limit');
+      table.dropColumn('wip_hard_limit');
+    });
+  },
+};
+
 const migrations: Migration[] = [
   initial,
   itemDescriptions,
@@ -417,6 +433,7 @@ const migrations: Migration[] = [
   dropItemLabels,
   boardPriorities,
   itemChecklists,
+  columnWipLimits,
 ];
 
 export class BoardsMigrationSource implements Knex.MigrationSource<Migration> {

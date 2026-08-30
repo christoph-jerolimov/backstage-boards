@@ -100,7 +100,13 @@ export interface BoardsApi {
   updateColumn(
     boardId: string,
     columnId: string,
-    update: { title?: string; position?: number; color?: ColumnColor | null },
+    update: {
+      title?: string;
+      position?: number;
+      color?: ColumnColor | null;
+      wipSoftLimit?: number | null;
+      wipHardLimit?: number | null;
+    },
   ): Promise<BoardColumn>;
   deleteColumn(
     boardId: string,
@@ -383,7 +389,13 @@ export class BoardsClient implements BoardsApi {
   updateColumn(
     boardId: string,
     columnId: string,
-    update: { title?: string; position?: number; color?: ColumnColor | null },
+    update: {
+      title?: string;
+      position?: number;
+      color?: ColumnColor | null;
+      wipSoftLimit?: number | null;
+      wipHardLimit?: number | null;
+    },
   ): Promise<BoardColumn> {
     return this.request(
       'PATCH',
