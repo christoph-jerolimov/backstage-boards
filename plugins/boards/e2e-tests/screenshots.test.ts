@@ -5,6 +5,11 @@ import {
   type APIRequestContext,
   type Page,
 } from '@playwright/test';
+import { suppressDevServerOverlay } from './devServerOverlay';
+
+// dev-only error overlays (e.g. the browser's benign ResizeObserver
+// notice) would swallow clicks and never appear in the built app CI runs
+test.beforeEach(({ page }) => suppressDevServerOverlay(page));
 
 /*
  * Screenshots of every boards surface, in light and dark mode
