@@ -290,6 +290,54 @@ describe('createRouter', () => {
     ).toEqual(['Alices']);
   });
 
+  it('filters overdue items on GET /boards/:boardId/items?overdue=true', async () => {
+    const board = (
+      await request(app)
+        .post('/boards')
+        .set('x-test-user', 'alice')
+        .send({ name: 'B' })
+        .expect(201)
+    ).body;
+    const columnId = board.columns[0].id;
+    // due dates are only settable through update, so create then patch
+    const add = async (title: string, dueDate?: string) => {
+      const item = (
+        await request(app)
+          .post(`/boards/${board.id}/items`)
+          .set('x-test-user', 'alice')
+          .send({ columnId, title })
+          .expect(201)
+      ).body;
+      if (dueDate) {
+        await request(app)
+          .patch(`/boards/${board.id}/items/${item.id}`)
+          .set('x-test-user', 'alice')
+          .send({ dueDate })
+          .expect(200);
+      }
+    };
+    await add('Late', '2000-01-01');
+    await add('Ahead', '2999-12-31');
+    await add('Undated');
+
+    const titles = async (query: string) =>
+      (
+        await request(app)
+          .get(`/boards/${board.id}/items${query}`)
+          .set('x-test-user', 'alice')
+          .expect(200)
+      ).body.items
+        .map((item: any) => item.title)
+        .sort();
+
+    expect(await titles('?overdue=true')).toEqual(['Late']);
+    expect(await titles('?overdue=false')).toEqual([
+      'Ahead',
+      'Late',
+      'Undated',
+    ]);
+  });
+
   it('rejects board creation without a name', async () => {
     await request(app)
       .post('/boards')

@@ -1,3 +1,4 @@
+import { dueState } from './dates';
 import { BoardItem } from './types';
 
 /**
@@ -14,6 +15,8 @@ export interface ItemFilter {
   tags?: string[];
   assignees?: string[];
   priorities?: string[];
+  /** Keep only items whose due date lies before today. */
+  overdue?: boolean;
 }
 
 export function isEmptyFilter(filter: ItemFilter): boolean {
@@ -21,7 +24,8 @@ export function isEmptyFilter(filter: ItemFilter): boolean {
     !filter.text?.trim() &&
     !(filter.tags && filter.tags.length > 0) &&
     !(filter.assignees && filter.assignees.length > 0) &&
-    !(filter.priorities && filter.priorities.length > 0)
+    !(filter.priorities && filter.priorities.length > 0) &&
+    !filter.overdue
   );
 }
 
@@ -54,6 +58,12 @@ export function itemMatchesFilter(
   if (
     priorities.length > 0 &&
     !(item.priorityId && priorities.includes(item.priorityId))
+  ) {
+    return false;
+  }
+  if (
+    filter.overdue &&
+    !(item.dueDate && dueState(item.dueDate) === 'overdue')
   ) {
     return false;
   }

@@ -67,7 +67,9 @@ externally managed items and for read-only visitors.
 
 Both views share the filter bar: free-text search over titles and
 descriptions, a **Tags** filter, an **Assignees** filter, and — when the
-board defines priorities — a **Priority** filter. An item must match the
+board defines priorities — a **Priority** filter. Once any listed item
+is overdue, an **Overdue (n)** toggle appears with the live count and
+narrows the board to items due before today. An item must match the
 text, carry **all** selected tags, and be assigned to **any** selected
 assignee. Active filters are reflected in the item counts, and one click
 clears them all.

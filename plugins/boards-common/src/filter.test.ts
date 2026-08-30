@@ -1,3 +1,4 @@
+import { todayISO } from './dates';
 import { isEmptyFilter, itemMatchesFilter, normalizeTags } from './filter';
 import { BoardItem } from './types';
 
@@ -106,6 +107,20 @@ describe('itemMatchesFilter', () => {
         assignees: ['user:default/carol'],
       }),
     ).toBe(false);
+  });
+
+  it('matches only overdue items while the overdue flag is set', () => {
+    const overdueItem = { ...item, dueDate: '2000-01-01' };
+    const dueToday = { ...item, dueDate: todayISO() };
+    expect(itemMatchesFilter(overdueItem, { overdue: true })).toBe(true);
+    expect(itemMatchesFilter(dueToday, { overdue: true })).toBe(false);
+    expect(itemMatchesFilter(item, { overdue: true })).toBe(false);
+    expect(itemMatchesFilter(item, { overdue: false })).toBe(true);
+  });
+
+  it('counts the overdue flag as an active filter', () => {
+    expect(isEmptyFilter({ overdue: true })).toBe(false);
+    expect(isEmptyFilter({ overdue: false })).toBe(true);
   });
 });
 
