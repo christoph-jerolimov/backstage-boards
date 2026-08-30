@@ -32,4 +32,4 @@
 
 - [x] 6.1 Run the full checks — `yarn tsc`, `yarn lint:all`, `yarn prettier --check`, and the boards/boards-common/boards-backend test suites — and verify everything passes.
 - [x] 6.2 Sanity-check in the running app: edit a description and a comment with headings, a table, a code block, `#tag`, and an `@` autocompleted mention; confirm WYSIWYG shortcuts, the typeahead, saved markdown re-rendering identically, and mention links pointing at catalog pages.
-- [ ] 6.3 Regenerate the affected e2e screenshot baselines (light + dark) via `yarn test:e2e --update-snapshots` and verify the full e2e suite passes against them.
+- [x] 6.3 Regenerate the affected e2e screenshot baselines (light + dark) via `yarn test:e2e --update-snapshots` and verify the full e2e suite passes against them.
