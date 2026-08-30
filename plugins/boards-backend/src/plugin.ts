@@ -13,7 +13,7 @@ import {
 import { applyDatabaseMigrations } from './database/migrations';
 import { BoardsService } from './service/BoardsService';
 import { BoardsPermissionGuard } from './permissions';
-import { createRouter } from './router';
+import { ALL_AUDIT_MODES, createRouter } from './router';
 import { registerActions } from './actions';
 import { scheduleReminders } from './reminders';
 
@@ -42,6 +42,7 @@ export const boardsPlugin = createBackendPlugin({
         notifications: notificationService,
         signals: signalsServiceRef,
         actionsRegistry: actionsRegistryServiceRef,
+        auditor: coreServices.auditor,
       },
       async init({
         logger,
@@ -58,6 +59,7 @@ export const boardsPlugin = createBackendPlugin({
         notifications,
         signals,
         actionsRegistry,
+        auditor,
       }) {
         const knex = await database.getClient();
         await applyDatabaseMigrations(knex);
@@ -101,6 +103,16 @@ export const boardsPlugin = createBackendPlugin({
           auth,
         });
 
+        const auditValue = config.getOptionalString('boards.audit') ?? 'none';
+        const auditMode = ALL_AUDIT_MODES.find(mode => mode === auditValue);
+        if (!auditMode) {
+          throw new Error(
+            `Invalid boards.audit value '${auditValue}'; expected one of ${ALL_AUDIT_MODES.join(
+              ', ',
+            )}`,
+          );
+        }
+
         httpRouter.use(
           await createRouter({
             service,
@@ -109,6 +121,7 @@ export const boardsPlugin = createBackendPlugin({
             userInfo,
             logger,
             permissionGuard,
+            audit: { mode: auditMode, auditor },
           }),
         );
         // Unauthenticated requests must reach the router so that boards with

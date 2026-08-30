@@ -48,6 +48,12 @@ board-specific lives in `plugins/`.
   server-side from the recorded item history, with links to the
   assignee and priority matrices.
 
+### Operations
+
+- **Audit logging** — optional audit events for every write (or every
+  request) through Backstage's core auditor service, switched by
+  `boards.audit` in app-config.
+
 ### Items
 
 - **Kanban and table views** — two switchable views over the same items.
